@@ -1,0 +1,192 @@
+---
+title: "Tagma"
+subtitle: "A Structural Primitive Based on the Hangul Syllabic 3D Coordinate System"
+metadata-files:
+  - ./_include/author.yml
+  - ./_include/format.pdf.yml
+  - ./_include/format.html.yml
+format:
+  html: {}
+  pdf: {}
+---
+
+{{< include ./_include/_title_meta_items.qmd >}}
+
+```{python}
+#| include: false
+#| context: local
+%run ./_include/_graphviz.py
+```
+
+## Introduction
+
+Project Tagma defines a structural primitive for computing derived from the coordinate system embedded in Hangul syllables. The Unicode standard allocates a contiguous block of 11,172 complete Hangul syllables, each encoded as a fixed 16-bit value. Tagma treats these syllables not as linguistic units but as coordinates in a three-dimensional space defined by initial consonant, medial vowel, and final consonant.
+
+This coordinate space provides properties that distinguish it from existing encoding-based computing primitives: fixed 16-bit alignment without storage waste, structural validity verification at the hardware level, content-addressable identity based on the coordinate itself, and a unified representation space for memory addressing, instruction encoding, and state identification.
+
+Tagma is a component of the SSCCS framework. It does not replace or compete with existing encoding standards. It provides a hardware-near implementation of the coordinate identity concept that SSCCS defines at the abstract level.
+
+## The Problem with Existing Low-Level Primitives
+
+The ASCII character encoding, designed in 1963 for teleprinters and early data transmission, uses 7 bits per character and supports 128 distinct symbols. In practice, ASCII is stored in 8-bit bytes, leaving one unused bit per character. The Unicode standard extends this by defining encoding forms including UTF-8, which uses variable-length sequences ranging from one to four bytes per character.
+
+Variable-length encoding has architectural consequences that are independent of any particular implementation. Memory alignment is not guaranteed. Instruction decoding must detect boundary positions. Prefetch and pipeline efficiency are affected. Hardware-level structural validation cannot rely on fixed field decomposition. These are structural properties of variable-length design, not engineering limitations.
+
+| Encoding | Storage unit | Addressable symbols | Waste per unit | Fixed alignment | Structural HW check |
+|----------|-------------|-------------------|----------------|-----------------|---------------------|
+| ASCII | 1 byte (8 bits) | 128 of 256 | 1 bit (12.5%) | yes | no |
+| Latin-1 | 1 byte | 191 of 256 | variable | yes | no |
+| UTF-8 (English) | 1-4 bytes | unlimited | none for ASCII | no | no |
+| UTF-16 (BMP) | 2 bytes | 63,488 of 65,536 | 2,048 reserved | no | no |
+| UTF-32 | 4 bytes | unlimited | 75-88% for common use | yes | no |
+| **Tagma** | **2 bytes** | **11,172 of 65,536** | **none** | **yes** | **yes (54,364 invalid)** |
+
+The structural constraint in Tagma arises from the fixed formula by which Hangul syllables are composed. Of the 65,536 states representable in 16 bits, only 11,172 satisfy the composition rules. A hardware decoder can distinguish valid from invalid states using combinational logic derived from the Unicode composition formula. No lookup table, no software intervention, and no additional storage is required.
+
+## The Hangul Coordinate Space
+
+The Unicode standard defines a contiguous block of Hangul syllables from U+AC00 to U+D7AF, covering 11,172 complete syllables. Each syllable is encoded as a 16-bit value determined by a fixed formula:
+
+```text
+Hangul Syllable = 0xAC00 + (initial x 588) + (medial x 28) + final
+```
+
+where `initial` has 19 possible values, `medial` has 21, and `final` has 28 including null. This structure is a property of the Unicode standard derived from the linguistic structure of Hangul. The formula is fixed and publicly specified in ISO/IEC 10646.
+
+The 588 and 28 constants arise from the number of possible medial-final and final combinations, respectively. Every valid Hangul syllable has exactly one representation, and every 16-bit value in the block either maps to exactly one syllable or is invalid.
+
+The establishment of this coordinate space required sustained technical effort by Korean standards experts who demonstrated that Hangul is not a pictographic script requiring individual code points but a compositional system whose mathematical structure can be expressed as a closed-form formula. Their proposal was accepted and encoded in Unicode 2.0.
+
+### Bitfield Layout
+
+The 16-bit coordinate decomposes into three structural fields with one reserved bit:
+
+| Field | Bits | Possible values | Range |
+|-------|------|-----------------|-------|
+| Initial (choseong) | 5 | 19 | 0-18 |
+| Medial (jungseong) | 5 | 21 | 0-20 |
+| Final (jongseong) | 5 | 28 | 0-27 |
+| Reserved | 1 | -- | -- |
+
+### Why No Other Script Provides This
+
+The Hangul syllable block is structurally unique among Unicode scripts. It possesses all of the following properties simultaneously, which no other script does:
+
+**Fixed mathematical generation formula.** Every valid code point in the block is generated by a single closed-form expression. Other scripts with structural organization have irregular composition: Chinese character composition is not reliably decomposable into fixed-width fields, and Devanagari conjunct formation depends on context.
+
+**Complete coverage within 16 bits.** The 11,172 valid syllables occupy less than the full 65,536 state space, leaving excess states for structural invalidity detection.
+
+**Featural depth.** Hangul consonants derive from articulator shapes and vowels from heaven-earth-human triadic symbolism. The coordinate fields carry structural information, not just arbitrary index values. The same decomposition that a hardware decoder performs corresponds to a genuine featural property, not an encoding convenience. No other script combines featural derivation with a complete fixed-width composition space.
+
+| Script type | Fixed formula | Fixed width | Invalid margin | Public standard |
+|-------------|---------------|-------------|----------------|-----------------|
+| Latin | no | yes | no | yes |
+| Hanzi | no | yes | no | yes |
+| Arabic | no | no | no | yes |
+| Devanagari | partial | no | no | yes |
+| **Hangul** | **yes** | **yes (16 bits)** | **54,364 states** | **yes** |
+| Cherokee | no | yes | no | yes |
+
+Only Hangul satisfies all four criteria.
+
+## Architectural Mapping
+
+Tagma maps the SSCCS abstract primitives onto a 16-bit coordinate space.
+
+A complete Hangul syllable corresponds to a **Segment**: a 16-bit coordinate whose identity is determined by its structure. Two coordinates with identical field values always produce identical 16-bit values, making the coordinate its own identifier. No separate hashing or lookup table is needed.
+
+The composition rules defined by Hangul syllable formation correspond to the **Scheme**: the specification of which coordinates are valid and how field values relate. The Scheme defines the boundaries of the coordinate space.
+
+Syllable validity predicates (the range checks on the three fields) implement the **Field** at the hardware level. Given specific constraints on initial, medial, and final ranges, the Field selects which coordinates are admissible at the moment of observation.
+
+Coordinate enumeration under field constraints implements **Observation**. The set of admissible coordinates is the subset of valid syllables whose three field values fall within the constrained ranges. This set can be enumerated by iterating valid combinations of the three fields, corresponding to a three-level iteration at the software level or a decoder array at the hardware level.
+
+```{python}
+#| label: fig-mapping
+#| fig-cap: Tagma coordinate decomposition and SSCCS primitive mapping.
+dot("""
+digraph TagmaMapping {
+    rankdir=TB;
+    node [shape=box, style=rounded];
+    syllable [label="16-bit coordinate"];
+    decode [label="Decoder", shape=box, style=filled, fillcolor=lightyellow];
+    initial [label="Initial (5b)"];
+    medial [label="Medial (5b)"];
+    final [label="Final (5b)"];
+    scheme [label="Scheme\ncomposition rules", fillcolor=lightblue];
+    field [label="Field\nrange constraints", fillcolor=lightgreen];
+    segment [label="Segment\ncoordinate identity", fillcolor=lightcoral];
+    syllable -> decode;
+    decode -> initial -> segment;
+    decode -> medial;
+    decode -> final;
+    initial -> scheme; medial -> scheme; final -> scheme;
+    initial -> field; medial -> field; final -> field;
+}
+""")
+```
+
+## Memory and Instruction in a Unified Space
+
+In conventional von Neumann architecture, instruction memory and data memory are logically separated. The processor fetches instructions from one space and reads or writes data in another. This separation is reflected in cache hierarchies, bus architectures, and the fundamental operation of the fetch-decode-execute cycle.
+
+Tagma defines a unified 16-bit coordinate space where the binary representation of a coordinate serves simultaneously as a memory address, an instruction opcode, or a state identifier. The distinction between instruction and data is a matter of interpretation determined by the Field applied at the moment of observation, not by the coordinate's location in separate memory regions.
+
+The structural implications:
+
+**Elimination of distinct fetch cycles.** Fetching a coordinate is a single memory operation regardless of whether it will be interpreted as an instruction or as data. The interpretation is determined by the operational context, not by the memory operation type.
+
+**Program counter as coordinate.** The program counter is a 16-bit coordinate value. Advancing the program counter means transitioning to the next coordinate based on the current state and the transition topology defined by the Scheme.
+
+**Structural deduplication.** Because identical field compositions produce identical 16-bit values, a coordinate used as an opcode is structurally the same object as the same coordinate used as a data value. The identity is a property of the coordinate itself, not of its role in the current operation.
+
+## Hardware-Level Properties
+
+### Structural Transition as Operation
+
+In conventional silicon, computation is implemented through arithmetic logic units executing opcodes such as addition or subtraction. In a Tagma-based system, the fundamental operation shifts from arithmetic calculation to structural transition. A 16-bit coordinate is read and decomposed into its three constituent fields by combinational logic. Allowed transitions between these fields are defined by a configurable Scheme, making data manipulation an inherently structural process whose operation is the change of coordinate state itself.
+
+### Structural Error Trapping
+
+Because the valid coordinate space is constrained to 11,172 of 65,536 possible states, the system has a structural check for memory integrity that operates without additional hardware overhead. Any read or write operation that presents an invalid coordinate is detected by the decoder logic in the same clock cycle. This provides a baseline error-detection mechanism at the hardware level that is independent of external error-correcting codes.
+
+The mechanism works as follows: the decoder checks whether the 16-bit value falls within the Hangul block (U+AC00 to U+D7AF) and, if so, whether its field decomposition satisfies the composition formula. A value outside these bounds or failing the composition test is flagged in the same cycle.
+
+### Proximity-Based Search
+
+Search operations reduce to distance queries in the 16-bit coordinate space. The system computes Hamming or Euclidean distance across the three fields using hardware comparators. This supports associative search operations without hash tables, B-trees, or software-based index structures. The nearest structural state is identified through the comparator array rather than through sequential comparison.
+
+## The Public Standard Advantage
+
+Because the Hangul syllable block is defined in an open international standard, Tagma does not require any proprietary license, patent, or permission to implement. The composition formula is publicly documented in ISO/IEC 10646. The coordinate space is not owned by any corporation or institution.
+
+This is a structural requirement for a computing primitive. A computing foundation that depends on proprietary technology or closed standards cannot serve as a universal layer. ASCII is open. The Unicode standard is open. Tagma inherits this openness from its underlying standard.
+
+Implications:
+
+- No licensing barrier to hardware implementation
+- No patent encumbrance on the coordinate mechanism
+- Any foundry, design team, or research group can implement Tagma without legal restriction
+- The primitive can be taught, documented, and standardized through existing international processes
+
+## Application Domains
+
+The deterministic timing characteristics of fixed-length decoding make Tagma-based hardware suitable for real-time and safety-critical systems where execution time must be predictable. The low decoder complexity translates to reduced transistor count and power consumption, which is relevant for edge and embedded applications.
+
+The structural error trapping capability provides a baseline check applicable to systems operating in high-radiation environments, such as space hardware, where traditional error-correcting codes add significant overhead.
+
+The proximity-based search mechanism supports applications requiring pattern matching or nearest-neighbor lookup, including some classes of machine learning inference and sensor data processing, without requiring separate specialized hardware.
+
+The public-standard nature of the coordinate space makes Tagma suitable as a teaching and research platform for computer architecture, since the entire specification is contained in a single formula.
+
+## Limitations
+
+Tagma does not claim to replace existing encoding systems or provide universal performance advantages. The benefits of fixed-length encoding are well documented in RISC architectures; Tagma extends this principle to a 16-bit coordinate space with structural validation.
+
+Structural validation does not eliminate the need for other forms of error checking. It provides a baseline structural check. External error-correcting codes and redundancy mechanisms remain necessary for full error detection.
+
+Tagma relies on the Unicode standard for coordinate conversion. No new encoding is required. Existing libraries provide all necessary operations.
+
+## References
+
+Unicode Standard, Chapter 3: Conformance, Hangul Syllable Composition. ISO/IEC 10646: Information technology -- Universal Coded Character Set (UCS). SSCCS Foundation project documentation.
