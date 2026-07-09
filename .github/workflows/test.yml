@@ -1,0 +1,81 @@
+name: Test Suite
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - "poc/**"
+      - "docs/wp.qmd"
+      - "docs/wp.qmd"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "run.sh"
+      - ".github/workflows/test.yml"
+      - "!**/*.md"
+      - "!**/*.qmd"
+  pull_request:
+    paths:
+      - "poc/**"
+      - "Cargo.toml"
+      - "Cargo.lock"
+      - "run.sh"
+      - ".github/workflows/test.yml"
+      - "!**/*.md"
+      - "!**/*.qmd"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  poc:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy, rustfmt
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: |
+            poc/nex-tagma
+          cache-targets: true
+          cache-on-failure: true
+      - name: Build
+        working-directory: poc/nex-tagma
+        run: cargo build 2>&1
+      - name: Clippy
+        working-directory: poc/nex-tagma
+        run: cargo clippy -- -D warnings 2>&1
+      - name: Formatting check
+        working-directory: poc/nex-tagma
+        run: cargo fmt --check 2>&1
+      - name: Tests
+        working-directory: poc/nex-tagma
+        run: cargo test --tests 2>&1
+      - name: Benchmark
+        working-directory: poc/nex-tagma
+        run: cargo run -- bench 2>&1
+      - name: PoC suite
+        working-directory: poc
+        run: bash run.sh 2>&1
+
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: quarto-dev/quarto-actions/setup@v2
+        with:
+          tinytex: true
+      - name: Install Python dependencies
+        run: |
+          pip install jupyter matplotlib numpy 2>&1
+      - name: Render whitepaper
+        working-directory: docs
+        run: quarto render wp.qmd --to pdf 2>&1
+      - name: Render tagma-id
+        working-directory: docs
+        run: quarto render tagma-id.qmd --to pdf 2>&1
