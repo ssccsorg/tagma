@@ -476,6 +476,8 @@ Tagma is a 16-bit boundary, not a 16-bit limitation. It addresses a specific des
 
 Tagma defines a new type of silicon primitive: a combinational decoder that derives identity from structure at approximately 300 gates and one cycle. At this gate cost, content-addressable operation becomes viable where hash-based approaches are too expensive in power, area, or latency. The structural validity check embedded in every decode provides inherent error detection, relevant for radiation-tolerant computing in space environments. The coordinate space that enables this is Hangul — an open international standard and a public good. Tagma will be released as open-source silicon, inviting the next conversation: what else becomes possible when identity costs less than a single multiply.
 
+Remark. The Unicode Hangul syllable block is the only script in the international standard whose encoding follows a closed-form composition formula with three independent structural axes. This property, documented in the Hunminjeongeum Haerye of 1443, remained a linguistic and calligraphic feature for over five centuries until the emergence of content-addressable computing made it relevant as a hardware identity primitive. The six-century gap between design intent and technological application is unusual but not unprecedented in the history of science: the conic sections of Apollonius of Perga (circa 200 BCE) found their application in Keplerian orbits eighteen centuries later. Tagma does not claim that Hangul was designed for computing, only that its structural properties happen to solve a problem that computing currently solves with greater expense.
+
 ::: {.appendix}
 
 ## Appendices {.unnumbered}
@@ -514,48 +516,51 @@ Latency comparison for 100,000 identity generation operations on an Apple M1, si
 
 ```{python}
 #| label: fig-bench-latency
-#| fig-cap: "Identity generation latency comparison: Tagma coordinate composition vs SHA-256 hashing, 100,000 operations. Tagma completes in 198 us (2 ns/op); SHA-256 requires 23.7 ms (237 ns/op). Error bars show min/max over 10 runs."
+#| fig-cap: "Identity generation latency: Tagma vs SHA-256, 100k operations on Apple M1. Left: per-operation latency. Right: scaling with syllable count."
 import matplotlib.pyplot as plt
 import numpy as np
 
-categories = ['SHA-256', 'Tagma\nCoord']
-latency_ns = [237, 2]
-n_values = [1, 2, 3, 6]
-sha_total_ns = [237, 474, 711, 1422]
-tagma_total_ns = [2, 4, 6, 12]
+categories = ['SHA-256', 'Tagma\n1-syll', 'Tagma\n6-syll', 'Tagma\n19-syll']
+latency_ns = [227, 2, 11, 35]
+n_vals = [1, 2, 6, 19]
+tagma_ns = [2, 2, 11, 35]
+sha_line = [227, 227, 227, 227]
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
-bars = ax1.bar(categories, latency_ns, color=['#d95f02', '#1b9e77'], width=0.5)
+bars = ax1.bar(categories, latency_ns, color=['#d95f02', '#1b9e77', '#1b9e77', '#1b9e77'], width=0.6)
 ax1.set_ylabel('Latency per operation (ns)')
 ax1.set_yscale('log')
 for bar, val in zip(bars, latency_ns):
     ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.1,
-             f'{val} ns', ha='center', va='bottom', fontsize=9)
-ax1.text(0.5, 10, '120x', ha='center', va='center', fontsize=14,
-         fontweight='bold',
-         bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+             f'{val} ns', ha='center', va='bottom', fontsize=8)
+ax1.annotate('115x', xy=(0.3, 4), fontsize=13, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+ax1.annotate('6x', xy=(2.3, 25), fontsize=12, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+ax1.plot([0, 0, 3, 3], [90, 115, 115, 90], color='gray', linewidth=0.8)
 
-ax2.plot(n_values, sha_total_ns, 'o-', color='#d95f02', label='SHA-256')
-ax2.plot(n_values, tagma_total_ns, 's-', color='#1b9e77', label='Tagma')
+ax2.plot(n_vals, sha_line, 'o-', color='#d95f02', label='SHA-256 (all spaces)')
+ax2.plot(n_vals, tagma_ns, 's-', color='#1b9e77', label='Tagma')
 ax2.set_xlabel('Syllables (N)')
-ax2.set_ylabel('Total latency (ns)')
-ax2.set_xticks(n_values)
-ax2.set_xticklabels(['1', '2', '3', '6'])
+ax2.set_ylabel('Latency (ns)')
+ax2.set_xticks(n_vals)
 ax2.legend(fontsize='small')
 ax2.grid(axis='y', alpha=0.3)
+ax2.annotate('6x at\n2^256', xy=(19, 35), xytext=(10, 60),
+            arrowprops=dict(arrowstyle='->'), fontsize=9)
 
 plt.tight_layout()
 plt.show()
 ```
 
-| Metric | SHA-256 | Tagma (1 syllable) | Tagma (6 syllables) |
-|--------|---------|-------------------|--------------------|
-| Latency per op | 237 ns | 2 ns | 12 ns |
-| Identity size | 32 bytes | 2 bytes | 12 bytes |
-| Addressable space | unlimited ($2^{256}$) | $1.1 \times 10^4$ | $1.9 \times 10^{24}$ (UUID scale) |
-| Collision resistance | probabilistic ($2^{128}$) | deterministic zero | deterministic zero |
-| Multi-axis query | $O(K \times N)$ intersection | $O(1)$ direct | $O(1)$ direct |
+| Metric | SHA-256 | Tagma (1-syll) | Tagma (6-syll) | Tagma (19-syll) |
+|--------|---------|----------------|----------------|-----------------|
+| Latency per op | 227 ns | 2 ns | 11 ns | 35 ns |
+| Identity size | 32 bytes | 2 bytes | 12 bytes | 38 bytes |
+| Addressable space | $2^{256}$ | $1.12 \times 10^4$ | $1.94 \times 10^{24}$ | $2^{256}$ |
+| Collision | probabilistic ($2^{-128}$) | deterministic zero | deterministic zero | deterministic zero |
+| Multi-axis query | $O(K \times N)$ | $O(1)$ direct | $O(1)$ direct | $O(1)$ direct |
 
 ### N-Syllable Composition: From 16 Bits to UUID Scale
 
@@ -569,6 +574,7 @@ $$S(N) = 11,172^N \approx 10^{4.05N}$$
 | 2 | 6 | $1.25 \times 10^8$ | Database records |
 | 3 | 9 | $1.39 \times 10^{12}$ | Distributed nodes |
 | 6 | 18 | $1.94 \times 10^{24}$ | UUID (128-bit) space |
+| 19 | 57 | $1.94 \times 10^{77}$ | SHA-256 (256-bit) equivalent |
 
 Each syllable retains independent hardware-verifiable validity ($19 \times 21 \times 28 = 11,172$ gates per syllable). The N-tuple identity space is the Cartesian product of $N$ independent 3D spaces, yielding a $3N$-dimensional structural coordinate system.
 

@@ -15,7 +15,7 @@ metadata-files:
     - ./_include/format.html.yml
 colorlinks: true
 abstract: |
-  SHA-256 is the de facto standard for content-addressable identity generation across storage engines, distributed systems, and databases. This paper demonstrates that SHA-256 can be replaced by a structural coordinate composition derived from the Unicode Hangul syllable block, reducing identity generation latency by approximately 120x (from 237 ns to 2 ns per operation), eliminating collision handling entirely, and converting multi-axis index queries from O(K x N) intersection to O(1) direct coordinate extraction. The replacement is not cryptographic: preimage resistance, authentication, and encryption remain with SHA-256. Identity generation alone is replaced. A software proof of concept confirming these measurements over 100,000 operations on Apple M1 silicon is provided as open-source reference implementation.
+  SHA-256 is the de facto standard for content-addressable identity generation across storage engines, distributed systems, and databases. This paper demonstrates that SHA-256 can be replaced by a structural coordinate composition derived from the Unicode Hangul syllable block, reducing identity generation latency by approximately 115x (from 227 ns to 2 ns per operation), eliminating collision handling entirely, and converting multi-axis index queries from O(K x N) intersection to O(1) direct coordinate extraction. The replacement is not cryptographic: preimage resistance, authentication, and encryption remain with SHA-256. Identity generation alone is replaced. A software proof of concept confirming these measurements over 100k operations on Apple M1 silicon is provided as open-source reference implementation.
 format:
   html:
     number-sections: true
@@ -70,36 +70,40 @@ format:
 ```
 
 ```{python}
-#| label: fig-bench
-#| fig-cap: "Identity generation latency: Tagma coordinate composition vs SHA-256 hashing, 100,000 operations on Apple M1. Tagma: 2 ns/op, SHA-256: 237 ns/op. Right panel shows linear scaling with syllable count."
+#| label: fig-bench-latency
+#| fig-cap: "Identity generation latency: Tagma vs SHA-256, 100k operations on Apple M1. Left: per-operation latency. Right: scaling with syllable count."
 import matplotlib.pyplot as plt
 import numpy as np
 
-categories = ['SHA-256', 'Tagma\n1 syllable']
-latency_ns = [237, 2]
-n_vals = [1, 2, 3, 6]
-sha_ns = [237, 474, 711, 1422]
-tagma_ns = [2, 4, 6, 12]
+categories = ['SHA-256', 'Tagma\n1-syll', 'Tagma\n6-syll', 'Tagma\n19-syll']
+latency_ns = [227, 2, 11, 35]
+n_vals = [1, 2, 6, 19]
+tagma_ns = [2, 2, 11, 35]
+sha_line = [227, 227, 227, 227]
 
 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10, 4))
 
-bars = ax1.bar(categories, latency_ns, color=['#d95f02', '#1b9e77'], width=0.5)
+bars = ax1.bar(categories, latency_ns, color=['#d95f02', '#1b9e77', '#1b9e77', '#1b9e77'], width=0.6)
 ax1.set_ylabel('Latency per operation (ns)')
 ax1.set_yscale('log')
 for bar, val in zip(bars, latency_ns):
     ax1.text(bar.get_x() + bar.get_width()/2, bar.get_height() * 1.1,
-             f'{val} ns', ha='center', va='bottom', fontsize=9)
-ax1.text(0.5, 10, '120x', ha='center', va='center', fontsize=14,
-         fontweight='bold',
-         bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+             f'{val} ns', ha='center', va='bottom', fontsize=8)
+ax1.annotate('115x', xy=(0.3, 4), fontsize=13, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+ax1.annotate('6x', xy=(2.3, 25), fontsize=12, fontweight='bold',
+            bbox=dict(boxstyle='round,pad=0.3', facecolor='yellow', alpha=0.7))
+ax1.plot([0, 0, 3, 3], [90, 115, 115, 90], color='gray', linewidth=0.8)
 
-ax2.plot(n_vals, sha_ns, 'o-', color='#d95f02', label='SHA-256')
+ax2.plot(n_vals, sha_line, 'o-', color='#d95f02', label='SHA-256 (all spaces)')
 ax2.plot(n_vals, tagma_ns, 's-', color='#1b9e77', label='Tagma')
 ax2.set_xlabel('Syllables (N)')
-ax2.set_ylabel('Total latency (ns)')
+ax2.set_ylabel('Latency (ns)')
 ax2.set_xticks(n_vals)
 ax2.legend(fontsize='small')
 ax2.grid(axis='y', alpha=0.3)
+ax2.annotate('6x at\n2^256', xy=(19, 35), xytext=(10, 60),
+            arrowprops=dict(arrowstyle='->'), fontsize=9)
 
 plt.tight_layout()
 plt.show()
@@ -109,7 +113,7 @@ plt.show()
 
 Every content-addressable system in computing today generates identifiers through a hash function. Storage engines use SHA-256 of content as the record key. Distributed systems use hash-based identifiers for node membership. Databases maintain hash indexes for fast lookup. The approach is universal, and it carries a universal cost: approximately 10,000 gate equivalents and 64-75 cycles for each identifier generation in hardware; 200-300 nanoseconds per operation in software.
 
-This paper demonstrates that for the narrow task of identity generation -- creating a unique, deterministic identifier from structured data -- the hash function can be replaced by a closed-form coordinate composition that is 120x faster in software and approximately 30x cheaper in gates. The replacement is not cryptographic. Preimage resistance, authentication, encryption, and signature verification remain unchanged. Only identity generation is affected.
+This paper demonstrates that for the narrow task of identity generation -- creating a unique, deterministic identifier from structured data -- the hash function can be replaced by a closed-form coordinate composition that is 115x faster in software and approximately 30x cheaper in gates. The replacement is not cryptographic. Preimage resistance, authentication, encryption, and signature verification remain unchanged. Only identity generation is affected.
 
 The coordinate space that enables this replacement is the Unicode Hangul syllable block [@unicode-hangul-block]. Its closed-form composition formula provides a 16-bit deterministic mapping from three independent axes to a unique identifier, with zero collisions by construction. The same coordinate can be read as a 16-bit value by hardware, decomposed into its three axis values by software, or displayed as a single Hangul syllable for human inspection.
 
@@ -128,7 +132,7 @@ Despite this, every content-addressable system pays the full cost of both roles 
 |---------------|-------|
 | Gate equivalents | ~10,000 |
 | Latency (hardware) | 64-75 cycles |
-| Latency (software, Apple M1) | 237 ns per op |
+| Latency (software, Apple M1) | 227 ns per op |
 | Identifier size | 256 bits (32 bytes) |
 | Collision handling | probabilistic, requires resolution table |
 | Multi-axis query | requires separate index structures |
@@ -174,6 +178,9 @@ $$S(N) = 11,172^N \approx 10^{4.05N}$$
 | 2 | 6 | 1.25 x 10^8 | 4 | Database records |
 | 3 | 9 | 1.39 x 10^12 | 6 | Distributed nodes |
 | 6 | 18 | 1.94 x 10^24 | 12 | UUID (128-bit) space |
+| 19 | 57 | $1.9 \times 10^{77}$ | 38 | SHA-256 (256-bit) |
+
+The coordinate space grows exponentially with syllable count. At 6 syllables it matches the UUID (128-bit) space, and at 19 syllables it reaches the SHA-256 (256-bit) equivalent space.
 
 ## Index Elimination
 
@@ -187,23 +194,26 @@ $$S(N) = 11,172^N \approx 10^{4.05N}$$
 
 A software proof of concept [@nex-tagma] implements the Tagma coordinate in Rust, with 10 integration tests covering all 11,172 valid coordinates and all 54,364 invalid states.
 
-| Metric | SHA-256 | Tagma (1 syllable) | Tagma (6 syllables) |
-|--------|---------|-------------------|--------------------|
-| Latency per op | 237 ns | 2 ns | 12 ns |
-| Identifier size | 32 bytes | 2 bytes | 12 bytes |
-| Addressable space | 2^256 | 1.12 x 10^4 | 1.94 x 10^24 (UUID scale) |
-| Collision | probabilistic (2^128) | deterministic zero | deterministic zero |
-| Multi-axis query | O(K x N) intersection | O(1) direct | O(1) direct |
+| Metric | SHA-256 | Tagma (1-syll) | Tagma (6-syll) | Tagma (19-syll) |
+|--------|---------|----------------|----------------|-----------------|
+| Latency per op | 227 ns | 2 ns | 11 ns | 35 ns |
+| Identifier size | 32 bytes | 2 bytes | 12 bytes | 38 bytes |
+| Addressable space | $2^{256}$ | $1.12 \times 10^4$ | $1.94 \times 10^{24}$ | $2^{256}$ |
+| Collision | probabilistic ($2^{-128}$) | deterministic zero | deterministic zero | deterministic zero |
+| Multi-axis query | $O(K \times N)$ | $O(1)$ direct | $O(1)$ direct | $O(1)$ direct |
 
 ## Conclusion
 
-- 120x faster in software (2 ns vs 237 ns per operation)
+- 115x faster in software (2 ns vs 227 ns per operation)
+- 6x faster at equivalent address space (35 ns vs 227 ns for 2^256 space)
 - 30x cheaper in hardware (300 vs 10,000 gates)
 - Zero collision by construction
 - Structurally transparent (identity encodes its own axis values)
 - Hardware-verifiable (validity check in one cycle)
 
 The complete reference implementation is available [@nex-tagma].
+
+Remark. The Unicode Hangul syllable block is the only script in the international standard whose encoding follows a closed-form composition formula with three independent structural axes. This property, documented in the Hunminjeongeum Haerye of 1443, remained a linguistic feature for over five centuries until content-addressable computing made it relevant as a hardware identity primitive. The gap between design intent and technological application is not unprecedented: the conic sections of Apollonius of Perga found their application in Keplerian orbits eighteen centuries later. Tagma does not claim that Hangul was designed for computing, only that its structural properties solve a problem that computing currently solves with greater expense.
 
 ## References {.unnumbered .unlisted}
 
