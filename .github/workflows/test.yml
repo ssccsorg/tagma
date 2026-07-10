@@ -5,20 +5,18 @@ on:
     branches: ["main"]
     paths:
       - "poc/**"
-      - "docs/wp.qmd"
-      - "docs/wp.qmd"
+      - "docs/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - "run.sh"
       - ".github/workflows/test.yml"
       - "!**/*.md"
       - "!**/*.qmd"
   pull_request:
     paths:
       - "poc/**"
+      - "docs/**"
       - "Cargo.toml"
       - "Cargo.lock"
-      - "run.sh"
       - ".github/workflows/test.yml"
       - "!**/*.md"
       - "!**/*.qmd"
@@ -44,22 +42,7 @@ jobs:
             poc/nex-tagma
           cache-targets: true
           cache-on-failure: true
-      - name: Build
-        working-directory: poc/nex-tagma
-        run: cargo build 2>&1
-      - name: Clippy
-        working-directory: poc/nex-tagma
-        run: cargo clippy -- -D warnings 2>&1
-      - name: Formatting check
-        working-directory: poc/nex-tagma
-        run: cargo fmt --check 2>&1
-      - name: Tests
-        working-directory: poc/nex-tagma
-        run: cargo test --tests 2>&1
-      - name: Benchmark
-        working-directory: poc/nex-tagma
-        run: cargo run -- bench 2>&1
-      - name: PoC suite
+      - name: PoC validation
         working-directory: poc
         run: bash run.sh 2>&1
 

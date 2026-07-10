@@ -6,3 +6,6 @@ link-citations: true
 execute:   
   cache: true
   echo: false
+format:
+  pdf:
+    latex-engine: xelatex

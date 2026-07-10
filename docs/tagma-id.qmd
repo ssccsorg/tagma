@@ -177,10 +177,11 @@ $$S(N) = 11,172^N \approx 10^{4.05N}$$
 | 1 | 3 | 1.12 x 10^4 | 2 | Sensor tags |
 | 2 | 6 | 1.25 x 10^8 | 4 | Database records |
 | 3 | 9 | 1.39 x 10^12 | 6 | Distributed nodes |
-| 6 | 18 | 1.94 x 10^24 | 12 | UUID (128-bit) space |
+| 6 | 18 | $1.94 \times 10^{24}$ | 12 | Below UUID ($3.4 \times 10^{38}$) |
+| 10 | 30 | $2.69 \times 10^{40}$ | 20 | Exceeds UUID (128-bit) |
 | 19 | 57 | $1.9 \times 10^{77}$ | 38 | SHA-256 (256-bit) |
 
-The coordinate space grows exponentially with syllable count. At 6 syllables it matches the UUID (128-bit) space, and at 19 syllables it reaches the SHA-256 (256-bit) equivalent space.
+The coordinate space grows exponentially with syllable count. At 10 syllables it exceeds the UUID (128-bit) space, and at 19 syllables it reaches the SHA-256 (256-bit) equivalent space.
 
 ## Index Elimination
 
