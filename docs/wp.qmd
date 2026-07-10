@@ -1,6 +1,6 @@
 ---
 title: "Tagma"
-subtitle: "A Content‑Addressable Structural Primitive Defined by the Hangul Syllabic Space"
+subtitle: "Content‑Addressable Structural Primitive Defined by the Hangul Syllabic Space"
 date: 2026-07
 date-format: "MMMM, YYYY"
 version-prefix: tagma-wp-0.1
