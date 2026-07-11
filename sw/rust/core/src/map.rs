@@ -492,8 +492,8 @@ mod tests {
     use alloc::format;
     use alloc::string::String;
     use alloc::string::ToString;
-    use alloc::vec::Vec;
     use alloc::vec;
+    use alloc::vec::Vec;
 
     #[test]
     fn new_map_is_empty() {
@@ -1033,11 +1033,14 @@ mod tests {
         map.insert(TagmaCoord::new(7).unwrap(), "c");
         let keys: Vec<_> = map.keys().collect();
         // Keys come in coordinate order (3, 5, 7), not insertion order
-        assert_eq!(keys, vec![
-            TagmaCoord::new(3).unwrap(),
-            TagmaCoord::new(5).unwrap(),
-            TagmaCoord::new(7).unwrap(),
-        ]);
+        assert_eq!(
+            keys,
+            vec![
+                TagmaCoord::new(3).unwrap(),
+                TagmaCoord::new(5).unwrap(),
+                TagmaCoord::new(7).unwrap(),
+            ]
+        );
     }
 
     #[test]
@@ -1111,7 +1114,9 @@ mod tests {
         let c = TagmaCoord::new(0).unwrap();
         map.insert(c, "hello".to_string());
         assert_eq!(map.get(c).map(|s| s.as_str()), Some("hello"));
-        map.entry(c).and_modify(|s| s.push_str(" world")).or_insert_with(String::new);
+        map.entry(c)
+            .and_modify(|s| s.push_str(" world"))
+            .or_insert_with(String::new);
         assert_eq!(map.get(c).map(|s| s.as_str()), Some("hello world"));
     }
 
