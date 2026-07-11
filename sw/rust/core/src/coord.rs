@@ -45,7 +45,7 @@ impl TagmaCoord {
     const N_INIT: usize = 19;
     const N_MED: usize = 21;
     const N_FIN: usize = 28;
-    const STRIDE_MED: usize = Self::N_FIN;                // 28
+    const STRIDE_MED: usize = Self::N_FIN; // 28
     const STRIDE_INIT: usize = Self::N_MED * Self::N_FIN; // 588
 }
 
@@ -75,7 +75,9 @@ impl TagmaCoord {
         let m = medial as usize;
         let f = final_ as usize;
         if i < Self::N_INIT && m < Self::N_MED && f < Self::N_FIN {
-            Some(Self((i * Self::STRIDE_INIT + m * Self::STRIDE_MED + f) as u16))
+            Some(Self(
+                (i * Self::STRIDE_INIT + m * Self::STRIDE_MED + f) as u16,
+            ))
         } else {
             None
         }
@@ -168,16 +170,12 @@ impl TagmaCoord {
     pub const fn hamming_distance(self, other: Self) -> (u8, u8, u8) {
         let (ai, am, af) = self.to_axes();
         let (bi, bm, bf) = other.to_axes();
-        (
-            abs_diff(ai, bi),
-            abs_diff(am, bm),
-            abs_diff(af, bf),
-        )
+        (abs_diff(ai, bi), abs_diff(am, bm), abs_diff(af, bf))
     }
 }
 
 const fn abs_diff(a: u8, b: u8) -> u8 {
-    if a > b { a - b } else { b - a }
+    a.abs_diff(b)
 }
 
 // ---------------------------------------------------------------------------

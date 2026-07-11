@@ -1,3 +1,5 @@
+extern crate alloc;
+
 pub mod coord;
 pub mod map;
 
