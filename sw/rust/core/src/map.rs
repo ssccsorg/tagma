@@ -1,7 +1,6 @@
 use crate::coord::TagmaCoord;
 use alloc::boxed::Box;
 
-
 /// A collision-free, fixed-size, hash-less associative array indexed by
 /// [`TagmaCoord`].
 ///
@@ -20,7 +19,9 @@ impl<V> TagmaMap<V> {
     const N: usize = TagmaCoord::N_VALID;
 
     #[inline]
-    fn idx(coord: TagmaCoord) -> usize { coord.index() as usize }
+    fn idx(coord: TagmaCoord) -> usize {
+        coord.index() as usize
+    }
 
     #[inline]
     fn slot(&self, coord: TagmaCoord) -> &Option<V> {
@@ -34,15 +35,33 @@ impl<V> TagmaMap<V> {
 
     // -- query ------------------------------------------------------------
 
-    #[inline] pub fn len(&self) -> usize { self.len }
-    #[inline] pub fn is_empty(&self) -> bool { self.len == 0 }
-    #[inline] pub fn capacity() -> usize { Self::N }
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+    #[inline]
+    pub fn capacity() -> usize {
+        Self::N
+    }
 
     // -- lookup -----------------------------------------------------------
 
-    #[inline] pub fn get(&self, coord: TagmaCoord) -> Option<&V> { self.slot(coord).as_ref() }
-    #[inline] pub fn get_mut(&mut self, coord: TagmaCoord) -> Option<&mut V> { self.slot_mut(coord).as_mut() }
-    #[inline] pub fn contains_key(&self, coord: TagmaCoord) -> bool { self.slot(coord).is_some() }
+    #[inline]
+    pub fn get(&self, coord: TagmaCoord) -> Option<&V> {
+        self.slot(coord).as_ref()
+    }
+    #[inline]
+    pub fn get_mut(&mut self, coord: TagmaCoord) -> Option<&mut V> {
+        self.slot_mut(coord).as_mut()
+    }
+    #[inline]
+    pub fn contains_key(&self, coord: TagmaCoord) -> bool {
+        self.slot(coord).is_some()
+    }
 
     // -- mutation ---------------------------------------------------------
 
@@ -50,19 +69,25 @@ impl<V> TagmaMap<V> {
         let slot = self.slot_mut(coord);
         let old = slot.take();
         *slot = Some(value);
-        if old.is_none() { self.len += 1; }
+        if old.is_none() {
+            self.len += 1;
+        }
         old
     }
 
     pub fn remove(&mut self, coord: TagmaCoord) -> Option<V> {
         let slot = self.slot_mut(coord);
         let old = slot.take();
-        if old.is_some() { self.len -= 1; }
+        if old.is_some() {
+            self.len -= 1;
+        }
         old
     }
 
     pub fn clear(&mut self) {
-        for slot in self.slots.iter_mut() { *slot = None; }
+        for slot in self.slots.iter_mut() {
+            *slot = None;
+        }
         self.len = 0;
     }
 }
@@ -80,7 +105,10 @@ impl<V> TagmaMap<V> {
 }
 
 impl<V> Default for TagmaMap<V> {
-    #[inline] fn default() -> Self { Self::new() }
+    #[inline]
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -103,35 +131,65 @@ pub enum Entry<'a, V> {
 }
 
 pub struct OccupiedEntry<'a, V> {
-    map: &'a mut TagmaMap<V>,
-    coord: TagmaCoord,
+    pub(super) map: &'a mut TagmaMap<V>,
+    pub(super) coord: TagmaCoord,
 }
 
 impl<'a, V> OccupiedEntry<'a, V> {
-    pub fn key(&self) -> TagmaCoord { self.coord }
-    pub fn get(&self) -> &V { unsafe { self.map.get(self.coord).unwrap_unchecked() } }
-    pub fn get_mut(&mut self) -> &mut V { unsafe { self.map.get_mut(self.coord).unwrap_unchecked() } }
+    pub fn key(&self) -> TagmaCoord {
+        self.coord
+    }
 
+    /// Returns a reference to the stored value.
+    ///
+    /// # Safety
+    ///
+    /// `OccupiedEntry` guarantees the slot is occupied: the entry was created
+    /// only after `contains_key` returned `true`, and the mutable borrow on
+    /// the map prevents any concurrent removal.
+    pub fn get(&self) -> &V {
+        // SAFETY: the slot is verified occupied at entry creation.
+        unsafe { self.map.get(self.coord).unwrap_unchecked() }
+    }
+
+    /// Returns a mutable reference to the stored value.
+    pub fn get_mut(&mut self) -> &mut V {
+        // SAFETY: same occupancy invariant as `get`.
+        unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
+    }
+
+    /// Inserts a new value, returning the old one.
     pub fn insert(&mut self, value: V) -> V {
+        // SAFETY: same occupancy invariant.
         unsafe { self.map.insert(self.coord, value).unwrap_unchecked() }
     }
 
+    /// Removes and returns the value.
     pub fn remove_entry(self) -> V {
+        // SAFETY: same occupancy invariant.
         unsafe { self.map.remove(self.coord).unwrap_unchecked() }
     }
 }
 
 pub struct VacantEntry<'a, V> {
-    map: &'a mut TagmaMap<V>,
-    coord: TagmaCoord,
+    pub(super) map: &'a mut TagmaMap<V>,
+    pub(super) coord: TagmaCoord,
 }
 
 impl<'a, V> VacantEntry<'a, V> {
-    pub fn key(&self) -> TagmaCoord { self.coord }
-    pub fn into_key(self) -> TagmaCoord { self.coord }
+    pub fn key(&self) -> TagmaCoord {
+        self.coord
+    }
 
+    pub fn into_key(self) -> TagmaCoord {
+        self.coord
+    }
+
+    /// Inserts a value and returns a mutable reference to it.
     pub fn insert(self, value: V) -> &'a mut V {
-        self.map.insert(self.coord, value);
+        // Vacant → guaranteed no old value to discard.
+        let _ = self.map.insert(self.coord, value);
+        // SAFETY: we just inserted the value above.
         unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
     }
 }
@@ -144,7 +202,9 @@ impl<'a, V> Entry<'a, V> {
         }
     }
 
-    pub fn or_insert(self, default: V) -> &'a mut V { self.or_insert_with(|| default) }
+    pub fn or_insert(self, default: V) -> &'a mut V {
+        self.or_insert_with(|| default)
+    }
 
     pub fn or_insert_with<F: FnOnce() -> V>(self, f: F) -> &'a mut V {
         match self {
@@ -280,6 +340,8 @@ impl<'a, V> Drop for Drain<'a, V> {
                 *self.map_len -= 1;
             }
         }
+        // After draining all remaining entries, the map must be empty.
+        debug_assert_eq!(*self.map_len, 0);
     }
 }
 
@@ -288,8 +350,18 @@ impl<'a, V> Drop for Drain<'a, V> {
 // ---------------------------------------------------------------------------
 
 impl<V> TagmaMap<V> {
-    pub fn iter(&self) -> Iter<'_, V> { Iter { slots: self.slots.iter(), idx: 0 } }
-    pub fn iter_mut(&mut self) -> IterMut<'_, V> { IterMut { slots: self.slots.iter_mut(), idx: 0 } }
+    pub fn iter(&self) -> Iter<'_, V> {
+        Iter {
+            slots: self.slots.iter(),
+            idx: 0,
+        }
+    }
+    pub fn iter_mut(&mut self) -> IterMut<'_, V> {
+        IterMut {
+            slots: self.slots.iter_mut(),
+            idx: 0,
+        }
+    }
 
     pub fn keys(&self) -> impl Iterator<Item = TagmaCoord> + '_ {
         self.iter().map(|(k, _)| k)
@@ -304,7 +376,11 @@ impl<V> TagmaMap<V> {
     }
 
     pub fn drain(&mut self) -> Drain<'_, V> {
-        Drain { slots: self.slots.iter_mut(), map_len: &mut self.len, idx: 0 }
+        Drain {
+            slots: self.slots.iter_mut(),
+            map_len: &mut self.len,
+            idx: 0,
+        }
     }
 
     pub fn retain<F: FnMut(TagmaCoord, &mut V) -> bool>(&mut self, mut f: F) {
@@ -329,7 +405,9 @@ impl<V> TagmaMap<V> {
 impl<V> FromIterator<(TagmaCoord, V)> for TagmaMap<V> {
     fn from_iter<I: IntoIterator<Item = (TagmaCoord, V)>>(iter: I) -> Self {
         let mut map = Self::new();
-        for (coord, value) in iter { map.insert(coord, value); }
+        for (coord, value) in iter {
+            map.insert(coord, value);
+        }
         map
     }
 }
@@ -344,7 +422,10 @@ impl<V> IntoIterator for TagmaMap<V> {
 
     fn into_iter(self) -> IntoIter<V> {
         let vec: alloc::vec::Vec<Option<V>> = self.slots.into_vec();
-        IntoIter { slots: vec.into_iter(), idx: 0 }
+        IntoIter {
+            slots: vec.into_iter(),
+            idx: 0,
+        }
     }
 }
 
@@ -352,14 +433,18 @@ impl<'a, V> IntoIterator for &'a TagmaMap<V> {
     type Item = (TagmaCoord, &'a V);
     type IntoIter = Iter<'a, V>;
 
-    fn into_iter(self) -> Iter<'a, V> { self.iter() }
+    fn into_iter(self) -> Iter<'a, V> {
+        self.iter()
+    }
 }
 
 impl<'a, V> IntoIterator for &'a mut TagmaMap<V> {
     type Item = (TagmaCoord, &'a mut V);
     type IntoIter = IterMut<'a, V>;
 
-    fn into_iter(self) -> IterMut<'a, V> { self.iter_mut() }
+    fn into_iter(self) -> IterMut<'a, V> {
+        self.iter_mut()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -376,7 +461,8 @@ impl<V> core::ops::Index<TagmaCoord> for TagmaMap<V> {
 
 impl<V> core::ops::IndexMut<TagmaCoord> for TagmaMap<V> {
     fn index_mut(&mut self, coord: TagmaCoord) -> &mut V {
-        self.get_mut(coord).expect("TagmaMap::index_mut: key not present")
+        self.get_mut(coord)
+            .expect("TagmaMap::index_mut: key not present")
     }
 }
 
@@ -492,7 +578,9 @@ mod tests {
         let mut map = TagmaMap::new();
         let c = TagmaCoord::new(5).unwrap();
         map.insert(c, 1);
-        for (_, v) in map.iter_mut() { *v += 1; }
+        for (_, v) in map.iter_mut() {
+            *v += 1;
+        }
         assert_eq!(map.get(c), Some(&2));
     }
 
@@ -521,7 +609,9 @@ mod tests {
         let mut map = TagmaMap::new();
         let c = TagmaCoord::new(7).unwrap();
         map.insert(c, 99);
-        for (_, v) in &mut map { *v = 0; }
+        for (_, v) in &mut map {
+            *v = 0;
+        }
         assert_eq!(map.get(c), Some(&0));
     }
 
@@ -547,7 +637,9 @@ mod tests {
     #[test]
     fn retain() {
         let mut map = TagmaMap::new();
-        for i in 0..10u16 { map.insert(TagmaCoord::new(i).unwrap(), i); }
+        for i in 0..10u16 {
+            map.insert(TagmaCoord::new(i).unwrap(), i);
+        }
         map.retain(|_, v| *v % 2 == 0);
         assert_eq!(map.len(), 5);
         for i in 0..10u16 {
@@ -559,7 +651,8 @@ mod tests {
     #[test]
     fn from_iterator() {
         let coords: Vec<_> = (0..5u16)
-            .map(|i| (TagmaCoord::new(i).unwrap(), i * 10)).collect();
+            .map(|i| (TagmaCoord::new(i).unwrap(), i * 10))
+            .collect();
         let map: TagmaMap<u16> = coords.into_iter().collect();
         assert_eq!(map.len(), 5);
         assert_eq!(map.get(TagmaCoord::new(3).unwrap()), Some(&30));
@@ -598,7 +691,9 @@ mod tests {
         let c = TagmaCoord::new(42).unwrap();
         if let Entry::Vacant(e) = map.entry(c) {
             e.insert("hello");
-        } else { panic!("should be vacant"); }
+        } else {
+            panic!("should be vacant");
+        }
         assert_eq!(map.get(c), Some(&"hello"));
     }
 
@@ -609,7 +704,9 @@ mod tests {
         map.insert(c, "x");
         if let Entry::Occupied(e) = map.entry(c) {
             assert_eq!(e.remove_entry(), "x");
-        } else { panic!("should be occupied"); }
+        } else {
+            panic!("should be occupied");
+        }
         assert!(!map.contains_key(c));
     }
 

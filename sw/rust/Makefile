@@ -1,10 +1,16 @@
-.PHONY: build test lint fmt check clean doc
+.PHONY: build test lint fmt check clean doc bench bench-fast
 
 build:
 	cargo build --release
 
 test:
 	cargo test --release
+
+bench:
+	cargo bench --release
+
+bench-fast:
+	cargo bench --release -- stress  # 500k mixed ops only
 
 lint:
 	cargo clippy --all-targets -- -D warnings

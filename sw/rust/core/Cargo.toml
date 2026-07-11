@@ -6,3 +6,11 @@ license = "Apache-2.0"
 description = "Tagma: content-addressable structural primitive — TagmaCoord, TagmaMap, TagmaSet, TimeIndex"
 
 [dependencies]
+
+[dev-dependencies]
+criterion = { version = "0.5", features = [] }
+rand = "0.8"
+
+[[bench]]
+name = "bench"
+harness = false
