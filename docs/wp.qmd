@@ -3,7 +3,7 @@ title: "Tagma"
 subtitle: "Content‑Addressable Structural Primitive Defined by the Hangul Syllabic Space"
 date: 2026-07
 date-format: "MMMM, YYYY"
-version-prefix: tagma-wp-0.1
+version-prefix: tagma-wp-1.0
 version-mark: true
 bibliography: ./_include/reference.bib
 csl: ./_include/ieee.csl
@@ -71,7 +71,7 @@ format:
 
 ## Introduction
 
-Tagma is a structural identity primitive: the realization that **a contiguous 16-bit Unicode block allocated to a three-axis writing system** provides a collision-free, hash-less[*-@sec-paradigm-shift*], structurally addressable coordinate space[*-@sec-hangul-space*] for computing.
+Tagma[^tagma] is a structural identity primitive: the realization that **a contiguous 16-bit Unicode block allocated to a three-axis writing system** provides a collision-free, hash-less[*-@sec-paradigm-shift*], structurally addressable coordinate space[*-@sec-hangul-space*] for computing.
 
 Computing standards are language-neutral and culture-neutral universal assets. Arabic numerals (0--9) belong to no single nation yet underpin every numerical operation in every instruction set. Unicode follows the same principle: it is an international standard that assigns each script a fixed address in a shared encoding space, treating all writing systems equally. Within this shared space, the Hangul syllable block (U+AC00--U+D7AF) occupies a contiguous 16-bit segment whose closed-form composition formula embeds three independent structural axes into every code point --- a mathematical property absent from every other script on the Basic Multilingual Plane. This property elevates a cultural asset into a general-purpose computing primitive.
 
@@ -83,6 +83,8 @@ Any 16-bit value in this space is simultaneously a 1-D address (Unicode code poi
 |--------|---------------|------|------------------|
 | **Hangul** | Sejong the Great & the Hall of Worthies | 1443 | A featural writing system with a complete, **exception-free three-axis** combinatorial structure |
 | **Unicode** | Unicode Consortium | 1996 | A **contiguous** 16-bit address space (U+AC00-U+D7AF) allocated to all modern Hangul syllables |
+
+[^tagma]: Pre-release (Apache 2.0) repository: <https://github.com/ssccsorg/tagma>, containing foundational libraries and proof-of-concept implementations.
 
 ## The Hangul Coordinate Space {#sec-hangul-space}
 
@@ -791,5 +793,3 @@ SHA-256 provides the content fingerprint; Tagma makes that fingerprint readable.
 
 ::: {#refs}
 :::
-
-{{< include ./_include/_license.md >}}
