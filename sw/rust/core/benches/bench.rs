@@ -340,6 +340,58 @@ fn bench_std_drain_all(c: &mut Criterion) {
 }
 
 // ===========================================================================
+// Single-operation microbenchmarks (isolated, no loop overhead)
+// ===========================================================================
+
+fn bench_tagma_get_single(c: &mut Criterion) {
+    let coord = tagma_core::TagmaCoord::new(5000).unwrap();
+    let mut map = tagma_core::TagmaMap::new();
+    map.insert(coord, 42u64);
+    let map = map; // freeze
+
+    c.bench_function("TagmaMap/get/single", |b| {
+        b.iter(|| {
+            black_box(black_box(&map).get(black_box(coord)));
+        })
+    });
+}
+
+fn bench_std_get_single(c: &mut Criterion) {
+    use std::collections::HashMap;
+    let coord = tagma_core::TagmaCoord::new(5000).unwrap();
+    let mut map = HashMap::new();
+    map.insert(coord, 42u64);
+    let map = map;
+
+    c.bench_function("HashMap/get/single", |b| {
+        b.iter(|| {
+            black_box(black_box(&map).get(black_box(&coord)));
+        })
+    });
+}
+
+fn bench_tagma_insert_single(c: &mut Criterion) {
+    let coord = tagma_core::TagmaCoord::new(5000).unwrap();
+    c.bench_function("TagmaMap/insert/single", |b| {
+        b.iter(|| {
+            let mut map = tagma_core::TagmaMap::new();
+            black_box(map.insert(black_box(coord), 42u64));
+        })
+    });
+}
+
+fn bench_std_insert_single(c: &mut Criterion) {
+    use std::collections::HashMap;
+    let coord = tagma_core::TagmaCoord::new(5000).unwrap();
+    c.bench_function("HashMap/insert/single", |b| {
+        b.iter(|| {
+            let mut map = HashMap::new();
+            black_box(map.insert(black_box(coord), 42u64));
+        })
+    });
+}
+
+// ===========================================================================
 // Stress test: 500,000 mixed operations on each map type
 // ===========================================================================
 
@@ -446,9 +498,15 @@ criterion_group!(
               bench_baseline_iterate
 );
 criterion_group!(
+    name = micro;
+    config = Criterion::default().sample_size(1000).measurement_time(std::time::Duration::from_secs(6));
+    targets = bench_tagma_get_single, bench_std_get_single,
+              bench_tagma_insert_single, bench_std_insert_single
+);
+criterion_group!(
     name = stress;
     config = Criterion::default().sample_size(30).measurement_time(std::time::Duration::from_secs(30));
     targets = bench_tagma_mixed_500k, bench_std_mixed_500k
 );
 
-criterion_main!(inserts, lookup, mutate, iterate, stress);
+criterion_main!(inserts, lookup, mutate, iterate, micro, stress);

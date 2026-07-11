@@ -19,6 +19,8 @@
 /// ```text
 /// C(i, m, f) = 0xAC00 + 588·i + 28·m + f
 /// ```
+use alloc::string::{String, ToString};
+
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 pub struct TagmaCoord(u16);
 
