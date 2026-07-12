@@ -100,9 +100,9 @@ Every valid 16-bit value carries **three simultaneous interpretations**: a 1-D U
 
 | Field | Bits | Values | Range |
 |-------|------|--------|-------|
-| Initial (choseong) | 5 | 19 | 0-18 |
-| Medial (jungseong) | 5 | 21 | 0-20 |
-| Final (jongseong) | 5 | 28 | 0-27 |
+| Initial (choseong 초성) | 5 | 19 | 0-18 |
+| Medial (jungseong 중성) | 5 | 21 | 0-20 |
+| Final (jongseong 종성) | 5 | 28 | 0-27 |
 | Reserved | 1 | -- | -- |
 
 :::
