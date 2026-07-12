@@ -102,10 +102,12 @@ Every valid 16-bit value carries **three simultaneous interpretations**: a 1-D U
 | Field | R | I | I | I | I | I | M | M | M | M | M | F | F | F | F | F |
 | Count | 1 | 19 | 19 | 19 | 19 | 19 | 21 | 21 | 21 | 21 | 21 | 28 | 28 | 28 | 28 | 28 |
 
-R = Reserved (1 bit, bit 15, reads as 0)  
-I = Initial / choseong (5 bits, 0--18)  
-M = Medial / jungseong (5 bits, 0--20)  
-F = Final / jongseong (5 bits, 0--27)
+| Field | Bits | Values | Range |
+|-------|------|--------|-------|
+| Initial (choseong) | 5 | 19 | 0-18 |
+| Medial (jungseong) | 5 | 21 | 0-20 |
+| Final (jongseong) | 5 | 28 | 0-27 |
+| Reserved | 1 | -- | -- |
 
 ```{python}
 #| include: false
@@ -136,6 +138,10 @@ def box_edges(x0, y0, z0, x1, y1, z1):
 full_edges  = box_edges(-1, -1, -1, 32, 32, 32)
 valid_edges = box_edges(-0.5, -0.5, -0.5, 18.5, 20.5, 27.5)
 ```
+
+::: {.columns}
+
+::: {.column width="67%"}
 
 ```{python}
 #| label: fig-3d-decode
@@ -216,7 +222,9 @@ plt.tight_layout()
 plt.show()
 ```
 
-One value, three uses. Only Hangul satisfies all four conditions required for the Tagma primitive: a fixed closed-form composition formula, complete fixed-width 16-bit representation, a structural invalidity margin, and an open international standard. The coordinate space extends to N syllables via the Cartesian product. Each syllable multiplies the addressable space by 11,172. A linear array over N syllables is indexed by flattening the N-dimensional coordinate using row-major order. Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system.
+:::
+
+::: {.column width="33%"}
 
 ```{python}
 #| label: fig-hangul-axes
@@ -236,12 +244,13 @@ digraph HangulAxes {
 """)
 ```
 
-| Field | Bits | Values | Range |
-|-------|------|--------|-------|
-| Initial (choseong) | 5 | 19 | 0-18 |
-| Medial (jungseong) | 5 | 21 | 0-20 |
-| Final (jongseong) | 5 | 28 | 0-27 |
-| Reserved | 1 | -- | -- |
+:::
+
+:::
+
+One value, three uses. Only Hangul satisfies all four conditions required for the Tagma primitive: a fixed closed-form composition formula, complete fixed-width 16-bit representation, a structural invalidity margin, and an open international standard. The coordinate space extends to N syllables via the Cartesian product. Each syllable multiplies the addressable space by 11,172. A linear array over N syllables is indexed by flattening the N-dimensional coordinate using row-major order. Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system.
+
+
 
 ## Philosophical Grounding
 
