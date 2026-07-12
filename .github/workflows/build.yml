@@ -1,4 +1,4 @@
-name: Build tagma-core
+name: CI — fmt → clippy → build → test
 
 on:
   push:

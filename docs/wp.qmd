@@ -684,7 +684,7 @@ No special characters, no padding, no escaping.
 
 ### Benchmark: Tagma vs SHA-256
 
-Latency comparison for 100,000 identity generation operations on an Apple M1 (Firestorm performance core, ~3.2 GHz, 128 KB L1 data cache, 12 MB L2 cache), single-threaded, compiled with `rustc` 1.84.0 in release mode (`-C opt-level=3 -C target-cpu=apple-m1`). Both operations use identical input data; the compiler is prevented from eliminating dead code through `std::hint::black_box`.
+Latency comparison for 100,000 identity generation operations on an Apple M1 (Firestorm performance core, ~3.2 GHz, 128 KB L1 data cache, 12 MB L2 cache), single-threaded, compiled with `rustc` 1.84.0 in release mode (`-C opt-level=3 -C target-cpu=apple-m1`). Both operations use identical input data; the compiler is prevented from eliminating dead code through `std::hint::black_box`. Full benchmark source: [github.com/ssccsorg/tagma/blob/main/sw/rust/benches/bench.rs](https://github.com/ssccsorg/tagma/blob/main/sw/rust/benches).
 
 ```{python}
 #| label: fig-bench-latency
