@@ -493,13 +493,9 @@ digraph TagmaPosition {
 """)
 ```
 
-Tagma positioning relative to existing identity and addressing infrastructure. SHA-256 provides cryptographic integrity; UUID provides decentralized generation; HashMap provides key-value lookup.
+Existing addressing paradigms each optimize a different axis: pointers minimize generation cost (zero) but provide no content-addressability; hash functions maximize identifier space at the cost of indirection; CAM cells offer full associativity at a transistor premium. Tagma occupies a fourth category — structural addressing — where identifier, address, and structure converge into a single 16-bit value decodable at the gate level.
 
-**Hash-based lookup.** Tagma replaces the entire hash pipeline with a combinational decoder. The trade-off is identifier count versus gate, cycle, and storage cost.
-
-**Linear memory.** Pointer-based addressing has zero generation cost and no collision, but provides no content-addressability. Tagma would provide content-addressability at the hardware level, with the address derived from structure rather than location.
-
-**Fixed-length RISC instructions.** The RISC-V ISA solved the variable-length instruction decode problem with 32-bit fixed-length encoding [@riscv-unpriv]. Tagma applies the same principle to data identifiers: fixed-length, self-decodable, structurally verifiable.
+The 11,172-identifier bound per syllable is not a limitation of scope but a commitment to determinism. Every coordinate maps to exactly one slot, in one cycle, with zero collision resolution. Hash-based systems accept probabilistic guarantees and variable latency; Tagma guarantees both latency and uniqueness by construction. Combined with N-syllable composition (yielding up to $1.94 \times 10^{77}$ identifiers at 19 syllables), the bound dissolves for practical purposes while per-syllable determinism is preserved.
 
 :::
 
