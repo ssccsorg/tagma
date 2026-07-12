@@ -24,7 +24,7 @@ format:
   pdf:
     pdf-engine: xelatex
     geometry:
-        - margin=26mm
+        - margin=16mm
     keep-tex: true
     number-sections: true
     execute:
@@ -72,22 +72,20 @@ format:
 %run ./_include/_graphviz.py
 ```
 
-## Introduction
+## Introduction {#sec-introduction}
 
-Tagma[^tagma] is a structural identity primitive: the realization that **a contiguous 16-bit Unicode block allocated to a three-axis writing system** provides a collision-free, hash-less[*-@sec-paradigm-shift*], structurally addressable coordinate space[*-@sec-hangul-space*] for computing.
+Computing standards are language-neutral and culture-neutral universal assets. Arabic numerals (0--9) belong to no single nation yet underpin every numerical operation in every instruction set. Unicode follows the same principle: it is an international standard that assigns each script a fixed address in a shared encoding space, treating all writing systems equally.
 
-Computing standards are language-neutral and culture-neutral universal assets. Arabic numerals (0--9) belong to no single nation yet underpin every numerical operation in every instruction set. Unicode follows the same principle: it is an international standard that assigns each script a fixed address in a shared encoding space, treating all writing systems equally. Within this shared space, the Hangul syllable block (U+AC00--U+D7AF) occupies a contiguous 16-bit segment whose closed-form composition formula embeds three independent structural axes into every code point --- a mathematical property absent from every other script on the Basic Multilingual Plane. This property elevates a cultural asset into a general-purpose computing primitive.
-
-Every content-addressable system in computing today generates identifiers through a hash function. This indirection layer imposes a predictable cost: gate area for the hash logic, cycle latency for computation, and storage overhead for the resulting identifier. Hash functions are a general solution but not the only one. When the identifier space has known structural properties, those properties can replace the hash function entirely.
-
-Any 16-bit value in this space is simultaneously a 1-D address (Unicode code point) and a 3-D coordinate (initial, medial, final), expressible as a Hangul syllable for debugging. One specification of this primitive is a gate-level combinatorial decoder that derives identity directly from value composition; a RISC-V implementation via the XIF coprocessor interface is provided as a reference [@nex-tagma]. A coordinate can be displayed as a Hangul syllable for debugging, decomposed into its three axis values for assembly, or processed as a raw 16-bit value by the hardware. The Projector layer that performs these translations is a software interface and is not part of the decoder specification.
+Within this shared space, the Hangul syllable block (U+AC00--U+D7AF) occupies a contiguous 16-bit segment whose closed-form composition formula embeds three independent structural axes into every code point --- a mathematical property absent from every other script on the Basic Multilingual Plane. Any 16-bit value in this space is simultaneously a 1-D address (Unicode code point) and a 3-D coordinate (initial, medial, final), expressible as a Hangul syllable for debugging.
 
 | System | Established By | When | What It Provides |
 |--------|---------------|------|------------------|
 | **Hangul** | Sejong the Great & the Hall of Worthies | 1443 | A featural writing system with a complete, **exception-free three-axis** combinatorial structure |
 | **Unicode** | Unicode Consortium | 1996 | A **contiguous** 16-bit address space (U+AC00-U+D7AF) allocated to all modern Hangul syllables |
 
-[^tagma]: Pre-release (Apache 2.0) repository: [Github](https://github.com/ssccsorg/tagma), containing foundational libraries and proof-of-concept implementations.
+Every content-addressable system today generates identifiers through a hash function. This indirection layer imposes a predictable cost: gate area, cycle latency, storage overhead, and probabilistic collision resolution. Tagma shows that this fixed 16-bit block can replace the hash function entirely where cryptographic integrity is not required, using a combinational decoder (~300 gates, 1 cycle). A RISC-V implementation via the XIF coprocessor interface serves as the reference [@nex-tagma].
+
+[^tagma]: Pre-release (Apache 2.0) repository: [GitHub](https://github.com/ssccsorg/tagma), containing the foundational core library and proof-of-concept implementations.
 
 ## The Hangul Coordinate Space {#sec-hangul-space}
 
@@ -97,10 +95,12 @@ $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 2
 
 Every valid 16-bit value carries **three simultaneous interpretations**: a 1-D Unicode address, a 3-D coordinate, and a Hangul syllable. Internally, the 16 bits are organized as:
 
-| Bit | 15 | 14 | 13 | 12 | 11 | 10 | 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
-|:---:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
-| Field | R | I | I | I | I | I | M | M | M | M | M | F | F | F | F | F |
-| Count | 1 | 19 | 19 | 19 | 19 | 19 | 21 | 21 | 21 | 21 | 21 | 28 | 28 | 28 | 28 | 28 |
+::: {.cell layout="[[50,50]]"}
+
+| 15 | 14 | 13 | 12 | 11 | 10 | 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+| :---: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: | :--: |
+| R | I | I | I | I | I | M | M | M | M | M | F | F | F | F | F |
+| 1 | 19 | 19 | 19 | 19 | 19 | 21 | 21 | 21 | 21 | 21 | 28 | 28 | 28 | 28 | 28 |
 
 | Field | Bits | Values | Range |
 |-------|------|--------|-------|
@@ -108,6 +108,11 @@ Every valid 16-bit value carries **three simultaneous interpretations**: a 1-D U
 | Medial (jungseong) | 5 | 21 | 0-20 |
 | Final (jongseong) | 5 | 28 | 0-27 |
 | Reserved | 1 | -- | -- |
+
+:::
+
+One value, three uses. Only Hangul satisfies all four conditions required for the Tagma primitive: a fixed closed-form composition formula, complete fixed-width 16-bit representation, a structural invalidity margin, and an open international standard. The coordinate space extends to N syllables via the Cartesian product. Each syllable multiplies the addressable space by 11,172. A linear array over N syllables is indexed by flattening the N-dimensional coordinate using row-major order. Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system.
+
 
 ```{python}
 #| include: false
@@ -139,7 +144,7 @@ full_edges  = box_edges(-1, -1, -1, 32, 32, 32)
 valid_edges = box_edges(-0.5, -0.5, -0.5, 18.5, 20.5, 27.5)
 ```
 
-::: {.cell layout="[[67,33]]"}
+::: {.cell layout="[[50,50]]"}
 
 ```{python}
 #| label: fig-3d-decode
@@ -190,9 +195,9 @@ ax.text(18.5, 20.5, 30,
 ax.set_xlabel('Initial (choseong)', fontsize=11)
 ax.set_ylabel('Medial (jungseong)', fontsize=11)
 ax.set_zlabel('Final (jongseong)', fontsize=11)
-ax.set_xlim(-3, 35)
-ax.set_ylim(-3, 35)
-ax.set_zlim(-3, 35)
+ax.set_xlim(-1.5, 30)
+ax.set_ylim(-1.5, 30)
+ax.set_zlim(-1.5, 32)
 
 ax.xaxis.set_major_locator(plt.MaxNLocator(5))
 ax.yaxis.set_major_locator(plt.MaxNLocator(5))
@@ -213,10 +218,8 @@ for coord in range(0, 33, 8):
     ax.plot([coord, coord], [0, 31], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
     ax.plot([0, 31], [coord, coord], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
 
-ax.view_init(elev=24, azim=-68)
-ax.legend(loc='upper left', fontsize='small', facecolor='white', edgecolor='#999999', framealpha=0.95)
 
-plt.tight_layout()
+plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
 plt.show()
 ```
 
@@ -240,8 +243,6 @@ digraph HangulAxes {
 
 :::
 
-One value, three uses. Only Hangul satisfies all four conditions required for the Tagma primitive: a fixed closed-form composition formula, complete fixed-width 16-bit representation, a structural invalidity margin, and an open international standard. The coordinate space extends to N syllables via the Cartesian product. Each syllable multiplies the addressable space by 11,172. A linear array over N syllables is indexed by flattening the N-dimensional coordinate using row-major order. Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system.
-
 ## Philosophical Grounding
 
 In current computing, data is identified by hash --- a derived value that depends on the data but is not the data itself. The identifier is separate from the structure it identifies. This indirection has costs: generation time, collision probability, lookup infrastructure.
@@ -254,7 +255,7 @@ This principle is possible because the Hangul composition formula produces a one
 |--------|-------------------|----------------------|--------------------------|-------------------|
 | Hangul | Y U+AC00-U+D7AF | Y 19x21x28, no exceptions | Y Onset-Nucleus-Coda | Yes |
 | ASCII | Y U+0000-U+007F | N | N | No |
-| Hiragana/Katakana | Y U+3040-U+30FF | N | N | No |
+| Japanese | Y U+3040-U+30FF | N | N | No |
 | CJK Unified Ideographs | Y U+4E00-U+9FFF | N (infinite, irregular) | N | No |
 | Arabic | Y U+0600-U+06FF | N | N | No |
 
