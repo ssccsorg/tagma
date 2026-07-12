@@ -72,7 +72,7 @@ format:
 
 ## Abstract {.unnumbered .unlisted}
 
-Hashing is the default mechanism for content-addressable identity in computing. Tagma shows that a fixed 16-bit Unicode block—the Hangul syllable space**[*-@sec-hangul-space*]**—can replace the hash function entirely where cryptographic integrity is not required. The Hangul block is the only script whose encoding follows a closed-form composition formula with three independent axes. As a result, every 16-bit value in this space is simultaneously a Unicode address and a 3-axis coordinate (initial, medial, final). This structural interpretation enables hash-less content addressing **[*-@sec-paradigm-shift*]** with zero collision probability and single-cycle decoding. We present a combinational decoder specification (~300 gates, 1 cycle), a RISC-V XIF coprocessor reference implementation, and a software reference implementation[^tagma] **[*-@sec-appendix-poc*]** demonstrating 6–115x latency reduction over SHA-256 in software: 115x for single-syllable identifiers and 6x for 256-bit-equivalent 19-syllable identifiers. In multidimensional query scenarios — where hash-based systems require index intersection or B-tree traversal — the comparison is architectural: Tagma replaces the entire lookup structure with direct coordinate access, eliminating hash tables, collision resolution, and index maintenance entirely. Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection. The coordinate space is an open international standard (Unicode) and a public good.
+Hashing is the default mechanism for content-addressable identity in computing. Tagma shows that a fixed 16-bit Unicode block—the Hangul syllable space**[*-@sec-hangul-space*]**—can replace the hash function entirely where cryptographic integrity is not required. The Hangul block is the only script whose encoding follows a closed-form composition formula with three independent axes. As a result, every 16-bit value in this space is simultaneously a Unicode address and a 3-axis coordinate (initial, medial, final). This structural interpretation enables hash-less content addressing **[*-@sec-paradigm-shift*]** with zero collision probability and single-cycle decoding. We present a combinational decoder specification (~300 gates, 1 cycle), a RISC-V XIF coprocessor reference, raw assembly, and a software reference implementation[^tagma] **[*-@sec-appendix-poc*]** demonstrating 6–115x latency reduction over SHA-256 in software: 115x for single-syllable identifiers and 6x for 256-bit-equivalent 19-syllable identifiers. In multidimensional query scenarios — where hash-based systems require index intersection or B-tree traversal — the comparison is architectural: Tagma replaces the entire lookup structure with direct coordinate access, eliminating hash tables, collision resolution, and index maintenance entirely. Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection. The coordinate space is an open international standard (Unicode) and a public good.
 
 ## Introduction {#sec-introduction}
 
@@ -111,7 +111,30 @@ Every valid 16-bit value carries **three simultaneous interpretations**: a 1-D U
 
 :::
 
+::: {.cell layout="[[48,4,48]]"}
+
 One value, three uses. Only Hangul satisfies all four conditions required for the Tagma primitive: a fixed closed-form composition formula, complete fixed-width 16-bit representation, a structural invalidity margin, and an open international standard. The coordinate space extends to N syllables via the Cartesian product. Each syllable multiplies the addressable space by 11,172. A linear array over N syllables is indexed by flattening the N-dimensional coordinate using row-major order. Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system.
+
+
+```{python}
+#| label: fig-hangul-axes
+#| fig-cap: "The three structural axes of the Hangul syllable coordinate space."
+dot("""
+digraph HangulAxes {
+    rankdir=LR;
+    node [shape=box];
+    syllable [label="Hangul syllable\n16-bit coordinate\nU+AC00..U+D7AF"];
+    initial [label="Initial\n19 values\n5 bits"];
+    medial [label="Medial\n21 values\n5 bits"];
+    final [label="Final\n28 values\n5 bits"];
+    syllable -> initial [label="  divide by 588"];
+    syllable -> medial [label="  divide by 28 (remainder)"];
+    syllable -> final [label="  mod 28"];
+}
+""")
+```
+
+:::
 
 ```{python}
 #| include: false
@@ -142,8 +165,6 @@ def box_edges(x0, y0, z0, x1, y1, z1):
 full_edges  = box_edges(-1, -1, -1, 32, 32, 32)
 valid_edges = box_edges(-0.5, -0.5, -0.5, 18.5, 20.5, 27.5)
 ```
-
-::: {.cell layout="[[50,50]]"}
 
 ```{python}
 #| label: fig-3d-decode
@@ -217,30 +238,11 @@ for coord in range(0, 33, 8):
     ax.plot([coord, coord], [0, 31], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
     ax.plot([0, 31], [coord, coord], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
 
+ax.legend(loc='upper left', fontsize='small', facecolor='white', edgecolor='#cccccc', framealpha=0.95)
 
 plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
 plt.show()
 ```
-
-```{python}
-#| label: fig-hangul-axes
-#| fig-cap: "The three structural axes of the Hangul syllable coordinate space."
-dot("""
-digraph HangulAxes {
-    rankdir=LR;
-    node [shape=box];
-    syllable [label="Hangul syllable\n16-bit coordinate\nU+AC00..U+D7AF"];
-    initial [label="Initial\n19 values\n5 bits"];
-    medial [label="Medial\n21 values\n5 bits"];
-    final [label="Final\n28 values\n5 bits"];
-    syllable -> initial [label="  divide by 588"];
-    syllable -> medial [label="  divide by 28 (remainder)"];
-    syllable -> final [label="  mod 28"];
-}
-""")
-```
-
-:::
 
 ## Philosophical Grounding
 
