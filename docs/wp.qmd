@@ -87,7 +87,7 @@ Any 16-bit value in this space is simultaneously a 1-D address (Unicode code poi
 | **Hangul** | Sejong the Great & the Hall of Worthies | 1443 | A featural writing system with a complete, **exception-free three-axis** combinatorial structure |
 | **Unicode** | Unicode Consortium | 1996 | A **contiguous** 16-bit address space (U+AC00-U+D7AF) allocated to all modern Hangul syllables |
 
-[^tagma]: Pre-release (Apache 2.0) repository: <https://github.com/ssccsorg/tagma>, containing foundational libraries and proof-of-concept implementations.
+[^tagma]: Pre-release (Apache 2.0) repository: [Github](https://github.com/ssccsorg/tagma), containing foundational libraries and proof-of-concept implementations.
 
 ## The Hangul Coordinate Space {#sec-hangul-space}
 
@@ -97,19 +97,11 @@ $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 2
 
 Every 16-bit value in this range has three simultaneous interpretations:
 
-::: {.columns}
-
-::: {.column width="60%"}
-
 | Interpretation | Domain | Use |
 |---------------|--------|-----|
 | 1-D address | Unicode code point (U+AC00-U+D7AF) | Standard character encoding |
 | 3-D coordinate | (initial, medial, final) | Structural positioning |
 | Semantic symbol | A Hangul syllable | Debugging aid |
-
-:::
-
-::: {.column width="40%"}
 
 | Parameter | Value |
 |-----------|-------|
@@ -118,27 +110,52 @@ Every 16-bit value in this range has three simultaneous interpretations:
 | Final (jongseong, 종성) | 28 values, 5 bits, range 0--27 |
 | Reserved | 1 bit (bit 15) |
 
-:::
-
-:::
-
 Bit field layout (16-bit):
 
 ```{python}
 #| label: fig-bitfield
-#| fig-cap: "16-bit field layout: reserved bit, initial (5), medial (5), final (5)."
+#| fig-cap: "16-bit field layout: reserved (1), initial (5), medial (5), final (5)."
 dot("""
 digraph BitField {
     rankdir=LR;
-    node [shape=box, style=filled, fillcolor=white, height=0.6, width=0.8, fontsize=11];
-    edge [style=invis];
+    node [shape=box, style=filled, height=0.5, width=0.35, fontsize=8, fontname="Courier"];
+    edge [style=invis, weight=2];
 
-    b15 [label="bit 15\nReserved\n(1)"];
-    b14 [label="bits 14--10\nInitial\n5 bits\n0--18"];
-    b09 [label="bits 9--5\nMedial\n5 bits\n0--20"];
-    b04 [label="bits 4--0\nFinal\n5 bits\n0--27"];
+    subgraph cluster_bits {
+        label="Bit positions";
+        style=filled; fillcolor="#f8f8f8";
 
-    b15 -> b14 -> b09 -> b04;
+        b15 [label="15", fillcolor="#e0e0e0"];
+        b14 [label="14", fillcolor="#d0d0d0"];
+        b13 [label="13", fillcolor="#d0d0d0"];
+        b12 [label="12", fillcolor="#d0d0d0"];
+        b11 [label="11", fillcolor="#d0d0d0"];
+        b10 [label="10", fillcolor="#d0d0d0"];
+        b09 [label="9", fillcolor="#bbbbbb"];
+        b08 [label="8", fillcolor="#bbbbbb"];
+        b07 [label="7", fillcolor="#bbbbbb"];
+        b06 [label="6", fillcolor="#bbbbbb"];
+        b05 [label="5", fillcolor="#bbbbbb"];
+        b04 [label="4", fillcolor="#999999"];
+        b03 [label="3", fillcolor="#999999"];
+        b02 [label="2", fillcolor="#999999"];
+        b01 [label="1", fillcolor="#999999"];
+        b00 [label="0", fillcolor="#999999"];
+
+        b15 -> b14 -> b13 -> b12 -> b11 -> b10 -> b09 -> b08 -> b07 -> b06 -> b05 -> b04 -> b03 -> b02 -> b01 -> b00;
+    }
+
+    subgraph cluster_fields {
+        label="Fields";
+        style=filled; fillcolor="#f8f8f8";
+
+        f_reserved [label="RESERVED\n1 bit", shape=box, style=filled, fillcolor="#e0e0e0", height=0.5, width=0.9, fontsize=9, fontname=""];
+        f_initial [label="INITIAL (choseong)\n5 bits, 0--18", shape=box, style=filled, fillcolor="#d0d0d0", height=0.5, width=2.5, fontsize=9, fontname=""];
+        f_medial [label="MEDIAL (jungseong)\n5 bits, 0--20", shape=box, style=filled, fillcolor="#bbbbbb", height=0.5, width=2.5, fontsize=9, fontname=""];
+        f_final [label="FINAL (jongseong)\n5 bits, 0--27", shape=box, style=filled, fillcolor="#999999", height=0.5, width=2.5, fontsize=9, fontname=""];
+
+        f_reserved -> f_initial -> f_medial -> f_final;
+    }
 }
 """)
 ```
