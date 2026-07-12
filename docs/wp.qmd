@@ -78,12 +78,7 @@ Hashing is the default mechanism for content-addressable identity in computing. 
 
 Computing standards are language-neutral and culture-neutral universal assets. Arabic numerals (0--9) belong to no single nation yet underpin every numerical operation in every instruction set. Unicode follows the same principle: it is an international standard that assigns each script a fixed address in a shared encoding space, treating all writing systems equally. Within this shared space, the Hangul syllable block (U+AC00--U+D7AF) occupies a contiguous 16-bit segment whose closed-form composition formula embeds three independent structural axes into every code point --- a mathematical property absent from every other script on the Basic Multilingual Plane. Any 16-bit value in this space is simultaneously a 1-D address (Unicode code point) and a 3-D coordinate (initial, medial, final), expressible as a Hangul syllable for debugging.
 
-| System | Established By | When | What It Provides |
-|--------|---------------|------|------------------|
-| **Hangul** | Sejong the Great & the Hall of Worthies | 1443 | A featural writing system with a complete, **exception-free three-axis** combinatorial structure |
-| **Unicode** | Unicode Consortium | 1996 | A **contiguous** 16-bit address space (U+AC00-U+D7AF) allocated to all modern Hangul syllables |
-
-Every content-addressable system today generates identifiers through a hash function. This indirection layer imposes a predictable cost: gate area, cycle latency, storage overhead, and probabilistic collision resolution. Tagma shows that this fixed 16-bit block can replace the hash function entirely where cryptographic integrity is not required, using a combinational decoder (~300 gates, 1 cycle). [@nex-tagma].
+Every content-addressable system today generates identifiers through a hash function. This indirection layer imposes a predictable cost: gate area, cycle latency, storage overhead, and probabilistic collision resolution. Tagma shows that this fixed 16-bit block can replace the hash function entirely where cryptographic integrity is not required, using a combinational decoder. [@nex-tagma].
 
 [^tagma]: Pre-release (Apache 2.0) repository: [GitHub](https://github.com/ssccsorg/tagma), containing the foundational core library and reference implementations.
 
@@ -196,7 +191,8 @@ for coord in range(0, 33, 8):
     ax.plot([coord, coord], [0, 31], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
     ax.plot([0, 31], [coord, coord], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
 
-ax.view_init(elev=22, azim=35)
+ax.dist = 7
+ax.view_init(elev=22, azim=-65)
 ax.legend(loc='upper left', fontsize='small', facecolor='white', edgecolor='#999999', framealpha=0.95)
 plt.subplots_adjust(left=0, right=1, bottom=0, top=1)
 plt.show()
