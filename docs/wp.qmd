@@ -95,16 +95,17 @@ The Unicode Hangul syllable block is the only script in the international standa
 
 $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 21,\; 0 \leq f < 28$$
 
-Every 16-bit value in this range encodes the following fields:
+Every valid 16-bit value carries **three simultaneous interpretations**: a 1-D Unicode address, a 3-D coordinate, and a Hangul syllable. Internally, the 16 bits are organized as:
 
-| Field | Bit(s) | Count | Range | Interpretation |
-|-------|--------|-------|-------|---------------|
-| Reserved | 15 | 1 | 0 | Reads as 0; frame bit |
-| Initial (choseong, 초성) | 14--10 | 19 | 0--18 | 3-D coordinate axis I |
-| Medial (jungseong, 중성) | 9--5 | 21 | 0--20 | 3-D coordinate axis M |
-| Final (jongseong, 종성) | 4--0 | 28 | 0--27 | 3-D coordinate axis F |
+| Bit | 15 | 14 | 13 | 12 | 11 | 10 | 9 | 8 | 7 | 6 | 5 | 4 | 3 | 2 | 1 | 0 |
+|:---:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|:--:|
+| Field | R | I | I | I | I | I | M | M | M | M | M | F | F | F | F | F |
+| Count | 1 | 19 | 19 | 19 | 19 | 19 | 21 | 21 | 21 | 21 | 21 | 28 | 28 | 28 | 28 | 28 |
 
-The three axes together form a complete three-dimensional coordinate space. Every valid 16-bit value is simultaneously a Unicode code point (1-D address, U+AC00--U+D7AF) and a 3-axis coordinate, displayable as a Hangul syllable.
+R = Reserved (1 bit, bit 15, reads as 0)  
+I = Initial / choseong (5 bits, 0--18)  
+M = Medial / jungseong (5 bits, 0--20)  
+F = Final / jongseong (5 bits, 0--27)
 
 ```{python}
 #| include: false
