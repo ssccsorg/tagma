@@ -8,9 +8,3 @@ description = "Tagma: content-addressable structural primitive — TagmaCoord, T
 [dependencies]
 
 [dev-dependencies]
-criterion = { version = "0.5", features = [] }
-rand = "0.8"
-
-[[bench]]
-name = "bench"
-harness = false

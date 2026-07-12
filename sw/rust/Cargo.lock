@@ -517,12 +517,17 @@ dependencies = [
 ]
 
 [[package]]
-name = "tagma-core"
+name = "tagma-benchmarks"
 version = "0.1.0"
 dependencies = [
  "criterion",
  "rand",
+ "tagma-core",
 ]
+
+[[package]]
+name = "tagma-core"
+version = "0.1.0"
 
 [[package]]
 name = "tinytemplate"

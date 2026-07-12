@@ -7,10 +7,10 @@ test:
 	cargo test --release
 
 bench:
-	cargo bench --release
+	cargo bench -p tagma-benchmarks --release
 
 bench-fast:
-	cargo bench --release -- stress  # 500k mixed ops only
+	cargo bench -p tagma-benchmarks --release -- stress  # 500k mixed ops only
 
 lint:
 	cargo clippy --all-targets -- -D warnings

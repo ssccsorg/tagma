@@ -3,4 +3,5 @@ resolver = "2"
 members = [
     "core",
     "base11172",
+    "benches",
 ]
