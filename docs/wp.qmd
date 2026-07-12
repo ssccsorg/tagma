@@ -139,9 +139,7 @@ full_edges  = box_edges(-1, -1, -1, 32, 32, 32)
 valid_edges = box_edges(-0.5, -0.5, -0.5, 18.5, 20.5, 27.5)
 ```
 
-::: {.columns}
-
-::: {.column width="67%"}
+::: {.cell layout="[[67,33]]"}
 
 ```{python}
 #| label: fig-3d-decode
@@ -222,10 +220,6 @@ plt.tight_layout()
 plt.show()
 ```
 
-:::
-
-::: {.column width="33%"}
-
 ```{python}
 #| label: fig-hangul-axes
 #| fig-cap: "The three structural axes of the Hangul syllable coordinate space."
@@ -246,11 +240,7 @@ digraph HangulAxes {
 
 :::
 
-:::
-
 One value, three uses. Only Hangul satisfies all four conditions required for the Tagma primitive: a fixed closed-form composition formula, complete fixed-width 16-bit representation, a structural invalidity margin, and an open international standard. The coordinate space extends to N syllables via the Cartesian product. Each syllable multiplies the addressable space by 11,172. A linear array over N syllables is indexed by flattening the N-dimensional coordinate using row-major order. Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system.
-
-
 
 ## Philosophical Grounding
 
@@ -338,7 +328,7 @@ Tagma addresses the class of content-addressable storage with up to approximatel
 
 The practical implication for everyday identifiers is direct. UUID generation requires entropy collection, version/variant bit insertion, and hyphen formatting at approximately 100 ns or more; its 128-bit output expressed in hex or Base64 consumes 36 or 22 characters respectively. Tagma produces a 6-syllable identifier (18 axes, $1.9 \times 10^{24}$ space) in approximately 12 ns, and a 10-syllable identifier exceeding UUID space in approximately 20 ns — each requiring only multiplications and additions — as a human-readable Hangul string with no special characters, no padding, and zero collision probability. Similarly, a SHA-256 hash output as 64 hex characters is matched by 19 Tagma syllables covering the same $2^{256}$ space in approximately 38 ns. In all cases Tagma output is shorter, faster, and structurally self-validating. A software proof of concept confirming these measurements is described in Appendix [*-@sec-appendix-poc*].
 
-### N-Syllable Composition: From 16 Bits to UUID Scale
+### N-Syllable Composition: From 16 Bits to SHA-256 Scale
 
 A single Tagma syllable provides 11,172 unique identifiers over 16 bits. For larger address spaces, syllables compose linearly:
 
@@ -363,7 +353,7 @@ This requires exactly $(N-1)$ multiply-add pairs — a fixed sequence of $2(N-1)
 
 Each syllable retains independent hardware-verifiable validity ($19 \times 21 \times 28 = 11,172$ gates per syllable). The N-tuple identity space is the Cartesian product of $N$ independent 3D spaces, yielding a $3N$-dimensional structural coordinate system.
 
-### The Paradigm Shift {#sec-paradigm-shift}
+### Hash-less computation: Direct structural addressing {#sec-paradigm-shift}
 
 In conventional computing, identity is established through indirection:
 
@@ -390,9 +380,7 @@ Location"];
 """)
 ```
 
-Each step adds cost: hash computation, collision handling, dynamic resizing, cache-unfriendly access patterns.
-
-Tagma replaces this with direct structural addressing:
+Each step adds cost: hash computation, collision handling, dynamic resizing, cache-unfriendly access patterns. Tagma replaces this with direct structural addressing:
 
 ```{python}
 #| label: fig-tagma-model
