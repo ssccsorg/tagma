@@ -243,9 +243,7 @@ digraph EncodingHierarchy {
 """)
 ```
 
-Variable-length encoding has architectural consequences that are independent of any particular implementation. Memory alignment is not guaranteed. Instruction decoding must detect boundary positions. Prefetch and pipeline efficiency are affected. These are structural properties of variable-length design, not engineering limitations.
-
-The structural constraint in Tagma arises from the fixed formula by which Hangul syllables are composed. As established in the Hangul Coordinate Space section, only 11,172 of 65,536 states satisfy the composition formula. A hardware decoder can distinguish valid from invalid states using combinational logic derived from that formula.
+Variable-length encoding has architectural consequences that are independent of any particular implementation. Memory alignment is not guaranteed. Instruction decoding must detect boundary positions. Prefetch and pipeline efficiency are affected. These are structural properties of variable-length design, not engineering limitations. The structural constraint in Tagma arises from the fixed formula by which Hangul syllables are composed. As established in the Hangul Coordinate Space section, only 11,172 of 65,536 states satisfy the composition formula. A hardware decoder can distinguish valid from invalid states using combinational logic derived from that formula.
 
 :::
 
@@ -427,7 +425,7 @@ Approximately 300 gate equivalents in 28nm. The decoder is smaller than a single
 
 ## Coprocessor Implementation
 
-Tagma can be attached to any processor pipeline. A reference implementation targeting RISC-V through the XIF coprocessor interface defined by the OpenHW Group [@openhw-xif; @cva6-xif] is described below. This is a standard interface that allows custom instructions without modifying the core pipeline.
+Tagma can be attached to any processor pipeline through the RISC-V XIF coprocessor interface [@openhw-xif; @cva6-xif], a standard mechanism for custom instructions that does not require modifying the core pipeline. The Rust reference implementation (`TagmaCoord`) serves as the functional golden model: every hardware instruction must produce results bit-exact with the corresponding Rust function.
 
 ```{python}
 #| label: fig-stack
@@ -449,13 +447,13 @@ digraph TagmaStack {
 """)
 ```
 
-Three custom instructions are defined:
+Three custom instructions implement the core `TagmaCoord` API:
 
-**tagma_check rd, rs1.** Decodes the lower 16 bits of rs1. Returns a 16-bit value: valid flag (1 bit, 1 = valid), reserved (1 bit, reads as zero), initial (5 bits), medial (5 bits), final (5 bits). Invalid inputs produce a zero valid flag and undefined field values. One cycle, combinational.
+**tagma_check rd, rs1.** Decodes the lower 16 bits of rs1. Returns a 16-bit value packed as: valid flag (bit 15, 1 = valid), reserved (bit 14, reads as zero), initial (bits 13--9, 5 bits, range 0--18), medial (bits 8--4, 5 bits, range 0--20), final (bits 3--0, 5 bits, range 0--27). Invalid inputs produce a zero valid flag with undefined field values. Corresponds to `TagmaCoord::new(rs1).map(|c| c.to_axes())`. One cycle, combinational.
 
-**tagma_dist rd, rs1, rs2.** Computes field-wise Hamming distance between the two 16-bit coordinates. Returns three 5-bit distances (initial, medial, final). One cycle, combinational.
+**tagma_compose rd, rs1, rs2, imm5.** Composes a coordinate from three 5-bit axis fields. rs1 supplies the initial field (selected by imm5 = 0), rs2 supplies the remaining two fields, or the immediate fields are extracted from rs1[14:0] directly (initial at bits 14--10, medial at 9--5, final at 4--0). Returns the 16-bit coordinate index (0--11171) in rd, or zero if any axis is out of range. Corresponds to `TagmaCoord::from_axes(initial, medial, final).map(|c| c.index())`. One cycle, combinational.
 
-**tagma_mux rd, rs1, rs2, imm5.** imm5 selects the field (0=initial, 1=medial, 2=final; values 3-31 are reserved). If the selected fields of rs1 and rs2 are equal, rd = rs1; else rd = rs2. The immediate operand is encoded in the instruction word according to the XIF specification for 5-bit immediates.
+**tagma_dist rd, rs1, rs2.** Computes field-wise absolute difference between the two 16-bit coordinates. Returns three 5-bit distances packed as: initial (bits 14--10), medial (bits 9--5), final (bits 4--0); bit 15 is reserved. Corresponds to `TagmaCoord::hamming_distance(rs1, rs2)`. One cycle, combinational.
 
 ### Verification
 
@@ -493,9 +491,7 @@ digraph TagmaPosition {
 """)
 ```
 
-Existing addressing paradigms each optimize a different axis: pointers minimize generation cost (zero) but provide no content-addressability; hash functions maximize identifier space at the cost of indirection; CAM cells offer full associativity at a transistor premium. Tagma occupies a fourth category — structural addressing — where identifier, address, and structure converge into a single 16-bit value decodable at the gate level.
-
-The 11,172-identifier bound per syllable is not a limitation of scope but a commitment to determinism. Every coordinate maps to exactly one slot, in one cycle, with zero collision resolution. Hash-based systems accept probabilistic guarantees and variable latency; Tagma guarantees both latency and uniqueness by construction. Combined with N-syllable composition (yielding up to $1.94 \times 10^{77}$ identifiers at 19 syllables), the bound dissolves for practical purposes while per-syllable determinism is preserved.
+Existing addressing paradigms each optimize a different axis: pointers minimize generation cost (zero) but provide no content-addressability; hash functions maximize identifier space at the cost of indirection; CAM cells offer full associativity at a transistor premium. Tagma occupies a fourth category — structural addressing — where identifier, address, and structure converge into a single 16-bit value decodable at the gate level. The 11,172-identifier bound per syllable is not a limitation of scope but a commitment to determinism. Every coordinate maps to exactly one slot, in one cycle, with zero collision resolution. Hash-based systems accept probabilistic guarantees and variable latency; Tagma guarantees both latency and uniqueness by construction. Combined with N-syllable composition (yielding up to $1.94 \times 10^{77}$ identifiers at 19 syllables), the bound dissolves for practical purposes while per-syllable determinism is preserved.
 
 :::
 
@@ -723,7 +719,7 @@ The encoding is self-validating: any character outside U+AC00..U+D7AF is immedia
 
 ## Tagma Compliance {#sec-appendix-compliance}
 
-An implementation is Tagma-compatible iff:
+An implementation is Tagma-compatible if:
 
 1. It implements the composition formula $C(i,m,f) = \text{U+AC00} + 588i + 28m + f$ correctly for all 11,172 valid coordinates.
 2. It rejects all 54,364 structurally invalid 16-bit values.
