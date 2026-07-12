@@ -95,70 +95,16 @@ The Unicode Hangul syllable block is the only script in the international standa
 
 $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 21,\; 0 \leq f < 28$$
 
-Every 16-bit value in this range has three simultaneous interpretations:
+Every 16-bit value in this range encodes the following fields:
 
-| Interpretation | Domain | Use |
-|---------------|--------|-----|
-| 1-D address | Unicode code point (U+AC00-U+D7AF) | Standard character encoding |
-| 3-D coordinate | (initial, medial, final) | Structural positioning |
-| Semantic symbol | A Hangul syllable | Debugging aid |
+| Field | Bit(s) | Count | Range | Interpretation |
+|-------|--------|-------|-------|---------------|
+| Reserved | 15 | 1 | 0 | Reads as 0; frame bit |
+| Initial (choseong, 초성) | 14--10 | 19 | 0--18 | 3-D coordinate axis I |
+| Medial (jungseong, 중성) | 9--5 | 21 | 0--20 | 3-D coordinate axis M |
+| Final (jongseong, 종성) | 4--0 | 28 | 0--27 | 3-D coordinate axis F |
 
-| Parameter | Value |
-|-----------|-------|
-| Initial (choseong, 초성) | 19 values, 5 bits, range 0--18 |
-| Medial (jungseong, 중성) | 21 values, 5 bits, range 0--20 |
-| Final (jongseong, 종성) | 28 values, 5 bits, range 0--27 |
-| Reserved | 1 bit (bit 15) |
-
-Bit field layout (16-bit):
-
-```{python}
-#| label: fig-bitfield
-#| fig-cap: "16-bit field layout: reserved (1), initial (5), medial (5), final (5)."
-dot("""
-digraph BitField {
-    rankdir=LR;
-    node [shape=box, style=filled, height=0.5, width=0.35, fontsize=8, fontname="Courier"];
-    edge [style=invis, weight=2];
-
-    subgraph cluster_bits {
-        label="Bit positions";
-        style=filled; fillcolor="#f8f8f8";
-
-        b15 [label="15", fillcolor="#e0e0e0"];
-        b14 [label="14", fillcolor="#d0d0d0"];
-        b13 [label="13", fillcolor="#d0d0d0"];
-        b12 [label="12", fillcolor="#d0d0d0"];
-        b11 [label="11", fillcolor="#d0d0d0"];
-        b10 [label="10", fillcolor="#d0d0d0"];
-        b09 [label="9", fillcolor="#bbbbbb"];
-        b08 [label="8", fillcolor="#bbbbbb"];
-        b07 [label="7", fillcolor="#bbbbbb"];
-        b06 [label="6", fillcolor="#bbbbbb"];
-        b05 [label="5", fillcolor="#bbbbbb"];
-        b04 [label="4", fillcolor="#999999"];
-        b03 [label="3", fillcolor="#999999"];
-        b02 [label="2", fillcolor="#999999"];
-        b01 [label="1", fillcolor="#999999"];
-        b00 [label="0", fillcolor="#999999"];
-
-        b15 -> b14 -> b13 -> b12 -> b11 -> b10 -> b09 -> b08 -> b07 -> b06 -> b05 -> b04 -> b03 -> b02 -> b01 -> b00;
-    }
-
-    subgraph cluster_fields {
-        label="Fields";
-        style=filled; fillcolor="#f8f8f8";
-
-        f_reserved [label="RESERVED\n1 bit", shape=box, style=filled, fillcolor="#e0e0e0", height=0.5, width=0.9, fontsize=9, fontname=""];
-        f_initial [label="INITIAL (choseong)\n5 bits, 0--18", shape=box, style=filled, fillcolor="#d0d0d0", height=0.5, width=2.5, fontsize=9, fontname=""];
-        f_medial [label="MEDIAL (jungseong)\n5 bits, 0--20", shape=box, style=filled, fillcolor="#bbbbbb", height=0.5, width=2.5, fontsize=9, fontname=""];
-        f_final [label="FINAL (jongseong)\n5 bits, 0--27", shape=box, style=filled, fillcolor="#999999", height=0.5, width=2.5, fontsize=9, fontname=""];
-
-        f_reserved -> f_initial -> f_medial -> f_final;
-    }
-}
-""")
-```
+The three axes together form a complete three-dimensional coordinate space. Every valid 16-bit value is simultaneously a Unicode code point (1-D address, U+AC00--U+D7AF) and a 3-axis coordinate, displayable as a Hangul syllable.
 
 ```{python}
 #| include: false
@@ -212,7 +158,7 @@ box = np.array([[-0.5, -0.5, -0.5],
 
 faces = [[0,1,2,3], [4,5,6,7], [0,1,5,4], [2,3,7,6], [0,3,7,4], [1,2,6,5]]
 
-valid_volume = Poly3DCollection([box[f] for f in faces], alpha=0.08, facecolor='#555555', edgecolor='none')
+valid_volume = Poly3DCollection([box[f] for f in faces], alpha=0.08, facecolor='#333333', edgecolor='none')
 ax.add_collection3d(valid_volume)
 
 # Lattice points: single gray value, no colormap
