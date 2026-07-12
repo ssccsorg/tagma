@@ -639,27 +639,48 @@ Tagma defines a new type of silicon primitive: a combinational decoder that deri
 \renewcommand{\thesubsection}{\Alph{section}.\arabic{subsection}}
 :::
 
-## Rust Reference Implementation {#sec-appendix-rust}
+## Reference Implementation {#sec-appendix-rust}
 
-The coordinate space is implemented as the `tagma-core` crate, a production-level `no_std` + `alloc` Rust library (Apache 2.0). It builds for native targets and `wasm32-unknown-unknown` and serves as the functional golden model for all hardware implementations.
+The coordinate space is implemented as a multi-crate Rust workspace (Apache 2.0) comprising two layers:
 
-### Implementation
+### Core Library: `tagma-core`
 
-The implementation provides the core `TagmaCoord` type in Rust:
+A `no_std` + `alloc` library that builds for native targets and `wasm32-unknown-unknown`.
+
+**TagmaCoord** — a 16-bit newtype guaranteed valid (0..11171), bit-exact with the hardware decoder specification:
 
 ```rust
 pub struct TagmaCoord(u16);  // 0..11171, guaranteed valid
 
 impl TagmaCoord {
-    pub const fn new(value: u16) -> Option<Self>;
-    pub const fn from_axes(initial: u8, medial: u8, final_: u8) -> Option<Self>;
-    pub const fn to_axes(self) -> (u8, u8, u8);
-    pub const fn to_char(self) -> char;
+    pub const fn new(value: u16) -> Option<Self>;           // validate raw index
+    pub const fn from_axes(i: u8, m: u8, f: u8) -> Option<Self>; // compose
+    pub const fn to_axes(self) -> (u8, u8, u8);             // decompose
+    pub const fn to_char(self) -> char;                      // to Hangul
     pub const fn hamming_distance(self, other: Self) -> (u8, u8, u8);
 }
 ```
 
-The library also provides `TagmaMap<V>` (direct-address table, Entry API), `TagmaSet` (bit array, 1.4 KB), and `TimeIndex` (temporal indexing via `time × 11172 + coord`). All source code is available at [github.com/ssccsorg/tagma](https://github.com/ssccsorg/tagma) under Apache 2.0.
+**TagmaMap\<V\>** — direct-address table. Backed by `Box<[Option<V>]>` (11,172 slots). O(1) worst-case insert, lookup, delete. No hashing, no collisions, no resizing. Full Entry API (`entry().or_insert_with()`), `drain()`, `retain()`, `IntoIterator`, `Index<TagmaCoord>`.
+
+**TagmaSet** — bit array over the coordinate space. Backed by `[u64; 175]` (1.4 KB, no heap). Insert/remove/contains are single-bit ops. Union, intersection, difference as bitwise operations. `Copy`, no allocator required.
+
+**TimeIndex** — temporal indexing via `time × 11172 + coord`. Single multiply-add replaces hash computation with zero collision overhead.
+
+Test coverage: 103 unit tests covering all 11,172 valid coordinates and all 54,364 invalid states.
+
+### Serialization: `base11172`
+
+A `no_std` + `alloc` crate providing Tagma's native serialization format. Every coordinate index 0..11171 maps to exactly one Hangul syllable (U+AC00 + index). A pair of syllables encodes a 16-bit value. The encoding is self-validating: characters outside U+AC00..U+D7AF are immediately detectable as invalid.
+
+```rust
+pub fn encode_u16(v: u16) -> [char; 2];         // u16 → two Hangul syllables
+pub fn encode_bytes(bytes: &[u8]) -> String;     // bytes → Hangul string
+pub fn decode_pair(c0: char, c1: char) -> Option<u16>;
+pub fn decode_bytes(s: &str) -> Option<Vec<u8>>;
+```
+
+No special characters, no padding, no escaping.
 
 ### Benchmark: Tagma vs SHA-256
 
@@ -714,16 +735,6 @@ plt.show()
 | Multi-axis query | $O(K \times N)$ | $O(1)$ direct | $O(1)$ direct | $O(1)$ direct |
 
 All figures above are software measurements on a general-purpose CPU. In silicon, the per-syllable decoder operates as a single combinational cycle independent of syllable count, so the 19-syllable composition cost converges toward 19 cycles versus 19 sequential SHA-256 calls at 64--75 cycles each --- a hardware improvement ratio exceeding 60x.
-
-## Tagma Text Encoding / Base11172 {#sec-appendix-base11172}
-
-Tagma coordinates serialize to printable, self-validating Hangul strings:
-
-- Each coordinate index $0 \leq \text{idx} < 11,172$ maps to exactly one Hangul syllable: $\text{char} = \text{U+AC00} + \text{idx}$.
-- A pair of syllables encodes a 16-bit value: $\text{value} = \text{hi} \times 11172 + \text{lo}$.
-- An N-syllable coordinate serializes to N consecutive Hangul syllables.
-
-The encoding is self-validating: any character outside U+AC00..U+D7AF is immediately detectable as invalid. No special characters, no padding, no escaping.
 
 ## Hardware Design Implications {#sec-appendix-hardware}
 
