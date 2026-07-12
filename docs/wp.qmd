@@ -22,6 +22,7 @@ format:
     code-font: "Source Code Pro"
     appendix-style: plain
   pdf:
+    pdf-engine: xelatex
     geometry:
         - margin=26mm
     keep-tex: true
@@ -39,6 +40,8 @@ format:
         \usepackage{xcolor}
         \usepackage{microtype}
         \setkeys{Gin}{width=\linewidth,height=\textheight,keepaspectratio}
+        \usepackage{xeCJK}
+        \setCJKmainfont{Noto Sans CJK KR}
         \addtokomafont{disposition}{\rmfamily}
         \input{./_files/wp_metadata.tex}
         \DeclareTOCStyleEntry[beforeskip=6pt]{default}{section}
@@ -94,11 +97,51 @@ $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 2
 
 Every 16-bit value in this range has three simultaneous interpretations:
 
+::: {.columns}
+
+::: {.column width="60%"}
+
 | Interpretation | Domain | Use |
 |---------------|--------|-----|
 | 1-D address | Unicode code point (U+AC00-U+D7AF) | Standard character encoding |
 | 3-D coordinate | (initial, medial, final) | Structural positioning |
 | Semantic symbol | A Hangul syllable | Debugging aid |
+
+:::
+
+::: {.column width="40%"}
+
+| Parameter | Value |
+|-----------|-------|
+| Initial (choseong, 초성) | 19 values, 5 bits, range 0--18 |
+| Medial (jungseong, 중성) | 21 values, 5 bits, range 0--20 |
+| Final (jongseong, 종성) | 28 values, 5 bits, range 0--27 |
+| Reserved | 1 bit (bit 15) |
+
+:::
+
+:::
+
+Bit field layout (16-bit):
+
+```{python}
+#| label: fig-bitfield
+#| fig-cap: "16-bit field layout: reserved bit, initial (5), medial (5), final (5)."
+dot("""
+digraph BitField {
+    rankdir=LR;
+    node [shape=box, style=filled, fillcolor=white, height=0.6, width=0.8, fontsize=11];
+    edge [style=invis];
+
+    b15 [label="bit 15\nReserved\n(1)"];
+    b14 [label="bits 14--10\nInitial\n5 bits\n0--18"];
+    b09 [label="bits 9--5\nMedial\n5 bits\n0--20"];
+    b04 [label="bits 4--0\nFinal\n5 bits\n0--27"];
+
+    b15 -> b14 -> b09 -> b04;
+}
+""")
+```
 
 ```{python}
 #| include: false
@@ -140,8 +183,7 @@ from mpl_toolkits.mplot3d.art3d import Poly3DCollection
 fig = plt.figure(figsize=(11, 9))
 ax = fig.add_subplot(111, projection='3d')
 
-# draw valid region as a semi-transparent filled box
-# face vertices for the 19x21x28 box
+# Draw valid region as a light gray semi-transparent filled box
 box = np.array([[-0.5, -0.5, -0.5],
                 [18.5, -0.5, -0.5],
                 [18.5, 20.5, -0.5],
@@ -151,32 +193,31 @@ box = np.array([[-0.5, -0.5, -0.5],
                 [18.5, 20.5, 27.5],
                 [-0.5, 20.5, 27.5]])
 
-# Define the 6 faces of the box (quadrilaterals)
 faces = [[0,1,2,3], [4,5,6,7], [0,1,5,4], [2,3,7,6], [0,3,7,4], [1,2,6,5]]
 
-valid_volume = Poly3DCollection([box[f] for f in faces], alpha=0.12, facecolor='#2c7bb6', edgecolor='none')
+valid_volume = Poly3DCollection([box[f] for f in faces], alpha=0.08, facecolor='#555555', edgecolor='none')
 ax.add_collection3d(valid_volume)
 
-# Lattice points: bigger markers, full density
+# Lattice points: single gray value, no colormap
 ax.scatter(I_f, M_f, F_f,
-           c=F_f, cmap='viridis', s=18, alpha=0.85, linewidth=0.2,
-           edgecolor='white', vmin=0, vmax=27, depthshade=True)
+           c='#666666', s=14, alpha=0.6, linewidth=0.15,
+           edgecolor='white', depthshade=True)
 
-# Full addressable space (dashed wireframe)
+# Full addressable space (dashed wireframe, light gray)
 for (xa, ya, za), (xb, yb, zb) in full_edges:
-    ax.plot([xa, xb], [ya, yb], [za, zb], color='#888888', linestyle='--', linewidth=0.5)
-ax.plot([], [], [], color='#888888', linestyle='--', linewidth=0.5, label='Full 32x32x32 addressable space')
+    ax.plot([xa, xb], [ya, yb], [za, zb], color='#aaaaaa', linestyle='--', linewidth=0.5)
+ax.plot([], [], [], color='#aaaaaa', linestyle='--', linewidth=0.5, label='Full 32x32x32 addressable space')
 
-# Valid region edge (solid wireframe) — draw on top of the volume
+# Valid region edge (solid wireframe, dark gray)
 for (xa, ya, za), (xb, yb, zb) in valid_edges:
-    ax.plot([xa, xb], [ya, yb], [za, zb], color='#1a3a5c', linestyle='-', linewidth=0.8)
-ax.plot([], [], [], color='#1a3a5c', linestyle='-', linewidth=0.8, label='Valid 19x21x28 syllable region')
+    ax.plot([xa, xb], [ya, yb], [za, zb], color='#333333', linestyle='-', linewidth=0.8)
+ax.plot([], [], [], color='#333333', linestyle='-', linewidth=0.8, label='Valid 19x21x28 syllable region')
 
-# Annotate the Unicode block range
+# Annotation
 ax.text(18.5, 20.5, 30,
         'U+AC00 .. U+D7AF\n11,172 valid coordinates',
         fontsize=8, ha='center', va='bottom',
-        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='#1a3a5c', alpha=0.9))
+        bbox=dict(boxstyle='round,pad=0.3', facecolor='white', edgecolor='#333333', alpha=0.9))
 
 ax.set_xlabel('Initial (choseong)', fontsize=11)
 ax.set_ylabel('Medial (jungseong)', fontsize=11)
@@ -189,27 +230,23 @@ ax.xaxis.set_major_locator(plt.MaxNLocator(5))
 ax.yaxis.set_major_locator(plt.MaxNLocator(5))
 ax.zaxis.set_major_locator(plt.MaxNLocator(5))
 
-# Clean panes
-ax.xaxis.pane.fill = False
-ax.yaxis.pane.fill = False
-ax.zaxis.pane.fill = False
-ax.xaxis.pane.set_edgecolor('none')
-ax.yaxis.pane.set_edgecolor('none')
-ax.zaxis.pane.set_edgecolor('none')
-ax.xaxis.line.set_color('black')
-ax.yaxis.line.set_color('black')
-ax.zaxis.line.set_color('black')
+# Clean panes, black axes
+for axis in [ax.xaxis, ax.yaxis, ax.zaxis]:
+    axis.pane.fill = False
+    axis.pane.set_edgecolor('none')
+    axis.line.set_color('black')
+
 ax.tick_params(axis='x', colors='black', labelsize=9)
 ax.tick_params(axis='y', colors='black', labelsize=9)
 ax.tick_params(axis='z', colors='black', labelsize=9)
 
-# Light grid on axes planes for depth perception
+# Light grid lines
 for coord in range(0, 33, 8):
     ax.plot([coord, coord], [0, 31], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
     ax.plot([0, 31], [coord, coord], [0, 0], color='#dddddd', linewidth=0.3, zorder=-1)
 
 ax.view_init(elev=24, azim=-68)
-ax.legend(loc='upper left', fontsize='small', facecolor='white', edgecolor='#cccccc', framealpha=0.95)
+ax.legend(loc='upper left', fontsize='small', facecolor='white', edgecolor='#999999', framealpha=0.95)
 
 plt.tight_layout()
 plt.show()
@@ -328,6 +365,31 @@ Tagma addresses the class of content-addressable storage with up to approximatel
 
 The practical implication for everyday identifiers is direct. UUID generation requires entropy collection, version/variant bit insertion, and hyphen formatting at approximately 100 ns or more; its 128-bit output expressed in hex or Base64 consumes 36 or 22 characters respectively. Tagma produces a 6-syllable identifier (18 axes, $1.9 \times 10^{24}$ space) in approximately 12 ns, and a 10-syllable identifier exceeding UUID space in approximately 20 ns — each requiring only multiplications and additions — as a human-readable Hangul string with no special characters, no padding, and zero collision probability. Similarly, a SHA-256 hash output as 64 hex characters is matched by 19 Tagma syllables covering the same $2^{256}$ space in approximately 38 ns. In all cases Tagma output is shorter, faster, and structurally self-validating. A software proof of concept confirming these measurements is described in Appendix [*-@sec-appendix-poc*].
 
+### N-Syllable Composition: From 16 Bits to UUID Scale
+
+A single Tagma syllable provides 11,172 unique identifiers over 16 bits. For larger address spaces, syllables compose linearly:
+
+$$S(N) = 11,172^N \approx 10^{4.05N}$$
+
+**Linearization.** An N-syllable coordinate (c_1, ..., c_N) maps to a single linear index via row-major order:
+
+$$\text{index}(c_1, \ldots, c_N) = \sum_{k=1}^{N} c_k \times 11,172^{\,N-k}$$
+
+This requires exactly $(N-1)$ multiply-add pairs — a fixed sequence of $2(N-1)$ arithmetic operations independent of the addressable space. Since $N$ is a compile-time constant, the lookup remains O(1) for any N-syllable composition.
+
+| Syllables | Axes | Identifier space | Equivalent to |
+|-----------|------|-----------------|---------------|
+| 1 | 3 | $1.12 \times 10^4$ | Sensor tags |
+| 2 | 6 | $1.25 \times 10^8$ | Database records |
+| 3 | 9 | $1.39 \times 10^{12}$ | Distributed nodes |
+| 6 | 18 | $1.94 \times 10^{24}$ | Below UUID ($3.4 \times 10^{38}$) |
+| 8 | 24 | $2.41 \times 10^{32}$ | Approaches UUID |
+| 9 | 27 | $2.99 \times 10^{36}$ | Below UUID ($3.4 \times 10^{38}$) |
+| 10 | 30 | $2.69 \times 10^{40}$ | Exceeds UUID ($3.4 \times 10^{38}$) |
+| 19 | 57 | $1.94 \times 10^{77}$ | SHA-256 (256-bit) equivalent |
+
+Each syllable retains independent hardware-verifiable validity ($19 \times 21 \times 28 = 11,172$ gates per syllable). The N-tuple identity space is the Cartesian product of $N$ independent 3D spaces, yielding a $3N$-dimensional structural coordinate system.
+
 ### The Paradigm Shift {#sec-paradigm-shift}
 
 In conventional computing, identity is established through indirection:
@@ -376,6 +438,22 @@ memory[coord]"];
 }
 """)
 ```
+
+### Consequence: Elimination of Separate Index Structures
+
+In current content-addressable systems, identity and index are separate data structures. The identity (hash) is content-derived but structurally opaque; indexes (hash tables, B-trees) must be maintained separately for multi-axis queries. Tagma's structural identity eliminates this separation:
+
+::: {tbl-colwidths="[20, 40, 40]"}
+
+| Layer | Current (SHA-256) | Tagma |
+|------|-------------------|-------|
+| Identity | $H = \text{SHA256}(\text{data})$ (256-bit opaque) | $\text{Tagma}(i,m,f) = \text{U+AC00} + 588i + 28m + f$ (16-bit transparent) |
+| Index | separate structures: HashMap, OrderedIndex | none: identity = coordinate |
+| Query | $\text{Vec}[o] \cap \text{Vec}[c] \cap \text{Vec}[t]$ -- $O(K \times N)$ intersection | $\text{coord}.\text{decompose}()$ -- $O(1)$ direct field extraction |
+
+:::
+
+This property, verified in the PoC, is the software-level manifestation of the same principle the hardware decoder implements: the coordinate IS the identity, and the identity IS the coordinate. No indirection, no intersection, no hash tables.
 
 ## The Decoder
 
@@ -599,10 +677,6 @@ The bitcell array remains standard 6T SRAM. The change is in the peripheral circ
 
 In a 28 nm CMOS process, a 6T SRAM high-density bitcell occupies approximately 0.127 $\mu$m$^2$. The 11,172-cell core array therefore covers approximately 1,419 $\mu$m$^2$ (0.0014 mm$^2$). With peripheral circuitry -- three decoders, sense amplifiers, and wordline drivers -- the total area approximately doubles to 0.003--0.004 mm$^2$, roughly 30x smaller than a single 32-bit multiplier in the same process.
 
-### Current Status
-
-The decoder specification and coordinate space definition are complete. Part I (XIF coprocessor) is the current implementation path. The decoder logic, coordinate space specification, and verification methodology follow the same pattern as the existing verification pipeline. Part II (memory controller mapping and 3D decoder layout) is specified but not yet implemented. The two paths share the identical coordinate specification and field decomposition; they differ only in the layer at which decode occurs.
-
 ## Application Domains
 
 The deterministic single-cycle decode makes Tagma suitable for real-time and safety-critical systems. The three-decoder topology of the future path reduces worst-case decode latency compared to a single linear decoder.
@@ -619,7 +693,19 @@ An exact enumeration of all 11,172 valid coordinates confirms the detection rate
 
 Tagma is a 16-bit boundary, not a 16-bit limitation. It addresses a specific design range: systems requiring content-addressable identity for a working set of up to 11,172 entries. Part I is designed to be compatible with existing processor pipelines (RISC-V reference) and verification flows. Part II is a future direction with no current implementation timeline. The structural validity check provided by the decoder does not eliminate the need for full error-correcting codes: single-bit errors that map one valid coordinate to another are not detected.
 
-Tagma does not replace cryptographic primitives. SHA-256 remains for signatures, Merkle proofs, and preimage resistance. Encryption, authentication, and key derivation are outside its scope. Tagma replaces the use of hashes as structural identifiers and addresses. A combined SHA-256 with Tagma encoding approach is described in Appendix [*-@sec-appendix-sha-tagma*].
+Tagma does not replace cryptographic primitives. SHA-256 remains for signatures, Merkle proofs, and preimage resistance. Encryption, authentication, and key derivation are outside its scope. Tagma replaces the use of hashes as structural identifiers and addresses.
+
+For applications requiring content determinism — where the same data must always produce the same identifier — SHA-256 and Tagma are complementary, not alternatives. SHA-256 provides the content fingerprint; Tagma makes that fingerprint readable:
+
+| Property | SHA-256 hex | SHA-256 with Tagma |
+|----------|------------|--------------------|
+| Output | 64 hex characters | 19 Hangul syllables |
+| Determinism | Yes | Yes (SHA preserved) |
+| Human readable | No | Yes |
+| Self-validating | No | Yes (each syllable checked) |
+| Collision resistance | 2^-256 | 2^-256 (SHA preserved) |
+
+The combination serves use cases such as file identification, content-addressed storage, and commit hashing where determinism is required but hex output is not.
 
 ## Vision
 
@@ -709,40 +795,25 @@ plt.show()
 
 All figures above are software measurements on a general-purpose CPU. In silicon, the per-syllable decoder operates as a single combinational cycle independent of syllable count, so the 19-syllable composition cost converges toward 19 cycles versus 19 sequential SHA-256 calls at 64--75 cycles each --- a hardware improvement ratio exceeding 60x.
 
-### N-Syllable Composition: From 16 Bits to UUID Scale
+## Tagma Text Encoding / Base11172 {#sec-appendix-base11172}
 
-A single Tagma syllable provides 11,172 unique identifiers over 16 bits. For larger address spaces, syllables compose linearly:
+Tagma coordinates serialize to printable, self-validating Hangul strings:
 
-$$S(N) = 11,172^N \approx 10^{4.05N}$$
+- Each coordinate index $0 \leq \text{idx} < 11,172$ maps to exactly one Hangul syllable: $\text{char} = \text{U+AC00} + \text{idx}$.
+- A pair of syllables encodes a 16-bit value: $\text{value} = \text{hi} \times 11172 + \text{lo}$.
+- An N-syllable coordinate serializes to N consecutive Hangul syllables.
 
-| Syllables | Axes | Identifier space | Equivalent to |
-|-----------|------|-----------------|---------------|
-| 1 | 3 | $1.12 \times 10^4$ | Sensor tags |
-| 2 | 6 | $1.25 \times 10^8$ | Database records |
-| 3 | 9 | $1.39 \times 10^{12}$ | Distributed nodes |
-| 6 | 18 | $1.94 \times 10^{24}$ | Below UUID ($3.4 \times 10^{38}$) |
-| 8 | 24 | $2.41 \times 10^{32}$ | Approaches UUID |
-| 9 | 27 | $2.99 \times 10^{36}$ | Below UUID ($3.4 \times 10^{38}$) |
-| 10 | 30 | $2.69 \times 10^{40}$ | Exceeds UUID ($3.4 \times 10^{38}$) |
-| 19 | 57 | $1.94 \times 10^{77}$ | SHA-256 (256-bit) equivalent |
+The encoding is self-validating: any character outside U+AC00..U+D7AF is immediately detectable as invalid. No special characters, no padding, no escaping.
 
-Each syllable retains independent hardware-verifiable validity ($19 \times 21 \times 28 = 11,172$ gates per syllable). The N-tuple identity space is the Cartesian product of $N$ independent 3D spaces, yielding a $3N$-dimensional structural coordinate system.
+## Tagma Compliance {#sec-appendix-compliance}
 
-### Consequence: Elimination of Separate Index Structures
+An implementation is Tagma-compatible iff:
 
-In current content-addressable systems, identity and index are separate data structures. The identity (hash) is content-derived but structurally opaque; indexes (hash tables, B-trees) must be maintained separately for multi-axis queries. Tagma's structural identity eliminates this separation:
-
-::: {tbl-colwidths="[20, 40, 40]"}
-
-| Layer | Current (SHA-256) | Tagma |
-|------|-------------------|-------|
-| Identity | $H = \text{SHA256}(\text{data})$ (256-bit opaque) | $\text{Tagma}(i,m,f) = \text{U+AC00} + 588i + 28m + f$ (16-bit transparent) |
-| Index | separate structures: HashMap, OrderedIndex | none: identity = coordinate |
-| Query | $\text{Vec}[o] \cap \text{Vec}[c] \cap \text{Vec}[t]$ -- $O(K \times N)$ intersection | $\text{coord}.\text{decompose}()$ -- $O(1)$ direct field extraction |
-
-:::
-
-This property, verified in the PoC, is the software-level manifestation of the same principle the hardware decoder implements: the coordinate IS the identity, and the identity IS the coordinate. No indirection, no intersection, no hash tables.
+1. It implements the composition formula $C(i,m,f) = \text{U+AC00} + 588i + 28m + f$ correctly for all 11,172 valid coordinates.
+2. It rejects all 54,364 structurally invalid 16-bit values.
+3. It provides O(1) worst-case access for single-syllable coordinates.
+4. It provides O(1) worst-case access for any fixed N-syllable composition via linearization.
+5. All implementations must be bit-exact: the same coordinate must produce the same decomposition and the same linear index across all languages and platforms.
 
 ## Hardware Design Implications {#sec-appendix-hardware}
 
@@ -760,8 +831,6 @@ Conventional hardware searches. Tagma hardware interprets. This shifts the hardw
 
 ## SHA-256 with Tagma Encoding {#sec-appendix-sha-tagma}
 
-For applications requiring content determinism — where the same data must always produce the same identifier — SHA-256 and Tagma are complementary, not alternatives:
-
 ```rust
 use sha2::{Sha256, Digest};
 
@@ -778,16 +847,6 @@ fn content_tagma_id(data: &[u8]) -> String {
 ```
 
 SHA-256 output is uniformly distributed, so modulo-11172 mapping is statistically unbiased; the collision probability per syllable remains $2^{-256}$, preserved from the underlying hash.
-
-| Property | SHA-256 hex | SHA-256 with Tagma |
-|----------|------------|--------------------|
-| Output | 64 hex characters | 19 Hangul syllables |
-| Determinism | Yes | Yes (SHA preserved) |
-| Human readable | No | Yes |
-| Self-validating | No | Yes (each syllable checked) |
-| Collision resistance | 2^-256 | 2^-256 (SHA preserved) |
-
-SHA-256 provides the content fingerprint; Tagma makes that fingerprint readable. The combination serves use cases such as file identification, content-addressed storage, and commit hashing where determinism is required but hex output is not.
 
 ## References {.unnumbered .unlisted}
 

@@ -15,7 +15,7 @@ metadata-files:
     - ./_include/format.html.yml
 colorlinks: true
 abstract: |
-  Project Tagma defines a structural identity primitive for computing derived from the coordinate system embedded in Hangul — the only script whose Unicode encoding follows a closed-form composition formula. The standard allocates a contiguous block of 11,172 complete syllables, each decomposable into three independent axes that map to a 16-bit hardware coordinate space. In this space, every valid value serves as its own content-addressable identifier, replacing hash-based identity generation with a combinational decoder. We describe the coordinate space, the decoder specification, a RISC-V coprocessor implementation path, and a future direction extending the same principle into the memory subsystem.
+  Tagma is the realization that the Unicode Hangul syllable block encodes a 16-bit structural coordinate space with a closed-form composition formula, three independent axes, and a built-in invalidity margin of 54,364 of 65,536 states. This space enables hash-less, collision-free content addressing with a combinational decoder of approximately 300 gates and one cycle. We define the coordinate space, the decoder specification, a RISC-V XIF coprocessor reference implementation, and core data structures (TagmaCoord, TagmaMap, TagmaSet, TimeIndex). Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection.
 format:
   html:
     number-sections: true
@@ -64,628 +64,106 @@ format:
         \makeatother
 ---
 
-## A Content‑Addressable Structural Primitive Defined by the Hangul Syllabic Space
-
-Tagma is the discovery that a 16‑bit Unicode block allocated to a 3‑axis writing system provides a collision‑free, hash‑less, structurally addressable coordinate space for computing.
-
-## The Discovery
-
-Tagma is not a technology. It is not a product. It is not an algorithm. It is a **discovery**—an emergent structure that revealed itself when three separate, independently established systems were viewed as a single coherent whole.
-
-Three systems, each complete and public, intersect at a single point:
-
-| System | Established By | When | What It Provides |
-|--------|---------------|------|------------------|
-| **Hangul** | Sejong the Great & the Hall of Worthies | 1443 | A featural writing system with a complete, exception‑free three‑axis combinatorial structure |
-| **Unicode** | Unicode Consortium | 1991 | A contiguous 16‑bit address space (U+AC00–U+D7AF) allocated to all modern Hangul syllables |
-| **SSCCS** | SSCCS Foundation | 2026 | A philosophical and computational framework that treats computation as the observation of structure under constraint |
-
-The intersection is **Tagma**: the realization that a linearly allocated Unicode block encodes a hidden 3‑axis coordinate space, and that this coordinate space can serve as a native addressing and identification primitive for computing.
-
-**Tagma was not invented.** It was discovered. No one designed it. No one intended it. The structure was always there, waiting for someone to look through the right lens.
-
----
-
-## The Mathematical Structure
-
-### The Coordinate Space
-
-Modern Korean Hangul syllables (11,172 in total) are formed by combining three axes:
-
-| Axis | Korean Term | Count | Bit Allocation |
-|------|-------------|-------|----------------|
-| Onset (초성) | Choseong | 19 | 5 bits |
-| Nucleus (중성) | Jungseong | 21 | 5 bits |
-| Coda (종성) | Jongseong | 28 | 5 bits |
-
-Total: **19 × 21 × 28 = 11,172** valid combinations.
-
-### The Encoding Formula
-
-Every Hangul syllable is assigned a Unicode code point by the following deterministic formula:
-
-```text
-code = 0xAC00 + (onset × 588) + (nucleus × 28) + coda
+```{python}
+#| include: false
+#| context: local
+%run ./_include/_graphviz.py
 ```
 
-This formula is **complete and exception‑free**. Every combination of (onset, nucleus, coda) yields a valid, distinct, and publicly recognized Hangul syllable. There are no gaps, no reserved values, no invalid combinations within the range.
+Tagma is a structural identity primitive: a 16-bit coordinate space embedded in the Unicode Hangul syllable block that replaces hash-based addressing with a combinational decoder. The space is an open international standard (Unicode) and a public good. Tagma was not invented; it was discovered --- an emergent structure at the intersection of a featural writing system (Hangul, 1443), a universal encoding standard (Unicode, 1991), and the needs of content-addressable computing.
 
-### The Three Interpretations
+## Coordinate Space {#sec-coordinate-space}
 
-Every 16‑bit value in this range has **three simultaneous interpretations**:
+The Unicode Hangul syllable block is the only script whose encoding follows a closed-form composition formula:
+
+$$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 21,\; 0 \leq f < 28$$
+
+**Dimensions:** 19 (initial) × 21 (medial) × 28 (final) = 11,172 valid coordinates.  
+**Invalidity margin:** 54,364 of 65,536 representable 16-bit states are structurally invalid and hardware-detectable.
+
+Every valid 16-bit value carries three interpretations:
 
 | Interpretation | Domain | Use |
-|----------------|--------|-----|
-| **1‑D address** | Unicode code point (U+AC00–U+D7AF) | Standard character encoding |
-| **3‑D coordinate** | (onset, nucleus, coda) | Structural positioning |
-| **Semantic symbol** | A Hangul syllable | Human readability |
+|---------------|--------|-----|
+| 1-D address | Unicode code point U+AC00--U+D7AF | Character encoding |
+| 3-D coordinate | (initial, medial, final) | Structural positioning |
+| Semantic symbol | Hangul syllable | Debugging aid |
 
-This triple‑interpretability is the core insight. One value, three uses, zero additional cost.
+## Decoder Specification
 
-### The N-Syllable Product Space
+A combinational circuit extracts three 5-bit fields from any 16-bit input in three stages:
 
-The single-syllable coordinate space extends naturally to N syllables via the Cartesian
-product:
+| Stage | Operation | Gate count |
+|-------|-----------|-----------|
+| 1 | Range check: input in [U+AC00, U+D7AF] | ~50 |
+| 2 | Field extraction: offset / 588 / 28 | ~140 |
+| 3 | Axis validation: initial<19, medial<21, final<28 | ~30 |
+| **Total** | | **~300 gates, 1 cycle** |
 
-```text
-S^N = S × S × ... × S  (N times)
-```
+Three custom instructions are defined for the RISC-V XIF coprocessor interface: coordinate decode, field-wise Hamming distance, and field-conditional select. A reference implementation targets the OpenHW CVA6 via CV-X-IF.
 
-where |S| = 11,172 is the size of the single-syllable space. The total size grows as
-11,172^N, not 11,172 × N. Each additional syllable multiplies, not adds, the addressable
-space.
+## SSCCS Mapping
 
-A linear array over S^N is indexed by flattening the N-dimensional coordinate into a
-single integer:
-
-```text
-index_N(c₁, c₂, ..., c_N) = (((c₁ × 11172 + c₂) × 11172 + c₃) ... ) × 11172 + c_N
-```
-
-This is identical to row-major tensor flattening: the innermost (rightmost) coordinate
-varies fastest. For N = 2, the formula matches the standard two-dimensional row-major
-layout; for N > 2, it generalizes recursively.
-
-Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system
-(onset₁, nucleus₁, coda₁, onset₂, ..., coda_N). The 16-bit syllable address is a
-projection of this higher-dimensional space into a linear array index.
-
-### What This Is Not
-
-| It is not | Because |
-|-----------|---------|
-| A new character set | It uses existing Unicode |
-| A new encoding scheme | It uses existing UTF‑8/16 |
-| A compression algorithm | It does not compress data |
-| A hash function | It has no cryptographic properties |
-| A proof of work | It requires no computation |
-
-It is a **discovery of structure**, not an invention of mechanism.
-
----
+| SSCCS Concept | Tagma Realization |
+|---------------|------------------|
+| **Segment** | A single 16-bit coordinate point |
+| **Scheme** | The 19×21×28 lattice defining admissible coordinates |
+| **Field** | Hardware comparators defining admissible states |
+| **Observation** | Decoder evaluation: validity flag + three axis fields |
 
 ## Why Hangul Is Irreplaceable
 
-### The Criteria
+No other Unicode script provides the conjunction of properties that Tagma requires:
 
-For Tagma to work, three conditions must be met simultaneously:
+| Script | Contiguous Address | Closed-Form Formula | Three-Axis Decomposition | Tagma-compatible? |
+|--------|-------------------|---------------------|--------------------------|-------------------|
+| **Hangul** | Y U+AC00-U+D7AF | Y 19x21x28 | Y Onset-Nucleus-Coda | **Yes** |
+| ASCII / Latin | Y U+0000-U+007F | N | N | No |
+| Hiragana / Katakana | Y U+3040-U+30FF | N | N | No |
+| CJK Unified Ideographs | Y U+4E00-U+9FFF | N | N | No |
+| Arabic | Y U+0600-U+06FF | N | N | No |
 
-| Condition | Why It Matters |
-|-----------|----------------|
-| **Contiguous address space** | Enables direct array indexing; non‑contiguous spaces require mapping tables |
-| **Complete combinatorial structure** | No exceptions, no gaps; every address is a valid coordinate |
-| **Three‑axis decomposition** | Enables structural operations (neighborhood search, slicing, distance metrics) |
+## Paradigm Shift
 
-### The Comparative Table
-
-| Script | Contiguous Address Space | Complete Combinatorial Structure | Three‑Axis Decomposition | Tagma‑compatible? |
-|--------|--------------------------|--------------------------------|--------------------------|-------------------|
-| **Hangul** | Y U+AC00–U+D7AF | Y 19×21×28, no exceptions | Y Onset‑Nucleus‑Coda | **Yes** |
-| ASCII | Y U+0000–U+007F | N No combinatorial structure | N None | No |
-| Hiragana/Katakana | Y U+3040–U+30FF | N No combinatorial structure | N None | No |
-| CJK Unified Ideographs | Y U+4E00–U+9FFF | N Infinite, irregular | N None (component‑based, not systematic) | No |
-| Arabic | Y U+0600–U+06FF | N No combinatorial structure | N None | No |
-
-| Criterion | Hangul Syllables | Emoji | Latin Alphabet | CJK Hanzi |
-|-----------|-----------------|-------|---------------|-----------|
-| Unicode block | U+AC00-U+D7AF (single contiguous) | scattered across SMP (U+1F300+) | U+0000-U+007F (tiny) | U+4E00-U+9FFF (huge, incomplete) |
-| Bits needed | 14 (effective) | 21+ | 7 | 16+ |
-| Fixed width | 16-bit aligned | no (multi-byte) | 8-bit | 16-bit |
-| Structural axes | 3 (initial, medial, final) | none | none | none (radical decomposition not Unicode-encoded) |
-| Hardware indexable | yes (300 gates) | no | no | partial |
-
-Emoji are Unicode-standard but structurally amorphous. Each emoji is an atomic assignment with no internal axes, scattered across multiple supplementary planes. They cannot serve as a hardware coordinate space because there is no closed-form formula to map a 16-bit value to a valid emoji and back. This makes Hangul structurally unique for low-level addressing.
-
-### The Uniqueness Claim
-
-Hangul is the **only** major writing system that simultaneously satisfies all three conditions. No other script was designed from first principles with a complete, exception‑free combinatorial system that was later fully encoded in a single contiguous Unicode block.
-
-Three additional properties reinforce this uniqueness:
-
-**BMP core status.** Hangul syllables occupy the Basic Multilingual Plane (Plane 0), Unicode's foundational layer. Every Unicode implementation supports BMP by definition. Tagma inherits this universal compatibility without requiring any supplementary plane or special handling.
-
-**Structural depth at alphabet rank.** Within the BMP, Hangul holds the same architectural rank as the Latin alphabet — both are primary scripts in the core encoding. Unlike Latin, Hangul embeds three structural axes (initial, medial, final) into each code point. It is a structurally rich alphabet at the protocol level of ASCII.
-
-**UNESCO World Heritage foundation.** The Hunminjeongeum Haerye, which documents Hangul's design principles, was inscribed on the UNESCO Memory of the World Register in 1997. UNESCO described Hangul as "the only script whose creator and creation purpose are clearly documented." Tagma does not merely use a convenient character set; it applies a UNESCO-recognized scientific design — created in 1443 and validated as humanity's shared intellectual heritage — to a 2026 computing problem.
-
-> *"Hangul is not merely a writing system. It is a 16‑bit coordinate space with native three‑axis decomposition and built‑in validity checking. It was designed in 1443, encoded in 1991, and discovered in 2026."*
-
-### A Free Three-Axis Coordinate System
-
-Building a custom three-axis coordinate system from scratch requires defining the encoding, standardizing it, documenting it, maintaining it, and convincing others to adopt it. Hangul provides all of this at zero cost:
-
-| Condition | Hangul | Custom system |
-|-----------|--------|---------------|
-| Defined by | Sejong the Great (1443) | You |
-| Standardized by | Unicode Consortium (1996) | You |
-| Recognized by | billions of devices worldwide | Zero until adopted |
-| Stability | immutable (cannot be changed) | requires maintenance |
-| Adoption barrier | none (already in every OS) | extreme (must be implemented everywhere) |
-
-Tagma did not design a coordinate system. It discovered that a complete, exception-free, three-axis coordinate system already existed — fully standardized, universally supported, and immutable.
-
-A Tagma coordinate is a 16-bit integer. That integer maps to a Unicode Hangul syllable through an OS-independent, language-independent, hardware-independent standard. The same bit pattern is interpreted identically on Windows (UTF-16LE), Linux (UTF-8), embedded firmware (raw u16), and JavaScript (charCodeAt):
-
-| Environment | Storage | Retrieval |
-|-------------|---------|-----------|
-| Windows | UTF-16LE, 2 bytes | direct u16 read |
-| Linux / macOS | UTF-8, 3 bytes | decode to u16 |
-| Embedded (no OS) | raw u16, 2 bytes | direct u16 read |
-| Web (JavaScript) | String.fromCharCode | .charCodeAt(0) |
-
-Because the coordinate is a 16-bit integer and a three-axis value simultaneously, the same data can be accessed as a 1D array index or a 3D array index without conversion:
-
-```rust
-let coord = TagmaCoord::from_axes(5, 10, 15);
-
-// 1D: slot array (compact, cache-friendly)
-let v1 = array_1d[coord.0 as usize];
-
-// 3D: axis array (structural, neighbor-aware)
-let (o, n, c) = coord.to_axes();
-let v3 = array_3d[o as usize][n as usize][c as usize];
-
-// Both point to the same logical data
-```
-
-| Benefit | Why Hangul |
-|---------|-----------|
-| Universal storage | 16-bit integer: same on every OS, every language, every hardware platform |
-| Zero adoption cost | already installed on every device that supports Unicode |
-| 1D/3D interchangability | coordinate is both a flat index and a structured tuple |
-| Self-validating | invalid code points are rejected by the Unicode standard itself |
-| Immutable standard | no versioning, no deprecation, no migration |
-
----
-
-## The Paradigm Shift: Hash‑less Computing
-
-### The Traditional Model
-
-In conventional computing, data identity is established through **hashing**:
+In conventional computing, identity passes through three indirections: a hash function (~10K gates, 64 rounds), a collision resolution table, and a pointer dereference. Tagma replaces all three with direct structural addressing:
 
 ```text
-Data → Hash Function → Hash Value → Index → Storage Location
+hash(data) → resolve → dereference               (traditional)
+C(i,m,f) = 0xAC00 + 588i + 28m + f  →  access    (Tagma, 1 cycle)
 ```
 
-This model has inherent costs:
+**What Tagma replaces:** ID generation, hash-map key indexing, associative lookup, temporal indexing, sensor identification, proximity search.  
+**What Tagma does NOT replace:** SHA-256 (signatures, Merkle proofs, integrity verification), encryption, key derivation, password hashing.
 
-- Computation (hash cycles)
-- Collision probability (and collision handling)
-- Variable‑length keys
-- Non‑structural addressing (the address reveals nothing about the data)
+## Core Data Structures
 
-### The Tagma Model
+The coordinate space is implemented as a library providing four fundamental types:
 
-In Tagma, data identity **is** its address:
+- **TagmaCoord** -- A 16-bit value guaranteed to be structurally valid. Constructable from raw index, Unicode code point, character, or the three axes (initial, medial, final). Decomposable back to axes. Hamming distance computation. Display as Hangul syllable.
+- **TagmaMap** -- A direct-address table indexed by coordinate. Fixed capacity of 11,172 entries. O(1) insert, lookup, and delete with no collisions, no resizing, and no hashing overhead.
+- **TagmaSet** -- A bit array over the coordinate space. Insert, remove, and membership test are single-bit operations. Union, intersection, and difference are bitwise operations over 175 machine words.
+- **TagmaTimeIndex** -- Temporal indexing via linearized coordinate: `time × 11172 + coord`. A single multiply-add replaces a full hash computation.
 
-```text
-Data → Coordinate Assignment → Direct Storage
-```
+## Development Direction
 
-No hashing. No collisions. No variable lengths. Direct, structural, O(1) guaranteed.
+Tagma progresses along two parallel paths:
 
-### The Eliminated Costs
+**Path I -- Coprocessor (current).** A ~300-gate combinational decoder attached to a standard processor pipeline via the RISC-V XIF interface. Three custom instructions (decode, Hamming distance, field-conditional select) enable hash-less content addressing at one cycle per operation. Reference implementation targets the OpenHW CVA6 core.
 
-| Traditional Cost | Tagma Eliminates It |
-|------------------|---------------------|
-| Hash computation (hundreds of CPU cycles) | Y |
-| Collision resolution (chaining, probing) | Y |
-| Dynamic resizing (memory allocation) | Y |
-| Random memory access (cache misses) | Y |
-| Padding (Base64/hex representation overhead) | Y |
+**Path II -- Memory Subsystem (future).** The same coordinate space extended into the memory controller and bitcell array. Three independent decoders (5-to-19, 5-to-21, 5-to-28) replace the conventional row-column decoder pair, enabling structural addressing at the memory level. The bitcell array remains standard 6T SRAM.
 
-### The Gained Capabilities
+Beyond these paths, the coordinate space opens directions including:
 
-| Capability | How Tagma Provides It |
-|------------|-----------------------|
-| **O(1) guaranteed lookup** | Direct array indexing by coordinate |
-| **Collision‑free identity** | Each coordinate is unique |
-| **Structural proximity search** | (x±1, y±1, z±1) are neighboring coordinates |
-| **Axis slicing** | Extract all coordinates with a fixed nucleus (y‑axis) |
-| **Self‑validating IDs** | Invalid coordinates are structurally impossible |
-| **Human‑readable representation** | Coordinates displayed as Hangul text |
-
-### What Tagma Does Not Replace
-
-| Function | Why Tagma Cannot Replace It |
-|----------|-----------------------------|
-| Cryptographic integrity (SHA‑256) | Tagma has no one‑way property |
-| Digital signatures (Ed25519) | Tagma has no non‑repudiation property |
-| Key derivation (HKDF) | Tagma has no randomness property |
-| Password hashing (bcrypt, Argon2) | Tagma has no work‑factor property |
-
-Tagma is an **identity and addressing primitive**. It does not replace cryptographic functions; it replaces the **use of hashes as identities and addresses**.
-
----
-
-## The Core Data Structures
-
-### TagmaCoord
-
-A 16‑bit value guaranteed to be a valid Hangul coordinate.
-
-```rust
-#[derive(Copy, Clone, PartialEq, Eq, Hash)]
-pub struct TagmaCoord(u16);  // 0..11171, guaranteed valid
-
-impl TagmaCoord {
-    pub const fn new(value: u16) -> Option<Self>;
-    pub const fn from_axes(onset: u8, nucleus: u8, coda: u8) -> Option<Self>;
-    pub const fn to_axes(self) -> (u8, u8, u8);
-    pub const fn to_char(self) -> char;  // UTF‑16 code point
-    pub const fn from_char(ch: char) -> Option<Self>;
-    pub const fn to_hangul_string(self) -> String;  // UTF‑8 string
-}
-```
-
-### TagmaMap
-
-A collision‑free, fixed‑size, hash‑less associative array.
-
-```rust
-pub struct TagmaMap<V> {
-    slots: [Option<V>; 11172],  // Fixed size, ~22KB for empty map
-    len: usize,
-}
-
-impl<V> TagmaMap<V> {
-    pub const fn new() -> Self;
-    pub fn get(&self, coord: TagmaCoord) -> Option<&V>;
-    pub fn get_mut(&mut self, coord: TagmaCoord) -> Option<&mut V>;
-    pub fn insert(&mut self, coord: TagmaCoord, value: V) -> Option<V>;
-    pub fn remove(&mut self, coord: TagmaCoord) -> Option<V>;
-    pub fn contains_key(&self, coord: TagmaCoord) -> bool;
-    pub fn len(&self) -> usize;
-    pub fn is_empty(&self) -> bool;
-    pub fn iter(&self) -> impl Iterator<Item = (TagmaCoord, &V)>;
-    pub fn clear(&mut self);
-}
-```
-
-**Properties:**
-
-- No collisions (coordinate → slot is a bijection)
-- No resizing (fixed size, predictable memory)
-- O(1) guaranteed (not average)
-- `no_std` compatible (no allocator required)
-- Lock‑free concurrency (slot‑level atomic operations)
-
-### TagmaSet
-
-A fixed‑size, collision‑free, memory‑optimized bit array for presence checking.
-
-```rust
-pub struct TagmaSet {
-    bits: [u64; 175],  // 11172 bits ≈ 1.4KB
-}
-
-impl TagmaSet {
-    pub const fn new() -> Self;
-    pub fn insert(&mut self, coord: TagmaCoord);
-    pub fn remove(&mut self, coord: TagmaCoord);
-    pub fn contains(&self, coord: TagmaCoord) -> bool;
-    pub fn union(&self, other: &Self) -> Self;
-    pub fn intersection(&self, other: &Self) -> Self;
-    pub fn difference(&self, other: &Self) -> Self;
-    pub fn iter(&self) -> impl Iterator<Item = TagmaCoord>;
-}
-```
-
-### TimeIndex as Array
-
-Tagma enables a TimeIndex implementation that replaces hash-based temporal indexing with direct array access:
-
-```rust
-pub struct TimeIndex {
-    slots: [Option<Vec<FactId>>; 11172],
-}
-
-impl TimeIndex {
-    pub fn get(&self, coord: TagmaCoord) -> Option<&Vec<FactId>> {
-        self.slots[coord.0 as usize].as_ref()
-    }
-}
-```
-
-| Property | Hash-based TimeIndex | Tagma Array TimeIndex |
-|----------|---------------------|----------------------|
-| Lookup cost | O(1) average, O(N) worst | O(1) always |
-| Collision | possible (resolved by chaining) | impossible |
-| Memory layout | scattered (heap allocations) | contiguous (CPU cache friendly) |
-| Bounds check | implicit (hash function) | explicit (array bounds) |
-| N-syllable extension | N separate hash tables | single (11172^N) contiguous array |
-
-For N-syllable composite keys, the index is computed as a linearized Cartesian product coordinate:
-
-```rust
-fn time_coord_index(time: u32, coord: TagmaCoord) -> usize {
-    (time as usize) * 11172 + (coord.0 as usize)
-}
-```
-
-This replaces a hash computation with a single multiply-add, taking tens of cycles instead of hundreds, and guarantees zero collisions.
-
-### Tagma Text Encoding (TTE)
-
-A serialization format for Tagma coordinates using Hangul syllables as the textual representation.
-
-**Rules:**
-
-- Each coordinate is serialized as its corresponding Hangul syllable
-- Multiple coordinates are concatenated
-- The resulting string is URL‑safe, JSON‑safe, XML‑safe (no special characters)
-
-```text
-TagmaCoord(0)   → "가"
-TagmaCoord(1)   → "각"
-TagmaCoord(42)  → "나"
-TagmaCoord(11171) → "힣"
-TagmaID = "가각나"  // Three coordinates serialized
-```
-
-**Properties:**
-
-- Self‑validating (invalid syllables are rejected)
-- Human‑readable (Hangul is a natural language script)
-- No padding required
-- No special characters (no `+`, `/`, `=`)
-- **Not** a Base64 replacement (it is Tagma‑specific serialization)
-
-### TagmaID
-
-A Tagma Text‑encoded identifier. Multiple coordinates can be concatenated into a single identifier.
-
-```text
-TagmaID = TTE(coord₁) + TTE(coord₂) + ... + TTE(coordₙ)
-```
-
-**Properties:**
-
-- Collision‑free (each coordinate is unique)
-- Self‑validating (invalid coordinates break the ID)
-- Human‑readable (Hangul text)
-- Variable length (scale by adding syllables)
-- No cryptographic properties (do not use for security)
-
----
-
-## The SSCCS Connection
-
-Tagma is the concrete realization of SSCCS at the silicon/software boundary.
-
-| SSCCS Concept | Tagma Equivalent |
-|---------------|------------------|
-| **Segment** | A `TagmaCoord` (3‑axis coordinate) |
-| **Scheme** | The decomposition rules (19×21×28) |
-| **Field** | Constraints on valid coordinates (e.g., "onset ∈ {ㄱ,ㄴ}") |
-| **Observation** | The enumeration of all valid coordinates |
-| **Stigmergy** | Traces left in TagmaMap slots |
-
-Tagma does not require SSCCS to exist. But Tagma was discovered **through** SSCCS—the philosophical lens that asked: "What if the structure itself is the address?"
-
----
-
-## The Defense: Prior Art and Public Disclosure
-
-### The Strategy
-
-Tagma is a discovery. Discoveries are protected not by patents, but by **public disclosure as prior art**.
-
-| Action | What It Provides |
-|--------|------------------|
-| **DOI (Zenodo)** | Immutable timestamp and international recognition (CERN) |
-| **GitHub public repository** | Public visibility and tamper‑proof commit history |
-| **C2PA signing** | Cryptographic proof of document integrity and timestamp |
-| **Public white paper** | Comprehensive documentation of the discovery |
-
-### Why Not Patents
-
-| Patent | Public Disclosure |
-|--------|-------------------|
-| Takes years to grant | Immediate |
-| Expensive | Free |
-| Only valid in specific jurisdictions | Globally valid as prior art |
-| Requires secrecy | Open (strengthens prior art) |
-| Can be challenged | Cannot be retroactively challenged |
-
-### Licensing
-
-| Layer | License | Rationale |
-|-------|---------|-----------|
-| White papers | CC0 (public domain) | Maximum defensibility as prior art |
-| `tagma-core` crate | Apache‑2.0 OR MIT | Standard open‑source |
-| `tagma-map` crate | Apache‑2.0 OR MIT | Standard open‑source |
-| Hardware implementations | Apache‑2.0 | Patent grant included |
-| Commercial products | Proprietary / Open Core | Revenue model |
-
----
-
-## The Hierarchy: A Family of Documents
-
-Tagma is the root. Everything else branches from it.
-
-### The Master Document (This Document)
-
-- **Title:** *"Tagma: A Content‑Addressable Structural Primitive Defined by the Hangul Syllabic Space"*
-- **Status:** Draft → Final → Zenodo (DOI)
-- **Scope:** The discovery, the mathematical structure, the paradigm shift, and the ecosystem.
-
-### Specialized White Papers
-
-| Document | Scope | Audience |
-|----------|-------|----------|
-| **TagmaMap Specification** | Hash‑less associative array design and implementation | Developers, researchers |
-| **TagmaSet Specification** | Bit‑array set design and implementation | Developers, researchers |
-| **Tagma Text Encoding Specification** | Serialization format (TTE) | Standards bodies, developers |
-| **TagmaID Specification** | Identifier format | Standards bodies, developers |
-| **Tagma & SSCCS** | Philosophical and ontological connection | Philosophers, researchers |
-| **Tagma & Hardware** | FPGA/ASIC implementation notes | Hardware engineers |
-
-### Implementations
-
-| Project | Language | Scope |
-|---------|----------|-------|
-| `tagma-core` | Rust (`no_std`) | Core types and operations |
-| `tagma-map` | Rust (`no_std`) | Hash‑less map and set |
-| `tagma-text` | Rust | Tagma Text Encoding (TTE) |
-| `tagma-id` | Rust | TagmaID generation and parsing |
-| `tagma-verilog` | Verilog/SystemVerilog | Hardware decoder |
-
-### Ecosystem Integration
-
-| Project | How Tagma Fits |
-|---------|----------------|
-| **neXus** | Fact IDs → TagmaCoord, TimeIndex → TagmaMap |
-| **ExaVerif** | Verification state IDs → TagmaCoord |
-| **Actus** | Segment IDs → TagmaCoord |
-| **Rem** | ID generation → TagmaCoord arithmetic |
-| **sdbs** | Document IDs → TagmaCoord |
-| **C2PA** | Manifest hashes → TagmaID (optional) |
-
----
-
-## The Philosophical Foundation
-
-### The Critique of Cultural Neutrality
-
-The claim that Western computing is "culture‑neutral" is historically false:
-
-| Technology | Hidden Bias |
-|------------|-------------|
-| ASCII | Designed for English teleprinters |
-| UTF‑8 | Optimized for English (1 byte/char) |
-| Regex `\w` | Matches English letters, not Hangul |
-| Programming languages | Keywords are English |
-| Hash functions | Ignore structural meaning |
-
-Tagma challenges this narrative by demonstrating that a non‑Western script—Hangul—offers superior structural properties for a core computing primitive. That script is not an obscure or marginal character set: it occupies the foundational layer of Unicode (BMP), holds the same architectural rank as the Latin alphabet, and its design principles are inscribed on the UNESCO Memory of the World Register. The challenge is not merely technical but cultural.
-
-### The Tao of Structure
-
-SSCCS is rooted in process philosophy: computation is the **observation of structure under constraint**. Tagma gives structure a concrete, physical address:
-
-> *"The Way that can be named is not the eternal Way. The coordinate that can be hashed is not the eternal coordinate."*  
-> — Adapted from Laozi
-
-Tagma is the first practical implementation of a non‑Western, process‑oriented computational primitive.
-
-### The Discovery Frame
-
-> *"Tagma was not invented. It was discovered. No one designed the intersection of Hangul, Unicode, and SSCCS—it was always there. Tagma is the name we give to the act of looking through the right lens."*
-
----
-
-## The Roadmap
-
-### Phase 0: Core Discovery (July 2026)
-
-- [x] Discovery: Hangul + Unicode → 3‑axis coordinate space
-- [x] Formulation: Tagma as a content‑addressable structural primitive
-- [x] Master document drafted
-- [ ] White paper published to Zenodo (DOI)
-- [ ] GitHub repository created (ssccsorg/tagma)
-- [ ] README with DOI and overview
-
-### Phase 1: Core Implementation (July–August 2026)
-
-- [ ] `tagma-core` crate published (crates.io)
-- [ ] `tagma-map` crate published (crates.io)
-- [ ] `tagma-text` crate published (crates.io)
-- [ ] `tagma-id` crate published (crates.io)
-- [ ] Benchmarks comparing TagmaMap to HashMap
-
-### Phase 2: Specifications (August–September 2026)
-
-- [ ] TagmaMap Specification (white paper)
-- [ ] Tagma Text Encoding Specification (white paper)
-- [ ] TagmaID Specification (white paper)
-- [ ] Tagma & SSCCS (white paper)
-
-### Phase 3: Hardware (September–December 2026)
-
-- [ ] Verilog module: TagmaCoord ↔ axes
-- [ ] FPGA prototype: 16‑bit Tagma decoder
-- [ ] Power consumption benchmarks
-
-### Phase 4: Integration (October–December 2026)
-
-- [ ] neXus integration: Fact IDs → TagmaCoord
-- [ ] ExaVerif integration: State IDs → TagmaCoord
-- [ ] sdbs integration: Document IDs → TagmaCoord
-- [ ] Rem integration: ID generation → TagmaCoord
-
-### Phase 5: Publication (January 2027)
-
-- [ ] All white papers published and consolidated
-- [ ] All crates at 1.0
-- [ ] Full ecosystem demonstration
-
----
-
-## The Open Questions
-
-These questions are not yet resolved. They are directions for future inquiry.
-
-| Question | Status |
-|----------|--------|
-| Can TagmaMap scale beyond 11,172 slots with multi‑slot extensions? | Open |
-| What is the optimal cache alignment for TagmaMap on modern CPUs? | Open |
-| Can TagmaMap be implemented in hardware as a fully associative memory? | Open |
-| Can Tagma be extended to other Unicode blocks with structures? | Open |
-| Can TagmaID be used for content‑addressed storage? | Open |
-| Can Tagma be integrated with IPFS or other distributed storage? | Open |
-| What is the power consumption of a hardware Tagma decoder vs SHA‑256? | Open |
-
----
-
-## Key Differentiators
-
-| Attribute | Traditional | Tagma |
-|-----------|-------------|-------|
-| **Identifier generation** | Hash (thousands of cycles) | Arithmetic (1–2 cycles) |
-| **Collision resistance** | Probabilistic (finite hash space) | Guaranteed (coordinate is unique) |
-| **Memory layout** | Dynamic hash table (variable size) | Fixed array (22KB) |
-| **Concurrency** | Requires synchronization | Lock‑free (slot‑level atomic) |
-| **Self‑validation** | Separate checksum/hash | Built‑in (16‑bit range) |
-| **Human readability** | Hexadecimal / Base64 | Hangul text |
-| **Structural operations** | None (random access only) | Proximity search, slicing, distance |
-| **Hardware mapping** | Complex (hash function needs gates) | Simple (decoder + address lines) |
-| **Legacy compatibility** | High (existing infrastructure) | Low (requires new thought) |
-
----
+- **Tagma as SSCCS foundation:** Segment → TagmaCoord, Scheme → 19×21×28 lattice, Field → axis comparators, Observation → decoder evaluation. The coordinate space provides a hardware substrate for SSCCS primitives.
+- **Tagma as neXus FIH accelerator:** Fact indexing via coordinate, Intent as movement vector, Hint as adjacency weight. The coordinate space replaces hash-based state indexing in the FIH model.
+- **Tagma as universal serializer:** Base11172 encoding maps arbitrary bytes to self-validating Hangul strings, serving as Tagma's native serialization format for storage and communication.
 
 ## References
 
-1. Tagma Master White Paper (forthcoming) — Zenodo DOI (TBD)
-2. SSCCS Whitepaper — *Schema–Segment Composition Computing System* (2026)
-3. Unicode Standard — Hangul Syllables (U+AC00–U+D7AF) <https://www.unicode.org/charts/PDF/UAC00.pdf>
-4. Korean Alphabet (Hangul) — Sejong the Great, 1443
-5. neXus Runtime Documentation — docs.ssccs.org/projects/nexus
-6. ExaVerif — docs.ssccs.org/projects/ev
-7. Rem Product Specification — docs.ssccs.org/projects/rem
-8. C2PA Specification — Coalition for Content Provenance and Authenticity
+For the full technical analysis including decoder specification, XIF coprocessor implementation, hardware design, benchmarks, and SEU detection analysis, see the [Tagma White Paper](https://github.com/ssccsorg/tagma/blob/main/docs/wp.qmd).
 
----
-
-*End of Master Document.*
+1. Tagma White Paper (forthcoming) -- Zenodo DOI (TBD)
+2. ISO/IEC 10646:2020 -- Universal Coded Character Set (UCS)
+3. Unicode Standard -- Hangul Syllables (U+AC00--U+D7AF)
+4. OpenHW CV-X-IF Specification
+5. SSCCS Whitepaper -- Schema--Segment Composition Computing System (2026)

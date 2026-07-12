@@ -59,6 +59,16 @@ impl TagmaCoord {
     /// Creates a `TagmaCoord` from a raw 16-bit value.
     ///
     /// Returns `None` if the value is outside the valid range [0, 11171].
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::new(0).unwrap();
+    /// assert_eq!(c.to_char(), '가');
+    ///
+    /// let invalid = TagmaCoord::new(11172);
+    /// assert!(invalid.is_none());
+    /// ```
     #[inline]
     pub const fn new(value: u16) -> Option<Self> {
         if (value as usize) < Self::N_VALID {
@@ -71,6 +81,17 @@ impl TagmaCoord {
     /// Creates a `TagmaCoord` from its three structural axes.
     ///
     /// Returns `None` if any axis is out of bounds.
+    /// Valid ranges: initial 0..19, medial 0..21, final 0..28.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let ga = TagmaCoord::from_axes(0, 0, 0).unwrap();
+    /// assert_eq!(ga.to_char(), '가');
+    ///
+    /// let invalid = TagmaCoord::from_axes(19, 0, 0);
+    /// assert!(invalid.is_none());
+    /// ```
     #[inline]
     pub const fn from_axes(initial: u8, medial: u8, final_: u8) -> Option<Self> {
         let i = initial as usize;
@@ -89,6 +110,16 @@ impl TagmaCoord {
     ///
     /// Returns `None` if the code point is outside the Hangul syllable block
     /// (U+AC00..U+D7AF).
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::from_code_point(0xAC00).unwrap();
+    /// assert_eq!(c.to_char(), '가');
+    ///
+    /// let invalid = TagmaCoord::from_code_point(0x0041);
+    /// assert!(invalid.is_none());
+    /// ```
     #[inline]
     pub const fn from_code_point(cp: u16) -> Option<Self> {
         if cp >= Self::BASE && cp <= Self::LAST {
@@ -101,6 +132,16 @@ impl TagmaCoord {
     /// Creates a `TagmaCoord` from a `char`.
     ///
     /// Returns `None` if the character is not a valid Hangul syllable.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::from_char('한').unwrap();
+    /// assert_eq!(c.to_code_point(), 0xD55C);
+    ///
+    /// let non_hangul = TagmaCoord::from_char('A');
+    /// assert!(non_hangul.is_none());
+    /// ```
     #[inline]
     pub const fn from_char(ch: char) -> Option<Self> {
         Self::from_code_point(ch as u16)
@@ -113,18 +154,42 @@ impl TagmaCoord {
 
 impl TagmaCoord {
     /// Returns the raw 0-based index (0..11171).
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::from_char('가').unwrap();
+    /// assert_eq!(c.index(), 0);
+    ///
+    /// let last = TagmaCoord::from_char('힣').unwrap();
+    /// assert_eq!(last.index(), 11171);
+    /// ```
     #[inline]
     pub const fn index(self) -> u16 {
         self.0
     }
 
     /// Returns the Unicode code point (U+AC00..U+D7AF).
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::new(0).unwrap();
+    /// assert_eq!(c.to_code_point(), 0xAC00);
+    /// ```
     #[inline]
     pub const fn to_code_point(self) -> u16 {
         Self::BASE + self.0
     }
 
     /// Returns the `char` corresponding to this coordinate.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::new(0).unwrap();
+    /// assert_eq!(c.to_char(), '가');
+    /// ```
     #[inline]
     pub const fn to_char(self) -> char {
         // SAFETY: self.0 is guaranteed < 11172, so BASE + self.0 is in U+AC00..U+D7AF,
@@ -134,6 +199,13 @@ impl TagmaCoord {
 
     /// Decomposes this coordinate into its three structural axes:
     /// `(initial, medial, final)`.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::from_char('한').unwrap();
+    /// assert_eq!(c.to_axes(), (18, 0, 4));
+    /// ```
     #[inline]
     pub const fn to_axes(self) -> (u8, u8, u8) {
         let v = self.0 as usize;
@@ -145,6 +217,13 @@ impl TagmaCoord {
     }
 
     /// Returns the Hangul syllable as a UTF-8 string.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::new(0).unwrap();
+    /// assert_eq!(c.to_hangul_string(), "가");
+    /// ```
     pub fn to_hangul_string(self) -> String {
         self.to_char().to_string()
     }
@@ -168,6 +247,16 @@ impl TagmaCoord {
     /// Computes the field-wise Hamming distance between two coordinates.
     ///
     /// Returns `(d_initial, d_medial, d_final)`, each in 0..=max(axis).
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let a = TagmaCoord::from_axes(0, 0, 0).unwrap();
+    /// let b = TagmaCoord::from_axes(3, 5, 7).unwrap();
+    /// assert_eq!(a.hamming_distance(b), (3, 5, 7));
+    ///
+    /// assert_eq!(a.hamming_distance(a), (0, 0, 0));
+    /// ```
     #[inline]
     pub const fn hamming_distance(self, other: Self) -> (u8, u8, u8) {
         let (ai, am, af) = self.to_axes();
@@ -186,12 +275,28 @@ const fn abs_diff(a: u8, b: u8) -> u8 {
 
 impl TagmaCoord {
     /// Returns the little-endian bytes of the raw index.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::new(0x2BA3).unwrap();
+    /// // 0x2BA3 = 11171 = last syllable 힣
+    /// assert_eq!(c.to_le_bytes(), [0xA3, 0x2B]);
+    /// ```
     #[inline]
     pub const fn to_le_bytes(self) -> [u8; 2] {
         self.0.to_le_bytes()
     }
 
     /// Returns the big-endian bytes of the raw index.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::new(0x2BA3).unwrap();
+    /// // 0x2BA3 = 11171 = last syllable 힣
+    /// assert_eq!(c.to_be_bytes(), [0x2B, 0xA3]);
+    /// ```
     #[inline]
     pub const fn to_be_bytes(self) -> [u8; 2] {
         self.0.to_be_bytes()
@@ -200,6 +305,17 @@ impl TagmaCoord {
     /// Creates a `TagmaCoord` from little-endian bytes.
     ///
     /// Returns `None` if the decoded value is invalid.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::from_le_bytes([0x00, 0x00]).unwrap();
+    /// assert_eq!(c.to_char(), '가');
+    ///
+    /// let invalid = TagmaCoord::from_le_bytes([0x04, 0x2C]);
+    /// // 0x2C04 = 11268, out of range
+    /// assert!(invalid.is_none());
+    /// ```
     #[inline]
     pub const fn from_le_bytes(bytes: [u8; 2]) -> Option<Self> {
         Self::new(u16::from_le_bytes(bytes))
@@ -208,6 +324,17 @@ impl TagmaCoord {
     /// Creates a `TagmaCoord` from big-endian bytes.
     ///
     /// Returns `None` if the decoded value is invalid.
+    ///
+    /// ```
+    /// use tagma_core::TagmaCoord;
+    ///
+    /// let c = TagmaCoord::from_be_bytes([0x00, 0x00]).unwrap();
+    /// assert_eq!(c.to_char(), '가');
+    ///
+    /// let invalid = TagmaCoord::from_be_bytes([0x2C, 0x04]);
+    /// // 0x2C04 = 11268, out of range
+    /// assert!(invalid.is_none());
+    /// ```
     #[inline]
     pub const fn from_be_bytes(bytes: [u8; 2]) -> Option<Self> {
         Self::new(u16::from_be_bytes(bytes))

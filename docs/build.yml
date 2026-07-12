@@ -52,6 +52,9 @@ post_render:
 #   - Directory patterns: **/_include/, **/*_libs/
 #   - Simple patterns: README.md, contributing.md
 exclude:
+  - "**/*_site/"
+  - "**/_llms/"
+  - "**/_publish/"
   - "**/README.md"
   - "**/*.llms.md"
   - "**/llms.txt"

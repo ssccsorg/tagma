@@ -22,9 +22,9 @@ pub struct TagmaSet {
 }
 
 impl TagmaSet {
-    const BITS: usize = TagmaCoord::N_VALID;                    // 11172
-    const WORD_BITS: usize = u64::BITS as usize;                // 64
-    const WORD_COUNT: usize = (Self::BITS + Self::WORD_BITS - 1) / Self::WORD_BITS; // 175
+    const BITS: usize = TagmaCoord::N_VALID; // 11172
+    const WORD_BITS: usize = u64::BITS as usize; // 64
+    const WORD_COUNT: usize = Self::BITS.div_ceil(Self::WORD_BITS); // 175
 
     #[inline]
     fn word_bit(coord: TagmaCoord) -> (usize, u64) {
@@ -41,13 +41,17 @@ impl TagmaSet {
     /// Creates an empty `TagmaSet`.
     #[inline]
     pub const fn new() -> Self {
-        TagmaSet { bits: [0u64; Self::WORD_COUNT] }
+        TagmaSet {
+            bits: [0u64; Self::WORD_COUNT],
+        }
     }
 }
 
 impl Default for TagmaSet {
     #[inline]
-    fn default() -> Self { Self::new() }
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -110,13 +114,21 @@ impl TagmaSet {
     /// Returns a reference to the coordinate if present (mirrors `HashSet::get`).
     #[inline]
     pub fn get<'a>(&self, coord: &'a TagmaCoord) -> Option<&'a TagmaCoord> {
-        if self.contains(*coord) { Some(coord) } else { None }
+        if self.contains(*coord) {
+            Some(coord)
+        } else {
+            None
+        }
     }
 
     /// Removes and returns the coordinate if present (mirrors `HashSet::take`).
     #[inline]
     pub fn take(&mut self, coord: &TagmaCoord) -> Option<TagmaCoord> {
-        if self.remove(*coord) { Some(*coord) } else { None }
+        if self.remove(*coord) {
+            Some(*coord)
+        } else {
+            None
+        }
     }
 
     /// Retains only the coordinates satisfying the predicate.
@@ -162,7 +174,10 @@ impl TagmaSet {
     /// Returns `true` if `self` is a subset of `other`.
     #[inline]
     pub fn is_subset(&self, other: &Self) -> bool {
-        self.bits.iter().zip(&other.bits).all(|(&a, &b)| a & !b == 0)
+        self.bits
+            .iter()
+            .zip(&other.bits)
+            .all(|(&a, &b)| a & !b == 0)
     }
 
     /// Returns `true` if `self` is a superset of `other`.
@@ -180,7 +195,11 @@ impl TagmaSet {
     #[inline]
     fn from_bitwise<F: FnMut(u64, u64) -> u64>(a: &Self, b: &Self, mut op: F) -> Self {
         let mut bits = [0u64; Self::WORD_COUNT];
-        for (out, (wa, wb)) in bits.iter_mut().zip(a.bits.iter().zip(&b.bits)).take(Self::WORD_COUNT) {
+        for (out, (wa, wb)) in bits
+            .iter_mut()
+            .zip(a.bits.iter().zip(&b.bits))
+            .take(Self::WORD_COUNT)
+        {
             *out = op(*wa, *wb);
         }
         TagmaSet { bits }
@@ -223,16 +242,21 @@ impl TagmaSet {
     /// An iterator over all coordinates in the set, in index order.
     #[inline]
     pub fn iter(&self) -> Iter {
-        Iter { bits: self.bits, word_idx: 0 }
+        Iter {
+            bits: self.bits,
+            word_idx: 0,
+        }
     }
 }
 
-impl<'a> IntoIterator for &'a TagmaSet {
+impl IntoIterator for &TagmaSet {
     type Item = TagmaCoord;
     type IntoIter = Iter;
 
     #[inline]
-    fn into_iter(self) -> Iter { self.iter() }
+    fn into_iter(self) -> Iter {
+        self.iter()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -258,7 +282,11 @@ impl core::ops::Index<TagmaCoord> for TagmaSet {
 
     #[inline]
     fn index(&self, coord: TagmaCoord) -> &bool {
-        if self.contains(coord) { &true } else { &false }
+        if self.contains(coord) {
+            &true
+        } else {
+            &false
+        }
     }
 }
 
@@ -270,7 +298,9 @@ impl core::fmt::Display for TagmaSet {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         write!(f, "{{")?;
         for (i, coord) in self.iter().enumerate() {
-            if i > 0 { write!(f, ", ")?; }
+            if i > 0 {
+                write!(f, ", ")?;
+            }
             write!(f, "{}", coord)?;
         }
         write!(f, "}}")
@@ -284,9 +314,9 @@ impl core::fmt::Display for TagmaSet {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use alloc::format;
     use alloc::vec;
     use alloc::vec::Vec;
-    use alloc::format;
 
     #[test]
     fn new_set_is_empty() {
@@ -457,9 +487,7 @@ mod tests {
 
     #[test]
     fn from_iterator() {
-        let coords: Vec<_> = (0..10u16)
-            .map(|i| TagmaCoord::new(i).unwrap())
-            .collect();
+        let coords: Vec<_> = (0..10u16).map(|i| TagmaCoord::new(i).unwrap()).collect();
         let set: TagmaSet = coords.into_iter().collect();
         assert_eq!(set.len(), 10);
     }
@@ -511,7 +539,7 @@ mod tests {
     fn clone_eq() {
         let mut a = TagmaSet::new();
         a.insert(TagmaCoord::new(0).unwrap());
-        let b = a.clone();
+        let b = a;
         assert_eq!(a, b);
         assert!(a.contains(TagmaCoord::new(0).unwrap()));
     }
@@ -554,7 +582,9 @@ mod tests {
     #[test]
     fn retain_all() {
         let mut set = TagmaSet::new();
-        for i in 0u16..10 { set.insert(TagmaCoord::new(i).unwrap()); }
+        for i in 0u16..10 {
+            set.insert(TagmaCoord::new(i).unwrap());
+        }
         set.retain(|_| true);
         assert_eq!(set.len(), 10);
     }
@@ -562,7 +592,9 @@ mod tests {
     #[test]
     fn retain_odd() {
         let mut set = TagmaSet::new();
-        for i in 0u16..10 { set.insert(TagmaCoord::new(i).unwrap()); }
+        for i in 0u16..10 {
+            set.insert(TagmaCoord::new(i).unwrap());
+        }
         set.retain(|c| c.index() % 2 == 0);
         assert_eq!(set.len(), 5);
         for i in 0u16..10 {
