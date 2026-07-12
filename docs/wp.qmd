@@ -59,7 +59,7 @@ format:
             \vspace{2em}
                 {\normalsize \@date \par}
           \end{center}
-          \vspace{4em}
+          \vspace{2em}
         }
         \makeatother
 ---
@@ -72,7 +72,7 @@ format:
 
 ## Abstract {.unnumbered .unlisted}
 
-Hashing is the default mechanism for content-addressable identity in computing. Tagma shows that a fixed 16-bit Unicode block—the Hangul syllable space**[*-@sec-hangul-space*]**—can replace the hash function entirely where cryptographic integrity is not required. The Hangul block is the only script whose encoding follows a closed-form composition formula with three independent axes. As a result, every 16-bit value in this space is simultaneously a Unicode address and a 3-axis coordinate (initial, medial, final). This structural interpretation enables hash-less content addressing **[*-@sec-paradigm-shift*]** with zero collision probability and single-cycle decoding. We present a combinational decoder specification (~300 gates, 1 cycle), a RISC-V XIF coprocessor reference implementation, and a software reference implementation **[*-@sec-appendix-poc*]** demonstrating 6–115x latency reduction over SHA-256 in software: 115x for single-syllable identifiers and 6x for 256-bit-equivalent 19-syllable identifiers. The 6x software baseline is expected to widen dramatically with silicon implementation, where the combinational decoder eliminates all loop and dispatch overhead from multi-syllable composition. Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection. The coordinate space is an open international standard (Unicode) and a public good.
+Hashing is the default mechanism for content-addressable identity in computing. Tagma shows that a fixed 16-bit Unicode block—the Hangul syllable space**[*-@sec-hangul-space*]**—can replace the hash function entirely where cryptographic integrity is not required. The Hangul block is the only script whose encoding follows a closed-form composition formula with three independent axes. As a result, every 16-bit value in this space is simultaneously a Unicode address and a 3-axis coordinate (initial, medial, final). This structural interpretation enables hash-less content addressing **[*-@sec-paradigm-shift*]** with zero collision probability and single-cycle decoding. We present a combinational decoder specification (~300 gates, 1 cycle), a RISC-V XIF coprocessor reference implementation, and a software reference implementation[^tagma] **[*-@sec-appendix-poc*]** demonstrating 6–115x latency reduction over SHA-256 in software: 115x for single-syllable identifiers and 6x for 256-bit-equivalent 19-syllable identifiers. In multidimensional query scenarios — where hash-based systems require index intersection or B-tree traversal — the comparison is architectural: Tagma replaces the entire lookup structure with direct coordinate access, eliminating hash tables, collision resolution, and index maintenance entirely. Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection. The coordinate space is an open international standard (Unicode) and a public good.
 
 ## Introduction {#sec-introduction}
 
