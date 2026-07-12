@@ -111,7 +111,7 @@ Every valid 16-bit value carries **three simultaneous interpretations**: a 1-D U
 
 :::
 
-::: {.cell layout="[[60, 40]]"}
+::: {.cell layout="[[60, 40]]" style="padding-top: 1em; padding-bottom: 1em;"}
 
 One value, three uses. Only Hangul satisfies all four conditions required for the Tagma primitive: a fixed closed-form composition formula, complete fixed-width 16-bit representation, a structural invalidity margin, and an open international standard. The coordinate space extends to N syllables via the Cartesian product. Each syllable multiplies the addressable space by 11,172. A linear array over N syllables is indexed by flattening the N-dimensional coordinate using row-major order. Every N-syllable coordinate corresponds to a 3N-dimensional structural coordinate system.
 
@@ -162,6 +162,8 @@ Hangul occupies the Basic Multilingual Plane (Plane 0), Unicode's foundational l
 
 Variable-length encoding has architectural consequences that are independent of any particular implementation. Memory alignment is not guaranteed. Instruction decoding must detect boundary positions. Prefetch and pipeline efficiency are affected. These are structural properties of variable-length design, not engineering limitations.
 
+::: {.cell layout="[[50,50]]"}
+
 ```{python}
 #| label: fig-encoding
 #| fig-cap: "Encoding hierarchy from variable-length to fixed-length structural encoding."
@@ -192,6 +194,8 @@ digraph EncodingHierarchy {
 | UTF-16 (BMP) | 2 bytes | 63,488 of 65,536 | 2,048 reserved | no | no |
 | UTF-32 | 4 bytes | unlimited | 75-88% for common use | yes | no |
 | **Tagma** | **2 bytes** | **11,172 of 65,536** | **none** | **yes** | **yes (54,364 invalid)** |
+
+:::
 
 The structural constraint in Tagma arises from the fixed formula by which Hangul syllables are composed. As established in the Hangul Coordinate Space section, only 11,172 of 65,536 states satisfy the composition formula. A hardware decoder can distinguish valid from invalid states using combinational logic derived from that formula.
 
@@ -437,6 +441,8 @@ A comprehensive comparison across dimensions not covered by individual paradigms
 
 In addition to the differentiators listed above, structural coordinates enable two capabilities unavailable to hash-based addressing:
 
+::: {.cell layout="[[50,50]]"}
+
 ```{python}
 #| label: fig-venn
 #| fig-cap: "Tagma positioning relative to existing identity and addressing infrastructure. SHA-256 provides cryptographic integrity; UUID provides decentralized generation; HashMap provides key-value lookup. Tagma occupies the structural coordinate space, replacing the hash-based addressing role in all three while leaving cryptographic functions to SHA-256."
@@ -474,6 +480,8 @@ What Tagma replaces, partially replaces, and does not replace:
 | Digital signatures | hash-then-sign for non-repudiation | No | Retain Ed25519 or ECDSA |
 | Key derivation | HKDF for key expansion | No | Retain HKDF |
 | Password hashing | bcrypt/Argon2 for work-factor | No | Retain bcrypt or Argon2 |
+
+:::
 
 ## Memory Hierarchy Penetration
 
@@ -685,7 +693,6 @@ Tagma changes the problem that hardware must solve, not just the speed at which 
 | Energy | Dynamic voltage scaling to cover worst-case hash latency | Fixed, minimal decode path; predictable power |
 
 Conventional hardware searches. Tagma hardware interprets. This shifts the hardware design problem from faster computation to simpler decoding.
-
 
 ## Three-Dimensional Coordinate Space Visualization {#sec-appendix-viz}
 
