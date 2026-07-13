@@ -73,7 +73,7 @@ format:
 
 ## Abstract {.unnumbered .unlisted}
 
-Hash[^hash-etym]ing is the default mechanism for content-addressable identity in computing. Tagma[^tagma-etym] shows that a fixed 16-bit Unicode block—the Hangul syllable space**[*-@sec-hangul-space*]**—can replace the hash function entirely where cryptographic integrity is not required. The Hangul block is the only script whose encoding follows a closed-form composition formula with three independent axes. As a result, every 16-bit value in this space is simultaneously a Unicode address and a 3-axis coordinate (initial, medial, final). This structural interpretation enables hash-less content addressing **[*-@sec-paradigm-shift*]** with zero collision probability and single-cycle decoding. We present a combinational decoder specification (~300 gates, 1 cycle), a RISC-V XIF coprocessor reference, raw assembly, and a software reference implementation[^tagma-repo] **[*-@sec-appendix-rust*]** demonstrating 6–115x latency reduction over SHA-256 in software: 115x for single-syllable identifiers and 6x for 256-bit-equivalent 19-syllable identifiers. In multidimensional query scenarios — where hash-based systems require index intersection or B-tree traversal — the comparison is architectural: Tagma replaces the entire lookup structure with direct coordinate access, eliminating hash tables, collision resolution, and index maintenance entirely. Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection. The coordinate space is an open international standard (Unicode) and a public good.
+Hash[^hash-etym]ing is the default mechanism for content-addressable identity in computing. Tagma[^tagma-etym] shows that a fixed 16-bit Unicode block—the Hangul syllable space**[*-@sec-hangul-space*]**—can replace the hash function entirely in non-cryptographic contexts. The Hangul block is the only script whose encoding follows a closed-form composition formula with three independent axes. As a result, every 16-bit value in this space is simultaneously a Unicode address and a 3-axis coordinate (initial, medial, final). This structural interpretation enables hash-less content addressing **[*-@sec-paradigm-shift*]** with zero collision probability and single-cycle decoding. We present a combinational decoder specification (~300 gates, 1 cycle), a RISC-V XIF coprocessor reference, raw assembly, and a software reference implementation[^tagma-repo] **[*-@sec-appendix-rust*]** demonstrating 6–115x latency reduction over SHA-256 [@fips180-4] in software: 115x for single-syllable identifiers and 6x for 256-bit-equivalent 19-syllable identifiers. In multidimensional query scenarios — where hash-based systems require index intersection or B-tree traversal — the comparison is architectural: Tagma replaces the entire lookup structure with direct coordinate access, eliminating hash tables, collision resolution, and index maintenance entirely. Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection, built upon an open international standard (Unicode) and a public good.
 
 ## Introduction {#sec-introduction}
 
@@ -82,7 +82,7 @@ Computing standards are language-neutral and culture-neutral universal assets. A
 Every content-addressable system today generates identifiers through a hash function. This indirection layer imposes a predictable cost: gate area, cycle latency, storage overhead, and probabilistic collision resolution. Tagma shows that this fixed 16-bit block can replace the hash function entirely where cryptographic integrity is not required, using a combinational decoder. [@nex-tagma].
 
 [^hash-etym]: English *hash* from French *hacher* ("to chop, to mince"), reflecting the paradigm of destroying structure to produce an opaque identifier. "Coordinate" from Latin *co-ordinare* ("to arrange together"), reflecting the paradigm of preserving and using structure as the identifier itself.
-[^tagma-etym]: Greek *τάγμα*: "that which has been arranged, an ordered body", Korean expression: 타그마. In the project, Tagma is the system name; Coord is the concrete implementation type, realizing the act of ordering.
+[^tagma-etym]: Greek *τάγμα*: "that which has been arranged, an ordered body", 타그마 (Korean expression). Tagma is the system name; Coord is the concrete implementation type, realizing the act of ordering.
 [^tagma-repo]: Repository: [Github (Pre-release, Apache 2.0)](https://github.com/ssccsorg/tagma)
 
 ## The Hangul Coordinate Space {#sec-hangul-space}
@@ -266,7 +266,7 @@ Every system that stores data by content rather than by location must generate i
 |--------|----------------|-----------------|-----------|------------------|
 | Pointer | 32-64 bits | zero | none | direct (location-based) |
 | Hash (SHA-256) | 256 bits | ~10K gates, 64-75 cycles | probabilistic | hash table + resolution |
-| UUID | 128 bits | entropy-dependent | probabilistic | hash table |
+| UUID [@rfc4122] | 128 bits | entropy-dependent | probabilistic | hash table |
 | CAM | per-bit comparison | 9-16 transistors/bit | none | associative [@paget-cam-survey] |
 | **Tagma** | **16 bits** | **1 cycle (combinational)** | **none (formulaic)** | **direct (coordinate = address)** |
 
@@ -279,7 +279,7 @@ Hash-based identity requires a hardware SHA-256 engine, a hash table with collis
 | Collision | probabilistic | deterministic, zero | logic eliminated |
 | Hardware for generation | ~10,000 gates | ~300 gates | ~30x fewer gates |
 | Lookup structure | hash table + collision list | direct address | structure eliminated |
-| Maximum identifiers | unlimited | 11,172 | constrained |
+| Maximum identifiers | 11,172 (per syllable; N-syllable composition extends to $11,172^N$) |  |  |
 
 Tagma addresses the class of content-addressable storage with up to approximately 11,000 entries. Systems in this range gain the efficiency of direct-mapped content addressability without CAM cell overhead [@cam-cell-design] or hash logic.
 
@@ -308,7 +308,7 @@ This requires exactly $(N-1)$ multiply-add pairs — a fixed sequence of $2(N-1)
 | 10 | 30 | $2.69 \times 10^{40}$ | Exceeds UUID ($3.4 \times 10^{38}$) |
 | 19 | 57 | $1.94 \times 10^{77}$ | SHA-256 (256-bit) equivalent |
 
-Each syllable retains independent hardware-verifiable validity ($19 \times 21 \times 28 = 11,172$ gates per syllable). The N-tuple identity space is the Cartesian product of $N$ independent 3D spaces, yielding a $3N$-dimensional structural coordinate system.
+Each syllable retains independent hardware-verifiable validity ($19 \times 21 \times 28 = 11,172$ gates per syllable). The N-tuple identity space is the Cartesian product of $N$ independent 3D spaces, yielding a $3N$-dimensional structural coordinate system. We call this N-syllable sequence a CoordPath, distinct from the atomic Coord.
 
 ### Hash-less computation: Direct structural addressing {#sec-paradigm-shift}
 
@@ -341,20 +341,31 @@ Each step adds cost: hash computation, collision handling, dynamic resizing, cac
 
 ### The Complexity of Structure: Coord Depth
 
-The traditional complexity analysis of this replacement resists easy categorization. Tagma retrieval is parameterized not by the number of stored entries but by **Coord Depth** $d$ --- the number of syllables required to uniquely identify an entity under a given scheme.
+Standard complexity analysis classifies algorithms by how their cost scales with input size $N$ --- the number of data items. Tagma's retrieval cost does not scale with data volume at all. It scales with **Coord Depth** $d$, the number of syllables required to uniquely identify an entity under a given scheme. These are fundamentally different kinds of quantities: one measures data inventory, the other measures structural dimensionality.
+
+$d$ is a system constant determined at schema design time. A sensor identifier requires $d=1$ (single Coord, 11,172 identifiers). UUID-scale identity uses $d=6$. SHA-256-scale identity uses $d=19$. Adding a billion entries does not increase $d$. The number of entries and the retrieval cost are decoupled --- a property no hash-based structure can offer.
 
 $$\text{Retrieval cost} = O(d), \quad d \ll \log N_{\text{entries}}$$
-
-$d$ is a **system constant**, not a function of data size. A sensor network uses $d=1$ (single Coord, 11,172 identifiers). UUID-scale identity uses $d=6$. SHA-256-scale identity uses $d=19$. These values are fixed at schema design time; adding a billion more entries does not increase $d$.
 
 | Metric | Hash table | Tagma |
 |--------|-----------|-------|
 | Scaling variable | Entry count $N$ | Coord Depth $d$ (fixed per scheme) |
-| Growth with data | Increases ($\log N$ average) | None (constant) |
+| Relationship to data | Cost grows with volume | Cost independent of volume |
 | Worst case | $O(N)$ (collision chain) | $O(d)$ (same as average) |
-| Parameter range | $10^0$ to $10^{12}$ | $1$ to $19$ (practical bound) |
+| Practical range | $10^0$ to $10^{12}$ | $1$ to $19$ |
 
-The hash table's $N$ represents how many items are stored. Tagma's $d$ represents how much structural dimensionality an identifier requires. These are different kinds of quantities --- one measures data volume, the other measures structural resolution. Standard O-notation collapses both into "$N$", obscuring the architectural distinction.
+The reason for this decoupling is architectural. A hash function receives a key and produces an address by destroying the key's internal structure --- chopping and mixing bits until only an opaque fingerprint remains. The lookup is indirect: hash, resolve collision, dereference. Coord inverts this: the syllable sequence carries its own address. Each Coord in the path says "I am the $k$-th segment of this identifier; the next segment is here." The data does not need to be hashed into an address --- the data is already the address.
+
+| | Hash | Tagma Coord |
+|---|------|-------------|
+| Operation | Chop and mix bits | Decompose along structural axes |
+| Output | Opaque 256-bit value | Self-describing 16-bit value |
+| Lookup | Hash + resolve + dereference | Direct array access |
+| Scaling unit | Number of items stored | Structural dimensionality required |
+
+This inversion --- address follows from structure rather than from computation --- makes Coord Depth a distinct scaling regime, expressible neither as $O(1)$ (which implies independence from any parameter) nor as $O(N)$ (which implies dependence on data volume). Coord Depth $O(d)$ parameterizes retrieval by the identifier's inherent dimensionality, a quantity bounded by the application schema, not by the data set.
+
+**The engineering frontier.** The mathematical bound holds for any fixed $d$: $2(d-1)$ arithmetic operations per lookup. On a general-purpose CPU, however, each operation incurs mechanical overhead: instruction dispatch, register pressure, pipeline latency, and cache hierarchy effects. At $d=1$ these are negligible (one array access). At $d=19$ the 18 multiply-add pairs accumulate approximately 35 ns on the Apple M1 --- still 6x faster than a single SHA-256 computation, but measurably more than the O(1) ideal of a single cycle. This gap is not a flaw in the theory; it is a consequence of running a structurally parallel operation on a sequential von Neumann machine. A dedicated combinational decoder executes all $d$ syllable decodes concurrently at gate level, collapsing the gap entirely. Tagma-optimized silicon is not merely faster silicon; it is the substrate for which this scaling regime was defined.
 
 ```{python}
 #| label: fig-tagma-model
@@ -440,15 +451,7 @@ digraph DecoderFlow {
 | Validation comparators x3 | ~30 |
 | **Total** | **~300** |
 
-Approximately 300 gate equivalents in 28nm. The decoder is smaller than a single 32-bit multiplier.
-
-An implementation is Tagma-compatible if:
-
-1. It implements the composition formula $C(i,m,f) = \text{U+AC00} + 588i + 28m + f$ correctly for all 11,172 valid coordinates.
-2. It rejects all 54,364 structurally invalid 16-bit values.
-3. It provides O(1) worst-case access for single-syllable coordinates.
-4. It provides O(1) worst-case access for any fixed N-syllable composition via linearization.
-5. All implementations must be bit-exact: the same coordinate must produce the same decomposition and the same linear index across all languages and platforms.
+Approximately 300 gate equivalents in 28nm. The decoder is smaller than a single 32-bit multiplier. The full compliance criteria for Tagma-compatible implementations are defined in Section [*-@sec-compliance*].
 
 ## Coprocessor Implementation
 
@@ -548,7 +551,7 @@ What Tagma replaces, partially replaces, and does not replace:
 | Domain | Hash Role | Tagma Replaces? | Tagma Alternative |
 |--------|----------|-----------------|-------------------|
 | ID generation | hash(data) to produce unique identifier | Yes | Coordinate assignment (1-2 cycles, zero collision) |
-| Hash map key | hash(key) to compute bucket index | Yes | Tagma coordinate as direct array index |
+| Hash map key | hash(key) to compute bucket index | Yes | CoordMap (direct array index) |
 | Content addressing | data hash as storage address | Partial | Coordinate-to-data mapping; requires coordinator |
 | Cache key | file metadata hash as cache key | Partial | Composite Tagma coordinate from content attributes |
 | Integrity verification | data hash to detect tampering | No | Retain SHA-256 or BLAKE3 |
@@ -558,11 +561,13 @@ What Tagma replaces, partially replaces, and does not replace:
 
 ## Memory Hierarchy Penetration
 
+*(Future direction — no current implementation timeline.)*
+
 The coprocessor path (above) would attach Tagma to a linear memory system. The coordinate is decoded and the result is used as an address in conventional memory.
 
 ### Memory Controller Mapping
 
-The Tagma coordinate space can be mapped to a physical address region configured to bypass virtual-to-physical translation, for example through RISC-V PMP or non-standard memory region attributes. The controller then receives each coordinate directly as a physical address and maps `initial-medial-final` to `row-column` within the existing memory array. Existing platforms (e.g., RISC-V) support custom address mapping logic at the memory controller or system level.
+The Tagma coordinate space can be mapped to a physical address region configured to bypass virtual-to-physical translation, for example through RISC-V PMP [@riscv-priv] or non-standard memory region attributes. The controller then receives each coordinate directly as a physical address and maps `initial-medial-final` to `row-column` within the existing memory array. Existing platforms (e.g., RISC-V) support custom address mapping logic at the memory controller or system level.
 
 ### Three-Dimensional Decode
 
@@ -621,7 +626,7 @@ The deterministic single-cycle decode makes Tagma suitable for real-time and saf
 
 **Radiation-tolerant computing.** The structural validity check embedded in every decode provides inherent error detection. A single-bit upset that maps a valid coordinate outside the U+AC00-U+D7AF range produces an immediate invalid flag. Errors that map one valid coordinate to another are not detected by the structural check alone and require ECC supplementation, as noted in Boundaries. The decoder's small gate count (approximately 300 gates) makes triplication feasible at lower cost than protecting a full hash unit.
 
-An exact enumeration of all 11,172 valid coordinates confirms the detection rate. Each valid coordinate has 16 possible single-bit-flip destinations. Averaged across all valid states, 12.14 of those 16 destinations remain within [U+AC00, U+D7AF] (standard deviation 0.61; range 10--13). The resulting average SEU detection rate is 24.1% from the structural check alone, before any ECC supplementation.
+An exact enumeration of all 11,172 valid coordinates confirms the detection rate[^seu-enum]. Each valid coordinate has 16 possible single-bit-flip destinations. Averaged across all valid states, 12.14 of those 16 destinations remain within [U+AC00, U+D7AF] (standard deviation 0.61; range 10--13). The resulting average SEU detection rate is 24.1% from the structural check alone, before any ECC supplementation. This detection rate comes at zero additional hardware cost — it is a free byproduct of the structural encoding. When combined with ECC, the structural check handles the subset of errors that map valid coordinates outside the valid range, while ECC handles the remaining cases.
 
 **Real-time object identification.** In sensor fusion for autonomous systems, Tagma coordinates serve as deterministic object identifiers that do not require hash computation or lookup tables. Each new object is assigned a coordinate at encoding time; subsequent frames reference the same coordinate without recomputation.
 
@@ -629,11 +634,11 @@ An exact enumeration of all 11,172 valid coordinates confirms the detection rate
 
 ## Boundaries
 
-Tagma is a 16-bit boundary, not a 16-bit limitation. The 11,172-identifier bound per syllable is not a limitation of scope but a commitment to determinism. It addresses a specific design range: systems requiring content-addressable identity for a working set of up to 11,172 entries. Part I is designed to be compatible with existing processor pipelines (RISC-V reference) and verification flows. Part II is a future direction with no current implementation timeline. The structural validity check provided by the decoder does not eliminate the need for full error-correcting codes: single-bit errors that map one valid coordinate to another are not detected.
+The 11,172-identifier bound per syllable is a consequence of the 19 x 21 x 28 composition formula, not a configurable parameter. It defines the single-syllable direct-address range. Applications requiring larger identifier spaces compose multiple syllables via CoordPath (Section N-Syllable Composition). The decoder's structural validity check does not eliminate the need for full error-correcting codes: single-bit errors that map one valid coordinate to another are not detected.
 
 Tagma does not replace cryptographic primitives. SHA-256 remains for signatures, Merkle proofs, and preimage resistance. Encryption, authentication, and key derivation are outside its scope. Tagma replaces the use of hashes as structural identifiers and addresses.
 
-For applications requiring content determinism — where the same data must always produce the same identifier — SHA-256 and Tagma are complementary, not alternatives. SHA-256 provides the content fingerprint; Tagma makes that fingerprint readable:
+For applications requiring content determinism — where the same data must always produce the same identifier — SHA-256 provides content fingerprinting while Tagma provides human-readable encoding of that fingerprint:
 
 | Property | SHA-256 hex | SHA-256 with Tagma |
 |----------|------------|--------------------|
@@ -643,43 +648,45 @@ For applications requiring content determinism — where the same data must alwa
 | Self-validating | No | Yes (each syllable checked) |
 | Collision resistance | 2^-256 | 2^-256 (SHA preserved) |
 
-The combination serves use cases such as file identification, content-addressed storage, and commit hashing where determinism is required but hex output is not.
+The combination serves use cases such as file identification, content-addressed storage, and commit hashing where determinism is required but hex output is not. An implementation example combining SHA-256 with Tagma encoding is provided in Appendix [*-@sec-appendix-sha-tagma*].
 
-## Compliance
+[^seu-enum]: Computed by exhaustive enumeration: for each of the 11,172 valid Coord values, all 16 single-bit-flip neighbors are tested against the valid range [U+AC00, U+D7AF].
+
+## Compliance {#sec-compliance}
 
 An implementation is Tagma-compatible iff it satisfies all of the following
 conditions:
 
-**Composition correctness.** The composition formula $C(i,m,f) = \text{U+AC00} +
-588i + 28m + f$ must produce the correct Unicode code point for every valid
-combination of axes ($19 \times 21 \times 28 = 11,172$ triplets).
+1. **Composition correctness.** The composition formula $C(i,m,f) = \text{U+AC00} +
+   588i + 28m + f$ must produce the correct Unicode code point for every valid
+   combination of axes ($19 \times 21 \times 28 = 11,172$ triplets).
 
-**Structural validity.** Every 16-bit value in the range [U+AC00, U+AC00 +
-11,172) must decode to a valid $(i,m,f)$ triplet. Every value outside this range
-must be rejected, including the 12 filler positions U+D7A4..U+D7AF within the
-Unicode block but outside the composition formula. Total: 11,172 valid values
-and 54,364 invalid values in the 16-bit space.
+2. **Structural validity.** Every 16-bit value in the range [U+AC00, U+AC00 +
+   11,172) must decode to a valid $(i,m,f)$ triplet. Every value outside this
+   range must be rejected, including the 12 filler positions U+D7A4..U+D7AF
+   within the Unicode block but outside the composition formula. Total: 11,172
+   valid values and 54,364 invalid values in the 16-bit space.
 
-**Decomposition correctness.** Decomposition must be the functional inverse of
-composition: $\text{decompose}(\text{compose}(i,m,f)) = (i,m,f)$ for all 11,172
-valid triplets.
+3. **Decomposition correctness.** Decomposition must be the functional inverse
+   of composition: $\text{decompose}(\text{compose}(i,m,f)) = (i,m,f)$ for all
+   11,172 valid triplets.
 
-**Linearization uniqueness.** The linearization function must be injective over
-the N-Coord product space. Distinct N-Coord tuples must produce distinct linear
-indices.
+4. **Linearization uniqueness.** The linearization function must be injective
+   over the N-Coord product space. Distinct N-Coord tuples must produce distinct
+   linear indices.
 
-**Bit-exactness.** All implementations must produce identical results for the
-same input across all languages, platforms, and hardware configurations:
-composition, decomposition, and linearization.
+5. **Bit-exactness.** All implementations must produce identical results for
+   the same input across all languages, platforms, and hardware configurations:
+   composition, decomposition, and linearization.
 
-**Coord atomicity.** Coord is a single-syllable atomic value. An implementation
-must not impose application-level semantics on Coord's three axis fields or
-assume any particular storage strategy for CoordPaths. Coord's only invariant
-is structural validity.
+6. **Coord atomicity.** Coord is a single-syllable atomic value. An
+   implementation must not impose application-level semantics on Coord's three
+   axis fields or assume any particular storage strategy for CoordPaths. Coord's
+   only invariant is structural validity.
 
 ## Vision
 
-Tagma defines a new type of silicon primitive: a combinational decoder that derives identity from structure at approximately 300 gates and one cycle. At this gate cost, content-addressable operation becomes viable where hash-based approaches are too expensive in power, area, or latency. The structural validity check embedded in every decode provides inherent error detection, relevant for radiation-tolerant computing in space environments. The coordinate space that enables this is Hangul — an open international standard and a public good. Tagma will be released as open-source silicon, inviting the next conversation: what else becomes possible when identity costs less than a single multiply.
+Tagma defines a new type of silicon primitive: a combinational decoder that derives identity from structure at approximately 300 gates and one cycle. At this gate cost, content-addressable operation becomes viable where hash-based approaches are too expensive in power, area, or latency. The structural validity check embedded in every decode provides inherent error detection, relevant for radiation-tolerant computing in space environments. The coordinate space that enables this is Hangul — an open international standard and a public good. Tagma will be released as open-source silicon, inviting the next conversation: what else becomes possible when identity costs less than a single multiply. The broader hardware design implications of this shift are discussed in Appendix [*-@sec-appendix-hardware*].
 
 ## Appendices {.unnumbered}
 
@@ -691,35 +698,16 @@ Tagma defines a new type of silicon primitive: a combinational decoder that deri
 
 ## Reference Implementation {#sec-appendix-rust}
 
-The coordinate space is implemented as a multi-crate Rust workspace (Apache 2.0) comprising two layers:
-
-The Coord type is defined in the coordinate space specification [@coord-spec] and is bit-exact with the hardware decoder.
+The coordinate space is implemented as a multi-crate Rust workspace (Apache 2.0) comprising two layers. The Coord type is defined in the coordinate space specification [@coord-spec] and is bit-exact with the hardware decoder.
 
 ### Core Library: `tagma-core`
 
 A `no_std` + `alloc` library that builds for native targets and `wasm32-unknown-unknown`.
 
-**Coord** — a 16-bit newtype guaranteed valid (0..11171), bit-exact with the hardware decoder specification:
-
-```rust
-pub struct Coord(u16);  // 0..11171, guaranteed valid
-
-impl Coord {
-    pub const fn new(value: u16) -> Option<Self>;           // validate raw index
-    pub const fn from_axes(i: u8, m: u8, f: u8) -> Option<Self>; // compose
-    pub const fn to_axes(self) -> (u8, u8, u8);             // decompose
-    pub const fn to_char(self) -> char;                      // to Hangul
-    pub const fn hamming_distance(self, other: Self) -> (u8, u8, u8);
-}
-```
-
-**CoordMap\<V\>** — direct-address table. Backed by `Box<[Option<V>]>` (11,172 slots). O(1) worst-case insert, lookup, delete. No hashing, no collisions, no resizing. Full Entry API (`entry().or_insert_with()`), `drain()`, `retain()`, `IntoIterator`, `Index<Coord>`.
-
-**CoordSet** — bit array over the coordinate space. Backed by `[u64; 175]` (1.4 KB, no heap). Insert/remove/contains are single-bit ops. Union, intersection, difference as bitwise operations. `Copy`, no allocator required.
-
-**TimeIndex** — temporal indexing via `time × 11172 + coord`. Single multiply-add replaces hash computation with zero collision overhead.
-
-Test coverage: 103 unit tests covering all 11,172 valid coordinates and all 54,364 invalid states.
+- **Coord** — a 16-bit newtype guaranteed valid (0..11171), bit-exact with the hardware decoder specification:
+- **CoordMap\<V\>** — direct-address table. Backed by `Box<[Option<V>]>` (11,172 slots). O(1) worst-case insert, lookup, delete. No hashing, no collisions, no resizing. Full Entry API (`entry().or_insert_with()`), `drain()`, `retain()`, `IntoIterator`, `Index<Coord>`.
+- **CoordSet** — bit array over the coordinate space. Backed by `[u64; 175]` (1.4 KB, no heap). Insert/remove/contains are single-bit ops. Union, intersection, difference as bitwise operations. `Copy`, no allocator required.
+- **TimeIndex(Draft)** — temporal indexing via `time × 11172 + coord`. Single multiply-add replaces hash computation with zero collision overhead.
 
 ### Serialization: `base11172`
 
@@ -736,7 +724,7 @@ No special characters, no padding, no escaping.
 
 ### Benchmark: Tagma vs SHA-256
 
-Latency comparison for 100,000 identity generation operations on an Apple M1 (Firestorm performance core, ~3.2 GHz, 128 KB L1 data cache, 12 MB L2 cache), single-threaded, compiled with `rustc` 1.84.0 in release mode (`-C opt-level=3 -C target-cpu=apple-m1`). Both operations use identical input data; the compiler is prevented from eliminating dead code through `std::hint::black_box`. Full benchmark source: [github.com/ssccsorg/tagma/blob/main/sw/rust/benches/bench.rs](https://github.com/ssccsorg/tagma/blob/main/sw/rust/benches).
+Latency comparison for 100,000 identity generation operations on an Apple M1 (Firestorm performance core, ~3.2 GHz, 128 KB L1 data cache, 12 MB L2 cache), single-threaded, compiled with `rustc` 1.84.0 in release mode (`-C opt-level=3 -C target-cpu=apple-m1`). Both operations use identical input data; the compiler is prevented from eliminating dead code through `std::hint::black_box`. Full benchmark source [@bench-source].
 
 ```{python}
 #| label: fig-bench-latency
@@ -819,7 +807,7 @@ fn content_tagma_id(data: &[u8]) -> String {
 }
 ```
 
-SHA-256 output is uniformly distributed, so modulo-11172 mapping is statistically unbiased; the collision probability per syllable remains $2^{-256}$, preserved from the underlying hash.
+SHA-256 output is uniformly distributed, so the modulo-11172 mapping to each Coord value is statistically unbiased. The overall collision probability of the 19-syllable output remains $2^{-256}$, preserved from the underlying hash.
 
 ## References {.unnumbered .unlisted}
 
