@@ -1,47 +1,43 @@
-name: Build Docs
+name: Test Suite
 
 on:
   push:
     branches: ["main"]
     paths:
-      - "docs/**"
+      - "sw/rust/**"
+      - "run.sh"
       - ".github/workflows/test.yml"
-      - "!docs/README.md"
-      - "!docs/index.html"
+      - "!sw/rust/**/*.md"
+      - "!**/*.qmd"
   pull_request:
     branches: ["main"]
     paths:
-      - "docs/**"
+      - "sw/rust/**"
+      - "run.sh"
       - ".github/workflows/test.yml"
-      - "!docs/README.md"
-      - "!docs/index.html"
+      - "!sw/rust/**/*.md"
+      - "!**/*.qmd"
   workflow_dispatch:
 
 permissions:
   contents: read
 
-concurrency:
-  group: "docs"
-  cancel-in-progress: false
+env:
+  CARGO_TERM_COLOR: always
 
 jobs:
-  docs:
+  build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
 
-      - uses: quarto-dev/quarto-actions/setup@v2
+      - uses: dtolnay/rust-toolchain@stable
         with:
-          tinytex: true
+          components: clippy, rustfmt
 
-      - name: Install Python dependencies
-        run: |
-          pip install jupyter matplotlib numpy 2>&1
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: sw/rust
 
-      - name: Render whitepaper
-        working-directory: docs
-        run: quarto render wp.qmd --to pdf 2>&1
-
-      - name: Render tagma-id
-        working-directory: docs
-        run: quarto render tagma-id.qmd --to pdf 2>&1
+      - name: Full pipeline
+        run: bash run.sh
