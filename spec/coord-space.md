@@ -13,11 +13,11 @@ $$C(i, m, f) = \text{U+AC00} + 588i + 28m + f$$
 
 where:
 
-| Variable | Domain | Name | Example |
-|----------|--------|------|---------|
-| $i$ | $0 \leq i < 19$ | Initial (choseong, 초성) | $i=0 \to \text{ㄱ}$ |
-| $m$ | $0 \leq m < 21$ | Medial (jungseong, 중성) | $m=0 \to \text{ㅏ}$ |
-| $f$ | $0 \leq f < 28$ | Final (jongseong, 종성) | $f=0 \to \text{(none)}$ |
+| Variable | Domain | Name |
+|----------|--------|------|
+| $i$ | $0 \leq i < 19$ | Initial (choseong, 초성) |
+| $m$ | $0 \leq m < 21$ | Medial (jungseong, 중성) |
+| $f$ | $0 \leq f < 28$ | Final (jongseong, 종성) |
 
 The valid coordinate range is:
 
@@ -48,7 +48,7 @@ A decoder must verify three conditions:
 3. $0 \leq m < 21$ (medial bound)
 4. $0 \leq f < 28$ (final bound)
 
-Conditions 2--4 are logically redundant if condition 1 holds (every code point
+Conditions 2-4 are logically redundant if condition 1 holds (every code point
 in the block satisfies the axis bounds by construction), but a compliant decoder
 must still implement them for hardware fault detection.
 
@@ -71,63 +71,117 @@ Bit:  15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
 ```
 
 - Bit 15: reserved (always 0 for valid coordinates)
-- Bits 14--10: initial (0--18)
-- Bits 9--5: medial (0--20)
-- Bits 4--0: final (0--27)
+- Bits 14-10: initial (0-18)
+- Bits 9-5: medial (0-20)
+- Bits 4-0: final (0-27)
 
-## 3. N-Syllable Product Space
+### 2.2 The Coord Type
 
-A single syllable provides 11,172 unique coordinates. For larger address spaces,
-syllables compose via the Cartesian product:
+`Coord` is the atomic coordinate value: a 16-bit unsigned integer in the range
+0..11172, guaranteed to be structurally valid. It represents exactly one Hangul
+syllable (one triplet of initial, medial, final axes).
 
-$$S(N) = 11,172^N$$
+## 3. N-Syllable Composition
+
+A single Coord provides 11,172 unique identifiers. For address spaces larger
+than 11,172, multiple Coord values compose into a CoordPath:
+
+$$1 \text{ Coord} = 3 \text{ axes} = 16 \text{ bits} = 11,172 \text{ identifiers}$$
+$$N \text{ Coords} = 3N \text{ axes} = N \times 16 \text{ bits} = 11,172^N \text{ identifiers}$$
+
+A CoordPath is an ordered sequence of N independent Coord values, each valid
+individually. The axis slots across all N Coords form a flat 3N-dimensional
+coordinate space.
 
 ### 3.1 Linearization (Row-Major Order)
 
-An N-syllable coordinate $(c_1, c_2, \ldots, c_N)$ where each $c_k$ is a valid
-single-syllable coordinate index ($0 \leq c_k < 11,172$) is mapped to a linear
-index by:
+An N-Coord sequence $(c_0, c_1, \ldots, c_{N-1})$ where each $c_k$ is a valid
+Coord index ($0 \leq c_k < 11,172$) maps to a single linear index:
 
-$$\text{linear\_index}(c_1, \ldots, c_N) = \sum_{k=1}^{N} c_k \times 11,172^{\,N-k}$$
+$$\text{linear\_index}(c_0, \ldots, c_{N-1}) = \sum_{k=0}^{N-1} c_k \times 11,172^{\,N-1-k}$$
 
 Equivalently, in iterative form:
 
 ```
 index = 0
-for k = 1 to N:
-    index = index * 11172 + c_k
+for k = 0 to N-1:
+    index = index x 11172 + c_k
 ```
+
+This is pure arithmetic. No hash function, no collision resolution, no
+indirection. The linear index is the address.
 
 ### 3.2 O(1) Guarantee
 
-For a fixed N, the linearization requires exactly:
-
-$$(N-1) \text{ multiplications} + (N-1) \text{ additions}$$
-
-This is $O(N)$ arithmetic operations. Since $N$ is a compile-time constant
-(number of syllables), the total cost is $O(1)$ with respect to the size of the
-addressable space $S(N)$.
-
-**Proof sketch:**
-
-1. The linear index is computed by a fixed sequence of $2(N-1)$ arithmetic
-   operations.
-2. No operation depends on the contents of the stored data; only on the
-   coordinate values themselves.
-3. After computing the index, accessing the backing array is $O(1)$
-   (direct address, no probing, no resolution).
-4. Therefore, the total lookup cost is $O(1)$ for any fixed N.
+For a fixed N, linearization requires exactly $2(N-1)$ arithmetic operations
+($N-1$ multiplications and $N-1$ additions). Since N is known at the call site,
+the total cost is $O(1)$ with respect to the size of the addressable space
+$S(N) = 11,172^N$.
 
 ### 3.3 Examples
 
-| Syllables | Linearization | Addressable space |
-|-----------|--------------|------------------|
-| 1 | $\text{index} = c_1$ | $1.12 \times 10^4$ |
-| 2 | $\text{index} = c_1 \times 11172 + c_2$ | $1.25 \times 10^8$ |
-| 6 | $\text{index} = ((((c_1 \times 11172 + c_2) \times 11172 + c_3) \times 11172 + c_4) \times 11172 + c_5) \times 11172 + c_6$ | $1.94 \times 10^{24}$ |
+| Coords | Linearization | Addressable space |
+|--------|--------------|------------------|
+| 1 | $\text{index} = c_0$ | $1.12 \times 10^4$ |
+| 2 | $\text{index} = c_0 \times 11172 + c_1$ | $1.25 \times 10^8$ |
+| 6 | (5 multiplications, 5 additions) | $1.94 \times 10^{24}$ |
 | 19 | (18 multiplications, 18 additions) | $1.94 \times 10^{77}$ |
 
-## 4. Serialization (Base11172)
+### 3.4 CoordPath: Dynamic-Length Sequence
+
+For N greater than 1, the coordinate space is accessed through CoordPath, a
+dynamic-length sequence of Coord values. CoordPath has no fixed compile-time
+size; its length is determined at runtime.
+
+CoordPath is distinct from Coord:
+- Coord is a single 16-bit value (atomic).
+- CoordPath is a sequence of zero or more Coord values (composite).
+
+The linearization formula applies uniformly regardless of CoordPath length.
+
+## 4. Axis Slot Mapping
+
+A sequence of N Coords provides 3N axis slots. Not all slots need to carry
+application semantic weight. The mapping from logical application axes to
+Coord axis slots is determined by the consumer, not by Coord itself.
+
+Coord is a 16-bit value. It does not interpret its three axis fields as any
+particular application-level semantics (e.g. sensor ID, time bucket, coordinate
+dimension). That interpretation belongs to the consumer's schema.
+
+### 4.1 Axis-Slot Assignment
+
+Example: a 4-axis identifier requiring 2 Coords:
+
+```
+Coord 0:  [axis_0, axis_1, axis_2]    (slots 0, 1, 2)
+Coord 1:  [axis_3,     _,     _]      (slots 3, 4, 5)
+```
+
+Slots 4 and 5 are unused in this schema. They contain valid Coord values
+(every slot in a CoordPath must hold a valid Coord), but their values carry
+no semantic weight. The consumer decides which slots to read and which to
+ignore.
+
+This is possible because:
+
+1. Every Coord in the path is independently valid (passes hardware decode).
+2. The linearization formula accepts all N Coord values regardless of which
+   axis slots are semantically active.
+3. The consumer projects only the slots it defined in its schema.
+
+### 4.2 Unused Slot Value Convention
+
+Unused slots contain Coord values that are structurally valid. The choice of
+value is a consumer policy, not a Coord concern:
+
+| Convention | Value | Use case |
+|-----------|-------|----------|
+| Zero | `Coord(0)` = `가` = (0,0,0) | Minimal bit pattern, debugging clarity |
+| Boundary | `Coord(11171)` = `힣` = (18,20,27) | Distinct from valid data ranges |
+| Replicate | Duplicate adjacent active axis value | Predictable for compression |
+
+## 5. Serialization (Base11172)
 
 A Tagma coordinate may be serialized to a printable, self-validating string
 using the Base11172 encoding:
@@ -136,25 +190,77 @@ using the Base11172 encoding:
   syllable: $\text{char} = \text{U+AC00} + \text{idx}$.
 - A pair of syllables encodes a 16-bit value (2 bytes):
   $\text{value} = \text{hi} \times 11172 + \text{lo}$.
-- An N-syllable coordinate serializes to N consecutive Hangul syllables.
+- A CoordPath of N Coords serializes to N consecutive Hangul syllables.
 
 The encoding is self-validating: any character outside U+AC00..U+D7AF is
 immediately detectable as invalid.
 
-## 5. Compliance
+## 6. Compliance
 
-An implementation is Tagma-compatible iff:
+An implementation is Tagma-compatible iff it satisfies all of the following
+conditions:
 
-1. It implements the composition formula (Section 1) correctly for all
-   11,172 valid coordinates.
-2. It rejects all 54,364 structurally invalid 16-bit values.
-3. It provides $O(1)$ worst-case access for single-syllable coordinates.
-4. It provides $O(1)$ worst-case access for any fixed N-syllable composition
-   via linearization (Section 3).
-5. All implementations must be bit-exact: the same coordinate must produce
-   the same decomposition and the same linear index across all languages and
-   platforms.
+### 6.1 Composition Correctness
+
+The composition formula $C(i,m,f) = \text{U+AC00} + 588i + 28m + f$ must
+produce the correct Unicode code point for every valid combination of axes:
+
+$$\forall i \in [0,19),\; \forall m \in [0,21),\; \forall f \in [0,28): \quad
+C(i,m,f) \in [\text{U+AC00}, \text{U+D7A3}]$$
+
+### 6.2 Structural Validity
+
+1. Every 16-bit value $v$ in the range $[\text{U+AC00}, \text{U+AC00} +
+   11,172)$ must decode to a valid $(i,m,f)$ triplet satisfying the axis bounds
+   (Section 1.1).
+2. Every 16-bit value $v$ outside this range must be rejected as structurally
+   invalid.
+3. The rejection includes the 12 filler positions U+D7A4..U+D7AF which lie
+   within the Unicode block but outside the composition formula's range.
+
+Total: 11,172 valid values and 54,364 invalid values in the 16-bit space.
+
+### 6.3 Decomposition Correctness
+
+Decomposition must be the functional inverse of composition:
+
+$$\text{decompose}(\text{compose}(i,m,f)) = (i,m,f)$$
+
+for all 11,172 valid triplets.
+
+### 6.4 Linearization Uniqueness
+
+The linearization function $L$ (Section 3.1) must be injective over the product
+space:
+
+$$L(c_0, \ldots, c_{N-1}) = L(c'_0, \ldots, c'_{N-1}) \iff
+\forall k: c_k = c'_k$$
+
+for any N ≥ 1. Distinct N-Coord tuples must produce distinct linear indices.
+
+### 6.5 Bit-Exactness
+
+All implementations must produce identical results for the same input:
+
+| Operation | Input | Required output |
+|-----------|-------|-----------------|
+| Composition | $(i,m,f)$ | Same Coord value |
+| Decomposition | Same Coord value | Same $(i,m,f)$ |
+| Linearization | Same N-Coord tuple | Same linear index |
+
+This must hold across all languages, platforms, and hardware configurations.
+
+### 6.6 Coord Atomicity
+
+Coord is a single-syllable atomic value. An implementation must not:
+
+- Impose application-level semantics on Coord's three axis fields.
+- Require Coord to validate or reject axis slot assignments (Section 4).
+- Assume any particular storage strategy for CoordPaths.
+
+Coord's only invariant is structural validity (Section 6.2). All higher-level
+interpretation is the consumer's responsibility.
 
 ---
 
-*Version 1.0 — Part of the Tagma specification family.*
+*Version 2.0 — Tagma Coordinate Space Specification.*
