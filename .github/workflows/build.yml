@@ -3,9 +3,24 @@ name: CI — fmt → clippy → build → test
 on:
   push:
     branches: ["main"]
+    paths:
+      - "sw/rust/**"
+      - "run.sh"
+      - ".github/workflows/build.yml"
+      - "!sw/rust/**/*.md"
+      - "!**/*.qmd"
   pull_request:
     branches: ["main"]
+    paths:
+      - "sw/rust/**"
+      - "run.sh"
+      - ".github/workflows/build.yml"
+      - "!sw/rust/**/*.md"
+      - "!**/*.qmd"
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 env:
   CARGO_TERM_COLOR: always
@@ -14,10 +29,6 @@ env:
 jobs:
   build:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: sw/rust
-
     steps:
       - uses: actions/checkout@v6
 
@@ -29,14 +40,5 @@ jobs:
         with:
           workspaces: sw/rust
 
-      - name: Check formatting
-        run: cargo fmt --check
-
-      - name: Clippy
-        run: cargo clippy --all-targets
-
-      - name: Build
-        run: cargo build --release
-
-      - name: Test
-        run: cargo test --release
+      - name: Full pipeline
+        run: bash run.sh --check
