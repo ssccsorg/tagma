@@ -48,12 +48,22 @@ enum Node<V> {
 impl<V> Node<V> {
     #[inline]
     fn new_leaf() -> Self {
-        Node::Leaf((0..11172).map(|_| None).collect::<Vec<_>>().into_boxed_slice())
+        Node::Leaf(
+            (0..11172)
+                .map(|_| None)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        )
     }
 
     #[inline]
     fn new_branch() -> Self {
-        Node::Branch((0..11172).map(|_| None).collect::<Vec<_>>().into_boxed_slice())
+        Node::Branch(
+            (0..11172)
+                .map(|_| None)
+                .collect::<Vec<_>>()
+                .into_boxed_slice(),
+        )
     }
 
     #[inline]

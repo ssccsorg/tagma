@@ -1,4 +1,4 @@
-use tagma_core::{Coord, CoordMap, CoordMap6, CoordMap19, CoordPath};
+use tagma_core::{Coord, CoordMap, CoordMap19, CoordMap6, CoordPath};
 
 // ── CoordMap — no_alloc single-syllable ──
 
