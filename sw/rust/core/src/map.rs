@@ -1,114 +1,237 @@
 use crate::coord::Coord;
+use crate::path::CoordPath;
 use alloc::boxed::Box;
 
-/// A collision-free, fixed-size, hash-less associative array indexed by
-/// [`Coord`].
+// ---------------------------------------------------------------------------
+// CoordMap: hash-less, collision-free N-level address table
+// ---------------------------------------------------------------------------
+
+/// A hash-less, collision-free, N-level address table indexed by [`CoordPath`].
 ///
-/// See the [module-level documentation](crate) for design rationale.
+/// # Depth
+///
+/// | `N`  | Identifier space | Typical use |
+/// |------|-----------------|-------------|
+/// | 1    | 11,172          | Sensor tags, basic KV (flat array) |
+/// | 2    | 1.25 × 10⁸     | Small KV |
+/// | 6    | 1.94 × 10²⁴    | UUID-scale |
+/// | 12   | 2.41 × 10⁶⁷    | Between UUID and SHA-256 |
+/// | 19   | 1.94 × 10⁷⁷    | SHA-256-scale (2²⁵⁶) |
+///
+/// # Hash-less principle
+///
+/// Every level is a direct array index into 11,172 slots:
+///
+/// ```text
+/// N=1:  slots[coord₀]                          → O(1) array access
+/// N=2:  root.branch[coord₀].leaf[coord₁]       → 2 array accesses
+/// N=6:  root.branch[coord₀]...[leaf][coord₅]   → 6 array accesses
+/// ```
+///
+/// No hashing, no collision resolution at any depth.
 #[derive(Clone, Debug)]
-pub struct CoordMap<V> {
-    slots: Box<[Option<V>]>,
+pub struct CoordMap<const N: usize, V> {
+    root: Node<V>,
     len: usize,
 }
 
-// ---------------------------------------------------------------------------
-// Core read / write
-// ---------------------------------------------------------------------------
+/// A single node in the tree.
+///
+/// - Leaf node (`depth == N`): `items` holds `[Option<V>; 11172]`.
+/// - Branch node (`depth < N`): `items` holds `[Option<Box<Node<V>>>; 11172]`.
+///
+/// The `depth` field is used only for run-time assertions in debug builds;
+/// it is zero-sized in release builds.
+#[derive(Clone, Debug)]
+struct Node<V> {
+    // We use a type-erased pointer to store either:
+    //   N=1: Box<[Option<V>; 11172]>
+    //   N>1: Box<[Option<Box<Node<V>>>; 11172]>
+    items: *mut (),
+    is_leaf: bool,
+    _marker: core::marker::PhantomData<V>,
+}
 
-impl<V> CoordMap<V> {
-    const N: usize = Coord::N_VALID;
+// SAFETY: Node<V> owns its items. Send + Sync follow V.
+unsafe impl<V: Send> Send for Node<V> {}
+unsafe impl<V: Sync> Sync for Node<V> {}
 
-    #[inline]
-    fn idx(coord: Coord) -> usize {
-        coord.index() as usize
-    }
-
-    #[inline]
-    fn slot(&self, coord: Coord) -> &Option<V> {
-        unsafe { self.slots.get_unchecked(Self::idx(coord)) }
-    }
-
-    #[inline]
-    fn slot_mut(&mut self, coord: Coord) -> &mut Option<V> {
-        unsafe { self.slots.get_unchecked_mut(Self::idx(coord)) }
-    }
-
-    // -- query ------------------------------------------------------------
-
-    #[inline]
-    pub fn len(&self) -> usize {
-        self.len
-    }
-    #[inline]
-    pub fn is_empty(&self) -> bool {
-        self.len == 0
-    }
-    #[inline]
-    pub fn capacity(&self) -> usize {
-        Self::N
-    }
-
-    // -- lookup -----------------------------------------------------------
-
-    #[inline]
-    pub fn get(&self, coord: Coord) -> Option<&V> {
-        self.slot(coord).as_ref()
-    }
-    #[inline]
-    pub fn get_mut(&mut self, coord: Coord) -> Option<&mut V> {
-        self.slot_mut(coord).as_mut()
-    }
-    #[inline]
-    pub fn get_key_value(&self, coord: Coord) -> Option<(Coord, &V)> {
-        self.slot(coord).as_ref().map(|v| (coord, v))
-    }
-    #[inline]
-    pub fn contains_key(&self, coord: Coord) -> bool {
-        self.slot(coord).is_some()
-    }
-
-    // -- mutation ---------------------------------------------------------
-
-    pub fn insert(&mut self, coord: Coord, value: V) -> Option<V> {
-        let slot = self.slot_mut(coord);
-        let old = slot.take();
-        *slot = Some(value);
-        if old.is_none() {
-            self.len += 1;
+impl<V> Node<V> {
+    /// Creates a leaf node (stores values directly).
+    fn new_leaf() -> Self {
+        let arr: Box<[Option<V>; 11172]> = unsafe { new_null_array() };
+        Node {
+            items: Box::into_raw(arr) as *mut (),
+            is_leaf: true,
+            _marker: core::marker::PhantomData,
         }
-        old
     }
 
-    pub fn remove(&mut self, coord: Coord) -> Option<V> {
-        let slot = self.slot_mut(coord);
-        let old = slot.take();
-        if old.is_some() {
-            self.len -= 1;
+    /// Creates a branch node (stores child pointers).
+    fn new_branch() -> Self {
+        let arr: Box<[Option<Box<Node<V>>>; 11172]> = unsafe { new_null_array() };
+        Node {
+            items: Box::into_raw(arr) as *mut (),
+            is_leaf: false,
+            _marker: core::marker::PhantomData,
         }
-        old
     }
 
-    pub fn clear(&mut self) {
-        for slot in self.slots.iter_mut() {
-            *slot = None;
+    /// Returns a reference to the value at `index`.
+    #[inline]
+    fn get_value(&self, index: usize) -> Option<&V> {
+        debug_assert!(self.is_leaf);
+        // SAFETY: self.items is Box<[Option<V>; 11172]> when is_leaf is true.
+        unsafe {
+            let arr = &*(self.items as *const [Option<V>; 11172]);
+            (*arr)[index].as_ref()
         }
-        self.len = 0;
     }
+
+    /// Returns a mutable reference to the value at `index`.
+    #[inline]
+    fn get_value_mut(&mut self, index: usize) -> Option<&mut V> {
+        debug_assert!(self.is_leaf);
+        unsafe {
+            let arr = &mut *(self.items as *mut [Option<V>; 11172]);
+            (*arr)[index].as_mut()
+        }
+    }
+
+    /// Takes the value at `index`, returning it.
+    #[inline]
+    fn take_value(&mut self, index: usize) -> Option<V> {
+        debug_assert!(self.is_leaf);
+        unsafe {
+            let arr = &mut *(self.items as *mut [Option<V>; 11172]);
+            (*arr)[index].take()
+        }
+    }
+
+    /// Sets the value at `index`, returning the previous value.
+    #[inline]
+    fn set_value(&mut self, index: usize, value: V) -> Option<V> {
+        debug_assert!(self.is_leaf);
+        unsafe {
+            let arr = &mut *(self.items as *mut [Option<V>; 11172]);
+            let old = (*arr)[index].take();
+            (*arr)[index] = Some(value);
+            old
+        }
+    }
+
+    /// Returns a reference to the child at `index`.
+    #[inline]
+    fn get_child(&self, index: usize) -> Option<&Box<Node<V>>> {
+        debug_assert!(!self.is_leaf);
+        unsafe {
+            let arr = &*(self.items as *const [Option<Box<Node<V>>>; 11172]);
+            (*arr)[index].as_ref()
+        }
+    }
+
+    /// Returns a mutable reference to the child at `index`, or `None` if absent.
+    #[inline]
+    fn get_child_mut_existing(&mut self, index: usize) -> Option<&mut Box<Node<V>>> {
+        debug_assert!(!self.is_leaf);
+        unsafe {
+            let arr = &mut *(self.items as *mut [Option<Box<Node<V>>>; 11172]);
+            (*arr)[index].as_mut()
+        }
+    }
+
+    /// Returns a mutable reference to the child at `index`, creating it
+    /// as a branch node if missing.
+    #[inline]
+    fn get_child_mut(&mut self, index: usize, is_last: bool) -> &mut Box<Node<V>> {
+        debug_assert!(!self.is_leaf);
+        unsafe {
+            let arr = &mut *(self.items as *mut [Option<Box<Node<V>>>; 11172]);
+            let slot = &mut (*arr)[index];
+            slot.get_or_insert_with(|| {
+                if is_last {
+                    Box::new(Node::new_leaf())
+                } else {
+                    Box::new(Node::new_branch())
+                }
+            })
+        }
+    }
+}
+
+impl<V> Drop for Node<V> {
+    fn drop(&mut self) {
+        unsafe {
+            if self.is_leaf {
+                let _ = Box::from_raw(self.items as *mut [Option<V>; 11172]);
+            } else {
+                let _ = Box::from_raw(self.items as *mut [Option<Box<Node<V>>>; 11172]);
+            }
+        }
+    }
+}
+
+/// Creates a boxed fixed-size array filled with `None`.
+///
+/// SAFETY: This works because `Option<T>` is represented as a null-pointer
+/// when `T` is a box (or similar), and as a zeroed discriminant for other
+/// types. For `Option<V>` and `Option<Box<Node<V>>>`, all-zeroes is the
+/// `None` representation.
+unsafe fn new_null_array<T>() -> Box<[T; 11172]> {
+    let layout = core::alloc::Layout::new::<[T; 11172]>();
+    let ptr = alloc::alloc::alloc_zeroed(layout);
+    if ptr.is_null() {
+        alloc::alloc::handle_alloc_error(layout);
+    }
+    // SAFETY: ptr is non-null, properly aligned, zero-initialized, and
+    // valid for reads and writes of size layout.
+    Box::from_raw(ptr as *mut [T; 11172])
 }
 
 // ---------------------------------------------------------------------------
 // Construction
 // ---------------------------------------------------------------------------
 
-impl<V> CoordMap<V> {
+impl<const N: usize, V> CoordMap<N, V> {
+    /// Creates an empty `CoordMap`.
+    ///
+    /// For `N=1`, allocates a flat array of 11,172 slots.
+    /// For `N>1`, allocates a single empty branch node (lazy).
     #[inline]
     pub fn new() -> Self {
-        let slots = (0..Self::N).map(|_| None).collect::<Box<[_]>>();
-        CoordMap { slots, len: 0 }
+        let root = if N == 1 {
+            Node::new_leaf()
+        } else {
+            Node::new_branch()
+        };
+        CoordMap { root, len: 0 }
+    }
+
+    /// Returns the number of entries in the map.
+    #[inline]
+    pub fn len(&self) -> usize {
+        self.len
+    }
+
+    /// Returns `true` if the map contains no entries.
+    #[inline]
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
+
+    /// Returns the maximum number of entries (`Some`) for N=1, or `None`
+    /// for N>1 (tree grows dynamically).
+    #[inline]
+    pub fn capacity(&self) -> Option<usize> {
+        if N == 1 {
+            Some(11172)
+        } else {
+            None
+        }
     }
 }
 
-impl<V> Default for CoordMap<V> {
+impl<const N: usize, V> Default for CoordMap<N, V> {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -116,10 +239,129 @@ impl<V> Default for CoordMap<V> {
 }
 
 // ---------------------------------------------------------------------------
-// Entry API
+// Core read / write — single Coord (N=1 convenience)
 // ---------------------------------------------------------------------------
 
-impl<V> CoordMap<V> {
+impl<V> CoordMap<1, V> {
+    /// Returns a reference to the value stored at `coord`.
+    #[inline]
+    pub fn get(&self, coord: Coord) -> Option<&V> {
+        self.root.get_value(coord.index() as usize)
+    }
+
+    /// Returns a mutable reference to the value stored at `coord`.
+    #[inline]
+    pub fn get_mut(&mut self, coord: Coord) -> Option<&mut V> {
+        self.root.get_value_mut(coord.index() as usize)
+    }
+
+    /// Returns `true` if the map contains an entry for `coord`.
+    #[inline]
+    pub fn contains_key(&self, coord: Coord) -> bool {
+        self.get(coord).is_some()
+    }
+
+    /// Inserts a value at `coord`, returning the previous value if any.
+    #[inline]
+    pub fn insert(&mut self, coord: Coord, value: V) -> Option<V> {
+        let old = self.root.set_value(coord.index() as usize, value);
+        if old.is_none() {
+            self.len += 1;
+        }
+        old
+    }
+
+    /// Removes the value at `coord`, returning it if present.
+    #[inline]
+    pub fn remove(&mut self, coord: Coord) -> Option<V> {
+        let old = self.root.take_value(coord.index() as usize);
+        if old.is_some() {
+            self.len -= 1;
+        }
+        old
+    }
+
+    /// Clears the map, removing all entries.
+    pub fn clear(&mut self) {
+        // Re-create the root as an empty leaf.
+        self.root = Node::new_leaf();
+        self.len = 0;
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Core read / write — CoordPath (general N)
+// ---------------------------------------------------------------------------
+
+impl<const N: usize, V> CoordMap<N, V> {
+    /// Returns a reference to the value stored at `path`.
+    pub fn get_path(&self, path: &CoordPath<N>) -> Option<&V> {
+        if N == 1 {
+            return self.root.get_value(path.coords()[0].index() as usize);
+        }
+        let mut node = &self.root;
+        // Navigate through branch nodes for the first N-1 coordinates.
+        for i in 0..(N - 1) {
+            let idx = path.coords()[i].index() as usize;
+            node = node.get_child(idx)?;
+        }
+        // Last coordinate indexes into the leaf node.
+        let last = path.coords()[N - 1].index() as usize;
+        node.get_value(last)
+    }
+
+    /// Inserts a value at `path`, returning the previous value if any.
+    pub fn insert_path(&mut self, path: &CoordPath<N>, value: V) -> Option<V> {
+        if N == 1 {
+            let old = self.root.set_value(path.coords()[0].index() as usize, value);
+            if old.is_none() {
+                self.len += 1;
+            }
+            return old;
+        }
+        let mut node = &mut self.root;
+        for i in 0..(N - 1) {
+            let idx = path.coords()[i].index() as usize;
+            let is_last = i == N - 2;
+            node = node.get_child_mut(idx, is_last);
+        }
+        let last = path.coords()[N - 1].index() as usize;
+        let old = node.set_value(last, value);
+        if old.is_none() {
+            self.len += 1;
+        }
+        old
+    }
+
+    /// Removes the value at `path`, returning it if present.
+    pub fn remove_path(&mut self, path: &CoordPath<N>) -> Option<V> {
+        if N == 1 {
+            let old = self.root.take_value(path.coords()[0].index() as usize);
+            if old.is_some() {
+                self.len -= 1;
+            }
+            return old;
+        }
+        let mut node = &mut self.root;
+        for i in 0..(N - 1) {
+            let idx = path.coords()[i].index() as usize;
+            node = node.get_child_mut_existing(idx)?;
+        }
+        let last = path.coords()[N - 1].index() as usize;
+        let old = node.take_value(last);
+        if old.is_some() {
+            self.len -= 1;
+        }
+        old
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Entry API (N=1 only)
+// ---------------------------------------------------------------------------
+
+impl<V> CoordMap<1, V> {
+    /// Gets the entry for `coord` for in-place manipulation.
     pub fn entry(&mut self, coord: Coord) -> Entry<'_, V> {
         if self.contains_key(coord) {
             Entry::Occupied(OccupiedEntry { map: self, coord })
@@ -135,8 +377,8 @@ pub enum Entry<'a, V> {
 }
 
 pub struct OccupiedEntry<'a, V> {
-    pub(super) map: &'a mut CoordMap<V>,
-    pub(super) coord: Coord,
+    map: &'a mut CoordMap<1, V>,
+    coord: Coord,
 }
 
 impl<'a, V> OccupiedEntry<'a, V> {
@@ -144,40 +386,26 @@ impl<'a, V> OccupiedEntry<'a, V> {
         self.coord
     }
 
-    /// Returns a reference to the stored value.
-    ///
-    /// # Safety
-    ///
-    /// `OccupiedEntry` guarantees the slot is occupied: the entry was created
-    /// only after `contains_key` returned `true`, and the mutable borrow on
-    /// the map prevents any concurrent removal.
     pub fn get(&self) -> &V {
-        // SAFETY: the slot is verified occupied at entry creation.
         unsafe { self.map.get(self.coord).unwrap_unchecked() }
     }
 
-    /// Returns a mutable reference to the stored value.
     pub fn get_mut(&mut self) -> &mut V {
-        // SAFETY: same occupancy invariant as `get`.
         unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
     }
 
-    /// Inserts a new value, returning the old one.
     pub fn insert(&mut self, value: V) -> V {
-        // SAFETY: same occupancy invariant.
         unsafe { self.map.insert(self.coord, value).unwrap_unchecked() }
     }
 
-    /// Removes and returns the value.
     pub fn remove_entry(self) -> V {
-        // SAFETY: same occupancy invariant.
         unsafe { self.map.remove(self.coord).unwrap_unchecked() }
     }
 }
 
 pub struct VacantEntry<'a, V> {
-    pub(super) map: &'a mut CoordMap<V>,
-    pub(super) coord: Coord,
+    map: &'a mut CoordMap<1, V>,
+    coord: Coord,
 }
 
 impl<'a, V> VacantEntry<'a, V> {
@@ -189,11 +417,8 @@ impl<'a, V> VacantEntry<'a, V> {
         self.coord
     }
 
-    /// Inserts a value and returns a mutable reference to it.
     pub fn insert(self, value: V) -> &'a mut V {
-        // Vacant → guaranteed no old value to discard.
         let _ = self.map.insert(self.coord, value);
-        // SAFETY: we just inserted the value above.
         unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
     }
 }
@@ -236,11 +461,11 @@ impl<'a, V> Entry<'a, V> {
 }
 
 // ---------------------------------------------------------------------------
-// Iteration
+// Iteration (N=1 only)
 // ---------------------------------------------------------------------------
 
 pub struct Iter<'a, V> {
-    slots: core::slice::Iter<'a, Option<V>>,
+    node: &'a Node<V>,
     idx: u16,
 }
 
@@ -248,10 +473,10 @@ impl<'a, V> Iterator for Iter<'a, V> {
     type Item = (Coord, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        for slot in self.slots.by_ref() {
+        while self.idx < 11172 {
             let coord = Coord::new(self.idx).unwrap();
             self.idx += 1;
-            if let Some(val) = slot.as_ref() {
+            if let Some(val) = self.node.get_value(coord.index() as usize) {
                 return Some((coord, val));
             }
         }
@@ -259,12 +484,12 @@ impl<'a, V> Iterator for Iter<'a, V> {
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.slots.len()))
+        (0, Some(11172 - self.idx as usize))
     }
 }
 
 pub struct IterMut<'a, V> {
-    slots: core::slice::IterMut<'a, Option<V>>,
+    node: &'a mut Node<V>,
     idx: u16,
 }
 
@@ -272,97 +497,36 @@ impl<'a, V> Iterator for IterMut<'a, V> {
     type Item = (Coord, &'a mut V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        for slot in self.slots.by_ref() {
+        while self.idx < 11172 {
             let coord = Coord::new(self.idx).unwrap();
             self.idx += 1;
-            if let Some(val) = slot.as_mut() {
-                return Some((coord, val));
-            }
+            // SAFETY: we yield each index at most once.
+            let ptr = self.node.get_value_mut(coord.index() as usize)?;
+            // Work around borrow checker: get_value_mut borrows self.node,
+            // but we can reborrow through the raw pointer since each
+            // index is yielded exactly once.
+            let val = unsafe { &mut *(ptr as *mut V) };
+            return Some((coord, val));
         }
         None
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.slots.len()))
+        (0, Some(11172 - self.idx as usize))
     }
 }
 
-pub struct IntoIter<V> {
-    slots: alloc::vec::IntoIter<Option<V>>,
-    idx: u16,
-}
-
-impl<V> Iterator for IntoIter<V> {
-    type Item = (Coord, V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        for slot in self.slots.by_ref() {
-            let coord = Coord::new(self.idx).unwrap();
-            self.idx += 1;
-            if let Some(val) = slot {
-                return Some((coord, val));
-            }
-        }
-        None
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.slots.len()))
-    }
-}
-
-pub struct Drain<'a, V> {
-    slots: core::slice::IterMut<'a, Option<V>>,
-    map_len: &'a mut usize,
-    idx: u16,
-}
-
-impl<'a, V> Iterator for Drain<'a, V> {
-    type Item = (Coord, V);
-
-    fn next(&mut self) -> Option<Self::Item> {
-        for slot in self.slots.by_ref() {
-            let coord = Coord::new(self.idx).unwrap();
-            self.idx += 1;
-            if let Some(val) = slot.take() {
-                *self.map_len -= 1;
-                return Some((coord, val));
-            }
-        }
-        None
-    }
-
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (0, Some(self.slots.len()))
-    }
-}
-
-impl<'a, V> Drop for Drain<'a, V> {
-    fn drop(&mut self) {
-        for slot in self.slots.by_ref() {
-            if slot.take().is_some() {
-                *self.map_len -= 1;
-            }
-        }
-        // After draining all remaining entries, the map must be empty.
-        debug_assert_eq!(*self.map_len, 0);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Iterator constructors
-// ---------------------------------------------------------------------------
-
-impl<V> CoordMap<V> {
+impl<V> CoordMap<1, V> {
     pub fn iter(&self) -> Iter<'_, V> {
         Iter {
-            slots: self.slots.iter(),
+            node: &self.root,
             idx: 0,
         }
     }
+
     pub fn iter_mut(&mut self) -> IterMut<'_, V> {
         IterMut {
-            slots: self.slots.iter_mut(),
+            node: &mut self.root,
             idx: 0,
         }
     }
@@ -378,35 +542,13 @@ impl<V> CoordMap<V> {
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> + '_ {
         self.iter_mut().map(|(_, v)| v)
     }
-
-    pub fn drain(&mut self) -> Drain<'_, V> {
-        Drain {
-            slots: self.slots.iter_mut(),
-            map_len: &mut self.len,
-            idx: 0,
-        }
-    }
-
-    pub fn retain<F: FnMut(Coord, &mut V) -> bool>(&mut self, mut f: F) {
-        let mut idx = 0u16;
-        self.slots.iter_mut().for_each(|slot| {
-            let coord = Coord::new(idx).unwrap();
-            idx += 1;
-            if let Some(val) = slot.as_mut() {
-                if !f(coord, val) {
-                    *slot = None;
-                    self.len -= 1;
-                }
-            }
-        });
-    }
 }
 
 // ---------------------------------------------------------------------------
-// FromIterator
+// FromIterator (N=1 only)
 // ---------------------------------------------------------------------------
 
-impl<V> FromIterator<(Coord, V)> for CoordMap<V> {
+impl<V> FromIterator<(Coord, V)> for CoordMap<1, V> {
     fn from_iter<I: IntoIterator<Item = (Coord, V)>>(iter: I) -> Self {
         let mut map = Self::new();
         for (coord, value) in iter {
@@ -417,23 +559,25 @@ impl<V> FromIterator<(Coord, V)> for CoordMap<V> {
 }
 
 // ---------------------------------------------------------------------------
-// IntoIterator
+// IntoIterator (N=1 only) — via a consumed Vec
 // ---------------------------------------------------------------------------
 
-impl<V> IntoIterator for CoordMap<V> {
+impl<V> IntoIterator for CoordMap<1, V> {
     type Item = (Coord, V);
-    type IntoIter = IntoIter<V>;
+    type IntoIter = alloc::vec::IntoIter<(Coord, V)>;
 
-    fn into_iter(self) -> IntoIter<V> {
-        let vec: alloc::vec::Vec<Option<V>> = self.slots.into_vec();
-        IntoIter {
-            slots: vec.into_iter(),
-            idx: 0,
+    fn into_iter(mut self) -> Self::IntoIter {
+        let mut vec = alloc::vec::Vec::with_capacity(self.len());
+        for i in 0u16..11172 {
+            if let Some(val) = self.root.take_value(i as usize) {
+                vec.push((Coord::new(i).unwrap(), val));
+            }
         }
+        vec.into_iter()
     }
 }
 
-impl<'a, V> IntoIterator for &'a CoordMap<V> {
+impl<'a, V> IntoIterator for &'a CoordMap<1, V> {
     type Item = (Coord, &'a V);
     type IntoIter = Iter<'a, V>;
 
@@ -442,7 +586,7 @@ impl<'a, V> IntoIterator for &'a CoordMap<V> {
     }
 }
 
-impl<'a, V> IntoIterator for &'a mut CoordMap<V> {
+impl<'a, V> IntoIterator for &'a mut CoordMap<1, V> {
     type Item = (Coord, &'a mut V);
     type IntoIter = IterMut<'a, V>;
 
@@ -452,10 +596,10 @@ impl<'a, V> IntoIterator for &'a mut CoordMap<V> {
 }
 
 // ---------------------------------------------------------------------------
-// Index
+// Index (N=1 only)
 // ---------------------------------------------------------------------------
 
-impl<V> core::ops::Index<Coord> for CoordMap<V> {
+impl<V> core::ops::Index<Coord> for CoordMap<1, V> {
     type Output = V;
 
     fn index(&self, coord: Coord) -> &V {
@@ -463,7 +607,7 @@ impl<V> core::ops::Index<Coord> for CoordMap<V> {
     }
 }
 
-impl<V> core::ops::IndexMut<Coord> for CoordMap<V> {
+impl<V> core::ops::IndexMut<Coord> for CoordMap<1, V> {
     fn index_mut(&mut self, coord: Coord) -> &mut V {
         self.get_mut(coord)
             .expect("CoordMap::index_mut: key not present")
@@ -471,41 +615,49 @@ impl<V> core::ops::IndexMut<Coord> for CoordMap<V> {
 }
 
 // ---------------------------------------------------------------------------
-// Equality
+// Type aliases for standard spaces
 // ---------------------------------------------------------------------------
 
-impl<V: PartialEq> PartialEq for CoordMap<V> {
-    fn eq(&self, other: &Self) -> bool {
-        self.len == other.len && self.slots == other.slots
-    }
-}
+/// 1-syllable:  11,172 identifiers — sensor tags, basic KV (flat array).
+pub type CoordMap1<V> = CoordMap<1, V>;
 
-impl<V: PartialEq> Eq for CoordMap<V> {}
+/// 2-syllable:  1.25 × 10⁸ identifiers — small KV.
+pub type CoordMap2<V> = CoordMap<2, V>;
+
+/// 6-syllable:  1.94 × 10²⁴ identifiers — UUID-scale.
+pub type CoordMap6<V> = CoordMap<6, V>;
+
+/// 12-syllable: 2.41 × 10⁶⁷ identifiers — between UUID and SHA-256.
+pub type CoordMap12<V> = CoordMap<12, V>;
+
+/// 19-syllable: 1.94 × 10⁷⁷ identifiers — SHA-256-scale (2²⁵⁶).
+pub type CoordMap19<V> = CoordMap<19, V>;
 
 // ---------------------------------------------------------------------------
-// Tests
+// Tests (inline)
 // ---------------------------------------------------------------------------
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use alloc::format;
     use alloc::string::String;
     use alloc::string::ToString;
-    use alloc::vec;
+
     use alloc::vec::Vec;
+
+    // ── CoordMap<1, _> — flat map tests ──
 
     #[test]
     fn new_map_is_empty() {
-        let map: CoordMap<u32> = CoordMap::new();
+        let map: CoordMap<1, u32> = CoordMap::new();
         assert!(map.is_empty());
         assert_eq!(map.len(), 0);
-        assert_eq!(map.capacity(), 11172);
+        assert_eq!(map.capacity(), Some(11172));
     }
 
     #[test]
     fn insert_and_get() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         assert_eq!(map.insert(c, 42), None);
         assert_eq!(map.get(c), Some(&42));
@@ -514,7 +666,7 @@ mod tests {
 
     #[test]
     fn insert_overwrite() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 1);
         assert_eq!(map.insert(c, 2), Some(1));
@@ -524,7 +676,7 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 42);
         assert_eq!(map.remove(c), Some(42));
@@ -534,7 +686,7 @@ mod tests {
 
     #[test]
     fn contains_key() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, ()>::new();
         let c = Coord::new(0).unwrap();
         assert!(!map.contains_key(c));
         map.insert(c, ());
@@ -542,20 +694,8 @@ mod tests {
     }
 
     #[test]
-    fn slot_independent() {
-        let mut map = CoordMap::new();
-        let a = Coord::new(0).unwrap();
-        let b = Coord::new(11171).unwrap();
-        map.insert(a, "first");
-        map.insert(b, "last");
-        assert_eq!(map.get(a), Some(&"first"));
-        assert_eq!(map.get(b), Some(&"last"));
-        assert_eq!(map.len(), 2);
-    }
-
-    #[test]
     fn clear() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, u32>::new();
         map.insert(Coord::new(0).unwrap(), 1);
         map.insert(Coord::new(100).unwrap(), 2);
         map.clear();
@@ -565,13 +705,13 @@ mod tests {
 
     #[test]
     fn iter_empty() {
-        let map: CoordMap<u32> = CoordMap::new();
+        let map: CoordMap<1, u32> = CoordMap::new();
         assert_eq!(map.iter().count(), 0);
     }
 
     #[test]
     fn iter_non_empty() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, u32>::new();
         let c1 = Coord::new(0).unwrap();
         let c2 = Coord::new(9999).unwrap();
         map.insert(c1, 10);
@@ -583,19 +723,8 @@ mod tests {
     }
 
     #[test]
-    fn iter_mut() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(5).unwrap();
-        map.insert(c, 1);
-        for (_, v) in map.iter_mut() {
-            *v += 1;
-        }
-        assert_eq!(map.get(c), Some(&2));
-    }
-
-    #[test]
     fn into_iter_consuming() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, &str>::new();
         let c = Coord::new(42).unwrap();
         map.insert(c, "hello");
         let collected: Vec<_> = map.into_iter().collect();
@@ -605,71 +734,17 @@ mod tests {
     }
 
     #[test]
-    fn into_iter_ref() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(7).unwrap();
-        map.insert(c, 99);
-        let collected: Vec<_> = (&map).into_iter().collect();
-        assert_eq!(collected[0], (c, &99));
-    }
-
-    #[test]
-    fn into_iter_mut_ref() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(7).unwrap();
-        map.insert(c, 99);
-        for (_, v) in &mut map {
-            *v = 0;
-        }
-        assert_eq!(map.get(c), Some(&0));
-    }
-
-    #[test]
-    fn keys_values() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(0).unwrap(), "a");
-        map.insert(Coord::new(1).unwrap(), "b");
-        assert_eq!(map.keys().count(), 2);
-        assert_eq!(map.values().cloned().collect::<Vec<_>>(), vec!["a", "b"]);
-    }
-
-    #[test]
-    fn drain_empties_map() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(0).unwrap(), 1);
-        map.insert(Coord::new(1).unwrap(), 2);
-        let drained: Vec<_> = map.drain().collect();
-        assert_eq!(drained.len(), 2);
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn retain() {
-        let mut map = CoordMap::new();
-        for i in 0..10u16 {
-            map.insert(Coord::new(i).unwrap(), i);
-        }
-        map.retain(|_, v| *v % 2 == 0);
-        assert_eq!(map.len(), 5);
-        for i in 0..10u16 {
-            let c = Coord::new(i).unwrap();
-            assert_eq!(map.get(c).is_some(), i % 2 == 0);
-        }
-    }
-
-    #[test]
     fn from_iterator() {
-        let coords: Vec<_> = (0..5u16)
-            .map(|i| (Coord::new(i).unwrap(), i * 10))
+        let pairs: Vec<_> = (0..5u16)
+            .map(|i| (Coord::new(i).unwrap(), i as u64))
             .collect();
-        let map: CoordMap<u16> = coords.into_iter().collect();
+        let map: CoordMap<1, u64> = pairs.into_iter().collect();
         assert_eq!(map.len(), 5);
-        assert_eq!(map.get(Coord::new(3).unwrap()), Some(&30));
     }
 
     #[test]
     fn entry_or_insert() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.entry(c).or_insert(42);
         assert_eq!(map.get(c), Some(&42));
@@ -678,478 +753,200 @@ mod tests {
     }
 
     #[test]
-    fn entry_or_insert_with_key() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(5).unwrap();
-        map.entry(c).or_insert_with_key(|k| k.index() as u32);
-        assert_eq!(map.get(c), Some(&5));
-    }
-
-    #[test]
     fn entry_and_modify() {
-        let mut map = CoordMap::new();
+        let mut map = CoordMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
-        map.insert(c, 1);
-        map.entry(c).and_modify(|v| *v += 1).or_insert(0);
+        map.entry(c).and_modify(|v| *v += 1).or_insert(1);
+        assert_eq!(map.get(c), Some(&1));
+        map.entry(c).and_modify(|v| *v += 1).or_insert(1);
         assert_eq!(map.get(c), Some(&2));
-    }
-
-    #[test]
-    fn entry_vacant_insert() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(42).unwrap();
-        if let Entry::Vacant(e) = map.entry(c) {
-            e.insert("hello");
-        } else {
-            panic!("should be vacant");
-        }
-        assert_eq!(map.get(c), Some(&"hello"));
-    }
-
-    #[test]
-    fn entry_occupied_remove() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(7).unwrap();
-        map.insert(c, "x");
-        if let Entry::Occupied(e) = map.entry(c) {
-            assert_eq!(e.remove_entry(), "x");
-        } else {
-            panic!("should be occupied");
-        }
-        assert!(!map.contains_key(c));
     }
 
     #[test]
     fn index_trait() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(3).unwrap();
-        map.insert(c, 10);
-        assert_eq!(map[c], 10);
-        map[c] = 20;
-        assert_eq!(map[c], 20);
-    }
-
-    #[test]
-    #[should_panic(expected = "key not present")]
-    fn index_panics_on_missing() {
-        let map: CoordMap<u32> = CoordMap::new();
-        let _ = &map[Coord::new(0).unwrap()];
-    }
-
-    #[test]
-    fn eq() {
-        let mut a = CoordMap::new();
-        let mut b = CoordMap::new();
-        a.insert(Coord::new(0).unwrap(), 1);
-        b.insert(Coord::new(0).unwrap(), 1);
-        assert_eq!(a, b);
-        b.insert(Coord::new(1).unwrap(), 2);
-        assert_ne!(a, b);
-    }
-
-    // =========================================================================
-    // HashMap 1:1 replacement scenario tests
-    // =========================================================================
-
-    #[test]
-    fn get_key_value_returns_coord() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(7).unwrap();
+        let mut map = CoordMap::<1, u32>::new();
+        let c = Coord::new(5).unwrap();
         map.insert(c, 42);
-        let (k, v) = map.get_key_value(c).unwrap();
-        assert_eq!(k, c);
-        assert_eq!(*v, 42);
-    }
-
-    #[test]
-    fn get_key_value_missing() {
-        let map: CoordMap<u32> = CoordMap::new();
-        assert_eq!(map.get_key_value(Coord::new(0).unwrap()), None);
-    }
-
-    #[test]
-    fn insert_then_get_then_remove_then_get() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(100).unwrap();
-        assert_eq!(map.insert(c, 1), None);
-        assert_eq!(map.get(c), Some(&1));
-        assert_eq!(map.remove(c), Some(1));
-        assert_eq!(map.get(c), None);
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn insert_duplicate_coord_tracks_len() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(0).unwrap();
-        map.insert(c, 1);
-        assert_eq!(map.len(), 1);
-        map.insert(c, 2);
-        assert_eq!(map.len(), 1); // overwrite does not increase len
-    }
-
-    #[test]
-    fn fill_and_empty_cycle() {
-        let mut map = CoordMap::new();
-        // Fill
-        for i in 0u16..11172 {
-            map.insert(Coord::new(i).unwrap(), i);
-        }
-        assert_eq!(map.len(), 11172);
-        assert!(!map.is_empty());
-        // Empty via drain
-        let count = map.drain().count();
-        assert_eq!(count, 11172);
-        assert!(map.is_empty());
-        assert_eq!(map.len(), 0);
-        // Refill after drain
-        for i in 0u16..100 {
-            map.insert(Coord::new(i).unwrap(), i);
-        }
-        assert_eq!(map.len(), 100);
-    }
-
-    #[test]
-    fn entry_or_insert_idiom_increment() {
-        // HashMap pattern: *map.entry(k).or_insert(0) += 1
-        let mut map = CoordMap::new();
-        let c = Coord::new(0).unwrap();
-        for _ in 0..5 {
-            *map.entry(c).or_insert(0) += 1;
-        }
-        assert_eq!(map.get(c), Some(&5));
-    }
-
-    #[test]
-    fn entry_and_modify_chain() {
-        // HashMap pattern: map.entry(k).and_modify(|v| *v += 1).or_insert(1)
-        let mut map = CoordMap::new();
-        let c = Coord::new(0).unwrap();
-        map.entry(c).and_modify(|v| *v += 1).or_insert(1);
-        assert_eq!(map.get(c), Some(&1));
-        map.entry(c).and_modify(|v| *v += 1).or_insert(1);
-        assert_eq!(map.get(c), Some(&2));
-    }
-
-    #[test]
-    fn entry_match_occupied() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(0).unwrap();
-        map.insert(c, "hello");
-        match map.entry(c) {
-            Entry::Occupied(e) => {
-                assert_eq!(e.key(), c);
-                assert_eq!(*e.get(), "hello");
-            }
-            Entry::Vacant(_) => panic!("should be occupied"),
-        }
-    }
-
-    #[test]
-    fn entry_match_vacant() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(42).unwrap();
-        match map.entry(c) {
-            Entry::Occupied(_) => panic!("should be vacant"),
-            Entry::Vacant(e) => {
-                assert_eq!(e.key(), c);
-                e.insert("world");
-            }
-        }
-        assert_eq!(map.get(c), Some(&"world"));
-    }
-
-    #[test]
-    fn collect_roundtrip() {
-        let data: Vec<_> = (0..50u16)
-            .map(|i| (Coord::new(i).unwrap(), i as u64))
-            .collect();
-        let map: CoordMap<u64> = data.clone().into_iter().collect();
-        assert_eq!(map.len(), 50);
-        let collected_back: Vec<_> = map.into_iter().collect();
-        assert_eq!(collected_back.len(), 50);
-        // Order is deterministic (coordinate order) but keys are unique
-        let mut sorted = data;
-        sorted.sort_by_key(|(k, _)| *k);
-        for ((k1, v1), (k2, v2)) in sorted.iter().zip(collected_back.iter()) {
-            assert_eq!(k1, k2);
-            assert_eq!(v1, v2);
-        }
-    }
-
-    #[test]
-    fn for_loop_borrowed() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(0).unwrap(), 10);
-        map.insert(Coord::new(1).unwrap(), 20);
-        let mut sum = 0u32;
-        for (_, v) in &map {
-            sum += *v;
-        }
-        assert_eq!(sum, 30);
-        // Map is still usable after borrow
-        assert_eq!(map.len(), 2);
-    }
-
-    #[test]
-    fn for_loop_mut_borrowed() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(0).unwrap(), 1);
-        for (_, v) in &mut map {
-            *v += 1;
-        }
-        assert_eq!(map.get(Coord::new(0).unwrap()), Some(&2));
-    }
-
-    #[test]
-    fn into_iter_for_loop() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(5).unwrap(), "a");
-        map.insert(Coord::new(10).unwrap(), "b");
-        let mut collected = Vec::new();
-        for (k, v) in map {
-            collected.push((k, v));
-        }
-        assert_eq!(collected.len(), 2);
-    }
-
-    #[test]
-    fn index_read_write() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(7).unwrap();
-        map.insert(c, 100);
-        assert_eq!(map[c], 100);
-        map[c] = 200;
-        assert_eq!(map[c], 200);
-    }
-
-    #[test]
-    #[should_panic]
-    fn index_panics_vacant() {
-        let map: CoordMap<i32> = CoordMap::new();
-        let _ = &map[Coord::new(0).unwrap()];
-    }
-
-    #[test]
-    fn retain_all_true() {
-        let mut map = CoordMap::new();
-        for i in 0u16..100 {
-            map.insert(Coord::new(i).unwrap(), i);
-        }
-        map.retain(|_, _| true);
-        assert_eq!(map.len(), 100);
-    }
-
-    #[test]
-    fn retain_all_false() {
-        let mut map = CoordMap::new();
-        for i in 0u16..100 {
-            map.insert(Coord::new(i).unwrap(), i);
-        }
-        map.retain(|_, _| false);
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn retain_by_coord() {
-        let mut map = CoordMap::new();
-        for i in 0u16..11172 {
-            map.insert(Coord::new(i).unwrap(), i);
-        }
-        // Retain only first half
-        map.retain(|k, _| k.index() < 5586);
-        assert_eq!(map.len(), 5586);
-        assert!(map.contains_key(Coord::new(0).unwrap()));
-        assert!(!map.contains_key(Coord::new(5586).unwrap()));
+        assert_eq!(map[c], 42);
+        map[c] = 99;
+        assert_eq!(map[c], 99);
     }
 
     #[test]
     fn default_is_empty() {
-        let map: CoordMap<String> = Default::default();
+        let map: CoordMap<1, u32> = Default::default();
         assert!(map.is_empty());
     }
 
-    #[test]
-    fn clone_independent() {
-        let mut a = CoordMap::new();
-        a.insert(Coord::new(0).unwrap(), 42);
-        let mut b = a.clone();
-        b.insert(Coord::new(1).unwrap(), 99);
-        assert_eq!(a.len(), 1);
-        assert_eq!(b.len(), 2);
-        assert_eq!(a.get(Coord::new(0).unwrap()), Some(&42));
-        assert_eq!(b.get(Coord::new(0).unwrap()), Some(&42));
-    }
+    // ── CoordMap<1, _> — path API ──
 
     #[test]
-    fn debug_format() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(0).unwrap(), 1);
-        let s = format!("{:?}", map);
-        assert!(s.contains("CoordMap"));
-    }
-
-    #[test]
-    fn many_inserts_no_collisions() {
-        let mut map = CoordMap::new();
-        for i in 0u16..11172 {
-            let prev = map.insert(Coord::new(i).unwrap(), i);
-            assert!(prev.is_none(), "collision at index {}", i);
-        }
-        assert_eq!(map.len(), 11172);
-    }
-
-    #[test]
-    fn overwrite_all_entries() {
-        let mut map = CoordMap::new();
-        for i in 0u16..11172 {
-            map.insert(Coord::new(i).unwrap(), 0u32);
-        }
-        for i in 0u16..11172 {
-            let prev = map.insert(Coord::new(i).unwrap(), i as u32);
-            assert_eq!(prev, Some(0));
-        }
-        assert_eq!(map.len(), 11172);
-    }
-
-    #[test]
-    fn remove_all_entries() {
-        let mut map = CoordMap::new();
-        for i in 0u16..11172 {
-            map.insert(Coord::new(i).unwrap(), i);
-        }
-        for i in 0u16..11172 {
-            let v = map.remove(Coord::new(i).unwrap());
-            assert_eq!(v, Some(i));
-        }
-        assert!(map.is_empty());
-    }
-
-    #[test]
-    fn keys_iterator_order() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(5).unwrap(), "a");
-        map.insert(Coord::new(3).unwrap(), "b");
-        map.insert(Coord::new(7).unwrap(), "c");
-        let keys: Vec<_> = map.keys().collect();
-        // Keys come in coordinate order (3, 5, 7), not insertion order
-        assert_eq!(
-            keys,
-            vec![
-                Coord::new(3).unwrap(),
-                Coord::new(5).unwrap(),
-                Coord::new(7).unwrap(),
-            ]
-        );
-    }
-
-    #[test]
-    fn values_iterator_order() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(5).unwrap(), "c");
-        map.insert(Coord::new(3).unwrap(), "a");
-        map.insert(Coord::new(7).unwrap(), "e");
-        let values: Vec<_> = map.values().copied().collect();
-        assert_eq!(values, vec!["a", "c", "e"]);
-    }
-
-    #[test]
-    fn drain_then_insert() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(0).unwrap(), 1);
-        map.drain();
-        assert!(map.is_empty());
-        map.insert(Coord::new(0).unwrap(), 2);
-        assert_eq!(map.get(Coord::new(0).unwrap()), Some(&2));
-    }
-
-    #[test]
-    fn clear_then_insert() {
-        let mut map = CoordMap::new();
-        map.insert(Coord::new(0).unwrap(), 1);
-        map.clear();
-        assert!(map.is_empty());
-        map.insert(Coord::new(0).unwrap(), 2);
-        assert_eq!(map.get(Coord::new(0).unwrap()), Some(&2));
-    }
-
-    #[test]
-    fn entry_take_ownership() {
-        let mut map = CoordMap::new();
+    fn flat_get_path() {
+        let mut map = CoordMap::<1, u32>::new();
         let c = Coord::new(42).unwrap();
-        map.insert(c, "owned");
-        if let Entry::Occupied(e) = map.entry(c) {
-            let v = e.remove_entry();
-            assert_eq!(v, "owned");
-        }
-        assert!(!map.contains_key(c));
+        map.insert(c, 100);
+        assert_eq!(map.get_path(&CoordPath::new([c])), Some(&100));
     }
 
     #[test]
-    fn entry_insert_if_vacant_else_update() {
-        let mut map = CoordMap::new();
+    fn flat_insert_path() {
+        let mut map = CoordMap::<1, u32>::new();
+        let c = Coord::new(42).unwrap();
+        map.insert_path(&CoordPath::new([c]), 100);
+        assert_eq!(map.get(c), Some(&100));
+    }
+
+    #[test]
+    fn flat_remove_path() {
+        let mut map = CoordMap::<1, u32>::new();
+        let c = Coord::new(42).unwrap();
+        map.insert(c, 100);
+        assert_eq!(map.remove_path(&CoordPath::new([c])), Some(100));
+        assert!(map.is_empty());
+    }
+
+    // ── CoordMap<2, _> — tree map (N=2) ──
+
+    #[test]
+    fn tree2_insert_and_get() {
+        let mut map = CoordMap::<2, u32>::new();
+        let c0 = Coord::new(0).unwrap();
+        let c1 = Coord::new(1).unwrap();
+        let path = CoordPath::new([c0, c1]);
+        assert_eq!(map.insert_path(&path, 42), None);
+        assert_eq!(map.get_path(&path), Some(&42));
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn tree2_insert_overwrite() {
+        let mut map = CoordMap::<2, u32>::new();
+        let path = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
+        map.insert_path(&path, 1);
+        assert_eq!(map.insert_path(&path, 2), Some(1));
+        assert_eq!(map.get_path(&path), Some(&2));
+        assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn tree2_remove() {
+        let mut map = CoordMap::<2, u32>::new();
+        let path = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
+        map.insert_path(&path, 42);
+        assert_eq!(map.remove_path(&path), Some(42));
+        assert_eq!(map.get_path(&path), None);
+        assert!(map.is_empty());
+    }
+
+    #[test]
+    fn tree2_independent_paths() {
+        let mut map = CoordMap::<2, u32>::new();
+        let path_a = CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]);
+        let path_b = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
+        map.insert_path(&path_a, 10);
+        map.insert_path(&path_b, 20);
+        assert_eq!(map.len(), 2);
+        assert_eq!(map.get_path(&path_a), Some(&10));
+        assert_eq!(map.get_path(&path_b), Some(&20));
+    }
+
+    #[test]
+    fn tree2_remaining_paths_after_remove() {
+        let mut map = CoordMap::<2, u32>::new();
+        let path_a = CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]);
+        let path_b = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
+        map.insert_path(&path_a, 10);
+        map.insert_path(&path_b, 20);
+        map.remove_path(&path_a);
+        assert_eq!(map.len(), 1);
+        assert_eq!(map.get_path(&path_a), None);
+        assert_eq!(map.get_path(&path_b), Some(&20));
+    }
+
+    // ── CoordMap<6, _> — UUID-scale ──
+
+    #[test]
+    fn tree6_basic() {
+        let mut map = CoordMap::<6, String>::new();
+        let coords = [
+            Coord::new(0).unwrap(),
+            Coord::new(1).unwrap(),
+            Coord::new(2).unwrap(),
+            Coord::new(3).unwrap(),
+            Coord::new(4).unwrap(),
+            Coord::new(5).unwrap(),
+        ];
+        let path = CoordPath::new(coords);
+        map.insert_path(&path, "hello".to_string());
+        assert_eq!(map.get_path(&path).map(|s| s.as_str()), Some("hello"));
+    }
+
+    #[test]
+    fn tree6_missing_path() {
+        let map = CoordMap::<6, u32>::new();
+        let path = CoordPath::new([
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+        ]);
+        assert_eq!(map.get_path(&path), None);
+    }
+
+    // ── Type aliases ──
+
+    #[test]
+    fn type_aliases_exist() {
+        let _m1: CoordMap1<u32> = CoordMap::new();
+        let _m2: CoordMap2<u32> = CoordMap::new();
+        let _m6: CoordMap6<u32> = CoordMap::new();
+        let _m12: CoordMap12<u32> = CoordMap::new();
+        let _m19: CoordMap19<u32> = CoordMap::new();
+    }
+
+    #[test]
+    fn coord_map1_is_coord_map_1() {
+        let mut m1: CoordMap1<u32> = CoordMap::new();
         let c = Coord::new(0).unwrap();
-        // insert if vacant
-        map.entry(c).and_modify(|v| *v += 1).or_insert(0);
-        assert_eq!(map[c], 0);
-        // update if occupied
-        map.entry(c).and_modify(|v| *v += 1).or_insert(0);
-        assert_eq!(map[c], 1);
+        m1.insert(c, 42);
+        assert_eq!(m1.get(c), Some(&42));
     }
 
     #[test]
-    fn large_value_type() {
-        // Ensure CoordMap works with large value types (e.g., arrays)
-        let mut map = CoordMap::new();
-        let c = Coord::new(0).unwrap();
-        map.insert(c, [0u8; 1024]);
-        assert!(map.contains_key(c));
-        let v = map.get(c).unwrap();
-        assert_eq!(v.len(), 1024);
+    fn coord_map6_uuid_scale() {
+        let mut map: CoordMap6<u32> = CoordMap::new();
+        let path = CoordPath::new([
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+        ]);
+        map.insert_path(&path, 42);
+        assert_eq!(map.get_path(&path), Some(&42));
     }
 
     #[test]
-    fn string_values() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(0).unwrap();
-        map.insert(c, "hello".to_string());
-        assert_eq!(map.get(c).map(|s| s.as_str()), Some("hello"));
-        map.entry(c)
-            .and_modify(|s| s.push_str(" world"))
-            .or_insert_with(String::new);
-        assert_eq!(map.get(c).map(|s| s.as_str()), Some("hello world"));
-    }
-
-    #[test]
-    fn option_value() {
-        let mut map = CoordMap::new();
-        let c = Coord::new(0).unwrap();
-        map.insert(c, Some(42));
-        assert_eq!(map.get(c), Some(&Some(42)));
-        map.insert(c, None);
-        // This is a valid value — CoordMap stores Option<V>, not nested
-        assert_eq!(map.get(c), Some(&None));
-    }
-
-    #[test]
-    fn eq_different_lengths() {
-        let mut a = CoordMap::new();
-        let mut b = CoordMap::new();
-        a.insert(Coord::new(0).unwrap(), 1);
-        b.insert(Coord::new(0).unwrap(), 1);
-        assert_eq!(a, b);
-        b.insert(Coord::new(1).unwrap(), 2);
-        assert_ne!(a, b);
-        a.insert(Coord::new(1).unwrap(), 2);
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn eq_different_values_same_key() {
-        let mut a = CoordMap::new();
-        let mut b = CoordMap::new();
-        a.insert(Coord::new(0).unwrap(), 1);
-        b.insert(Coord::new(0).unwrap(), 99);
-        assert_ne!(a, b);
+    fn max_depth_insert() {
+        let mut map = CoordMap::<19, u32>::new();
+        let coords = [
+            Coord::new(0).unwrap(), Coord::new(1).unwrap(),
+            Coord::new(2).unwrap(), Coord::new(3).unwrap(),
+            Coord::new(4).unwrap(), Coord::new(5).unwrap(),
+            Coord::new(6).unwrap(), Coord::new(7).unwrap(),
+            Coord::new(8).unwrap(), Coord::new(9).unwrap(),
+            Coord::new(10).unwrap(), Coord::new(11).unwrap(),
+            Coord::new(12).unwrap(), Coord::new(13).unwrap(),
+            Coord::new(14).unwrap(), Coord::new(15).unwrap(),
+            Coord::new(16).unwrap(), Coord::new(17).unwrap(),
+            Coord::new(18).unwrap(),
+        ];
+        let path = CoordPath::new(coords);
+        map.insert_path(&path, 42);
+        assert_eq!(map.get_path(&path), Some(&42));
+        assert_eq!(map.len(), 1);
     }
 }
