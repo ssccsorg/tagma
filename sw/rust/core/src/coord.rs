@@ -19,6 +19,7 @@
 /// ```text
 /// C(i, m, f) = 0xAC00 + 588·i + 28·m + f
 /// ```
+#[cfg(feature = "alloc")]
 use alloc::string::{String, ToString};
 
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
@@ -236,6 +237,7 @@ impl Coord {
     /// let c = Coord::new(0).unwrap();
     /// assert_eq!(c.to_hangul_string(), "가");
     /// ```
+    #[cfg(feature = "alloc")]
     pub fn to_hangul_string(self) -> String {
         self.to_char().to_string()
     }

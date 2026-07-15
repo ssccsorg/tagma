@@ -3,10 +3,13 @@ use crate::path::CoordPath;
 use alloc::boxed::Box;
 
 // ---------------------------------------------------------------------------
-// CoordMap: hash-less, collision-free N-level address table
+// TreeMap: hash-less, collision-free N-level address table (N>1)
 // ---------------------------------------------------------------------------
 
-/// A hash-less, collision-free, N-level address table indexed by [`CoordPath`].
+/// A hash-less, collision-free, N-level address table indexed by [`CoordPath`]
+/// for N > 1. Requires a heap allocator.
+///
+/// For single-syllable addressing without heap allocation, use [`FlatMap`].
 ///
 /// # Depth
 ///
@@ -30,7 +33,7 @@ use alloc::boxed::Box;
 ///
 /// No hashing, no collision resolution at any depth.
 #[derive(Clone, Debug)]
-pub struct CoordMap<const N: usize, V> {
+pub struct TreeMap<const N: usize, V> {
     root: Node<V>,
     len: usize,
 }
@@ -192,8 +195,8 @@ unsafe fn new_null_array<T>() -> Box<[T; 11172]> {
 // Construction
 // ---------------------------------------------------------------------------
 
-impl<const N: usize, V> CoordMap<N, V> {
-    /// Creates an empty `CoordMap`.
+impl<const N: usize, V> TreeMap<N, V> {
+    /// Creates an empty `TreeMap`.
     ///
     /// For `N=1`, allocates a flat array of 11,172 slots.
     /// For `N>1`, allocates a single empty branch node (lazy).
@@ -204,7 +207,7 @@ impl<const N: usize, V> CoordMap<N, V> {
         } else {
             Node::new_branch()
         };
-        CoordMap { root, len: 0 }
+        TreeMap { root, len: 0 }
     }
 
     /// Returns the number of entries in the map.
@@ -231,7 +234,7 @@ impl<const N: usize, V> CoordMap<N, V> {
     }
 }
 
-impl<const N: usize, V> Default for CoordMap<N, V> {
+impl<const N: usize, V> Default for TreeMap<N, V> {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -242,7 +245,7 @@ impl<const N: usize, V> Default for CoordMap<N, V> {
 // Core read / write — single Coord (N=1 convenience)
 // ---------------------------------------------------------------------------
 
-impl<V> CoordMap<1, V> {
+impl<V> TreeMap<1, V> {
     /// Returns a reference to the value stored at `coord`.
     #[inline]
     pub fn get(&self, coord: Coord) -> Option<&V> {
@@ -293,7 +296,7 @@ impl<V> CoordMap<1, V> {
 // Core read / write — CoordPath (general N)
 // ---------------------------------------------------------------------------
 
-impl<const N: usize, V> CoordMap<N, V> {
+impl<const N: usize, V> TreeMap<N, V> {
     /// Returns a reference to the value stored at `path`.
     pub fn get_path(&self, path: &CoordPath<N>) -> Option<&V> {
         if N == 1 {
@@ -362,7 +365,7 @@ impl<const N: usize, V> CoordMap<N, V> {
 // Entry API (N=1 only)
 // ---------------------------------------------------------------------------
 
-impl<V> CoordMap<1, V> {
+impl<V> TreeMap<1, V> {
     /// Gets the entry for `coord` for in-place manipulation.
     pub fn entry(&mut self, coord: Coord) -> Entry<'_, V> {
         if self.contains_key(coord) {
@@ -379,7 +382,7 @@ pub enum Entry<'a, V> {
 }
 
 pub struct OccupiedEntry<'a, V> {
-    map: &'a mut CoordMap<1, V>,
+    map: &'a mut TreeMap<1, V>,
     coord: Coord,
 }
 
@@ -406,7 +409,7 @@ impl<'a, V> OccupiedEntry<'a, V> {
 }
 
 pub struct VacantEntry<'a, V> {
-    map: &'a mut CoordMap<1, V>,
+    map: &'a mut TreeMap<1, V>,
     coord: Coord,
 }
 
@@ -516,7 +519,7 @@ impl<'a, V> Iterator for IterMut<'a, V> {
     }
 }
 
-impl<V> CoordMap<1, V> {
+impl<V> TreeMap<1, V> {
     pub fn iter(&self) -> Iter<'_, V> {
         Iter {
             node: &self.root,
@@ -564,7 +567,7 @@ impl<V> CoordMap<1, V> {
 }
 
 pub struct Drain<'a, V> {
-    map: &'a mut CoordMap<1, V>,
+    map: &'a mut TreeMap<1, V>,
     idx: u16,
 }
 
@@ -601,7 +604,7 @@ impl<'a, V> Drop for Drain<'a, V> {
 // FromIterator (N=1 only)
 // ---------------------------------------------------------------------------
 
-impl<V> FromIterator<(Coord, V)> for CoordMap<1, V> {
+impl<V> FromIterator<(Coord, V)> for TreeMap<1, V> {
     fn from_iter<I: IntoIterator<Item = (Coord, V)>>(iter: I) -> Self {
         let mut map = Self::new();
         for (coord, value) in iter {
@@ -615,7 +618,7 @@ impl<V> FromIterator<(Coord, V)> for CoordMap<1, V> {
 // IntoIterator (N=1 only) — via a consumed Vec
 // ---------------------------------------------------------------------------
 
-impl<V> IntoIterator for CoordMap<1, V> {
+impl<V> IntoIterator for TreeMap<1, V> {
     type Item = (Coord, V);
     type IntoIter = alloc::vec::IntoIter<(Coord, V)>;
 
@@ -630,7 +633,7 @@ impl<V> IntoIterator for CoordMap<1, V> {
     }
 }
 
-impl<'a, V> IntoIterator for &'a CoordMap<1, V> {
+impl<'a, V> IntoIterator for &'a TreeMap<1, V> {
     type Item = (Coord, &'a V);
     type IntoIter = Iter<'a, V>;
 
@@ -639,7 +642,7 @@ impl<'a, V> IntoIterator for &'a CoordMap<1, V> {
     }
 }
 
-impl<'a, V> IntoIterator for &'a mut CoordMap<1, V> {
+impl<'a, V> IntoIterator for &'a mut TreeMap<1, V> {
     type Item = (Coord, &'a mut V);
     type IntoIter = IterMut<'a, V>;
 
@@ -652,18 +655,18 @@ impl<'a, V> IntoIterator for &'a mut CoordMap<1, V> {
 // Index (N=1 only)
 // ---------------------------------------------------------------------------
 
-impl<V> core::ops::Index<Coord> for CoordMap<1, V> {
+impl<V> core::ops::Index<Coord> for TreeMap<1, V> {
     type Output = V;
 
     fn index(&self, coord: Coord) -> &V {
-        self.get(coord).expect("CoordMap::index: key not present")
+        self.get(coord).expect("TreeMap::index: key not present")
     }
 }
 
-impl<V> core::ops::IndexMut<Coord> for CoordMap<1, V> {
+impl<V> core::ops::IndexMut<Coord> for TreeMap<1, V> {
     fn index_mut(&mut self, coord: Coord) -> &mut V {
         self.get_mut(coord)
-            .expect("CoordMap::index_mut: key not present")
+            .expect("TreeMap::index_mut: key not present")
     }
 }
 
@@ -671,20 +674,21 @@ impl<V> core::ops::IndexMut<Coord> for CoordMap<1, V> {
 // Type aliases for standard spaces
 // ---------------------------------------------------------------------------
 
-/// 1-syllable:  11,172 identifiers — sensor tags, basic KV (flat array).
-pub type CoordMap1<V> = CoordMap<1, V>;
+/// 1-syllable:  11,172 identifiers (heap-allocated flat array).
+/// For no_alloc, use `FlatMap`.
+pub type TreeMap1<V> = TreeMap<1, V>;
 
 /// 2-syllable:  1.25 × 10⁸ identifiers — small KV.
-pub type CoordMap2<V> = CoordMap<2, V>;
+pub type TreeMap2<V> = TreeMap<2, V>;
 
 /// 6-syllable:  1.94 × 10²⁴ identifiers — UUID-scale.
-pub type CoordMap6<V> = CoordMap<6, V>;
+pub type TreeMap6<V> = TreeMap<6, V>;
 
 /// 12-syllable: 2.41 × 10⁶⁷ identifiers — between UUID and SHA-256.
-pub type CoordMap12<V> = CoordMap<12, V>;
+pub type TreeMap12<V> = TreeMap<12, V>;
 
 /// 19-syllable: 1.94 × 10⁷⁷ identifiers — SHA-256-scale (2²⁵⁶).
-pub type CoordMap19<V> = CoordMap<19, V>;
+pub type TreeMap19<V> = TreeMap<19, V>;
 
 // ---------------------------------------------------------------------------
 // Tests (inline)
@@ -698,11 +702,11 @@ mod tests {
 
     use alloc::vec::Vec;
 
-    // ── CoordMap<1, _> — flat map tests ──
+    // ── TreeMap<1, _> — flat map tests ──
 
     #[test]
     fn new_map_is_empty() {
-        let map: CoordMap<1, u32> = CoordMap::new();
+        let map: TreeMap<1, u32> = TreeMap::new();
         assert!(map.is_empty());
         assert_eq!(map.len(), 0);
         assert_eq!(map.capacity(), Some(11172));
@@ -710,7 +714,7 @@ mod tests {
 
     #[test]
     fn insert_and_get() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         assert_eq!(map.insert(c, 42), None);
         assert_eq!(map.get(c), Some(&42));
@@ -719,7 +723,7 @@ mod tests {
 
     #[test]
     fn insert_overwrite() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 1);
         assert_eq!(map.insert(c, 2), Some(1));
@@ -729,7 +733,7 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 42);
         assert_eq!(map.remove(c), Some(42));
@@ -739,7 +743,7 @@ mod tests {
 
     #[test]
     fn contains_key() {
-        let mut map = CoordMap::<1, ()>::new();
+        let mut map = TreeMap::<1, ()>::new();
         let c = Coord::new(0).unwrap();
         assert!(!map.contains_key(c));
         map.insert(c, ());
@@ -748,7 +752,7 @@ mod tests {
 
     #[test]
     fn clear() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         map.insert(Coord::new(0).unwrap(), 1);
         map.insert(Coord::new(100).unwrap(), 2);
         map.clear();
@@ -758,13 +762,13 @@ mod tests {
 
     #[test]
     fn iter_empty() {
-        let map: CoordMap<1, u32> = CoordMap::new();
+        let map: TreeMap<1, u32> = TreeMap::new();
         assert_eq!(map.iter().count(), 0);
     }
 
     #[test]
     fn iter_non_empty() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c1 = Coord::new(0).unwrap();
         let c2 = Coord::new(9999).unwrap();
         map.insert(c1, 10);
@@ -777,7 +781,7 @@ mod tests {
 
     #[test]
     fn into_iter_consuming() {
-        let mut map = CoordMap::<1, &str>::new();
+        let mut map = TreeMap::<1, &str>::new();
         let c = Coord::new(42).unwrap();
         map.insert(c, "hello");
         let collected: Vec<_> = map.into_iter().collect();
@@ -791,13 +795,13 @@ mod tests {
         let pairs: Vec<_> = (0..5u16)
             .map(|i| (Coord::new(i).unwrap(), i as u64))
             .collect();
-        let map: CoordMap<1, u64> = pairs.into_iter().collect();
+        let map: TreeMap<1, u64> = pairs.into_iter().collect();
         assert_eq!(map.len(), 5);
     }
 
     #[test]
     fn entry_or_insert() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.entry(c).or_insert(42);
         assert_eq!(map.get(c), Some(&42));
@@ -807,7 +811,7 @@ mod tests {
 
     #[test]
     fn entry_and_modify() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.entry(c).and_modify(|v| *v += 1).or_insert(1);
         assert_eq!(map.get(c), Some(&1));
@@ -817,7 +821,7 @@ mod tests {
 
     #[test]
     fn index_trait() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(5).unwrap();
         map.insert(c, 42);
         assert_eq!(map[c], 42);
@@ -827,15 +831,15 @@ mod tests {
 
     #[test]
     fn default_is_empty() {
-        let map: CoordMap<1, u32> = Default::default();
+        let map: TreeMap<1, u32> = Default::default();
         assert!(map.is_empty());
     }
 
-    // ── CoordMap<1, _> — path API ──
+    // ── TreeMap<1, _> — path API ──
 
     #[test]
     fn flat_get_path() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(42).unwrap();
         map.insert(c, 100);
         assert_eq!(map.get_path(&CoordPath::new([c])), Some(&100));
@@ -843,7 +847,7 @@ mod tests {
 
     #[test]
     fn flat_insert_path() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(42).unwrap();
         map.insert_path(&CoordPath::new([c]), 100);
         assert_eq!(map.get(c), Some(&100));
@@ -851,18 +855,18 @@ mod tests {
 
     #[test]
     fn flat_remove_path() {
-        let mut map = CoordMap::<1, u32>::new();
+        let mut map = TreeMap::<1, u32>::new();
         let c = Coord::new(42).unwrap();
         map.insert(c, 100);
         assert_eq!(map.remove_path(&CoordPath::new([c])), Some(100));
         assert!(map.is_empty());
     }
 
-    // ── CoordMap<2, _> — tree map (N=2) ──
+    // ── TreeMap<2, _> — tree map (N=2) ──
 
     #[test]
     fn tree2_insert_and_get() {
-        let mut map = CoordMap::<2, u32>::new();
+        let mut map = TreeMap::<2, u32>::new();
         let c0 = Coord::new(0).unwrap();
         let c1 = Coord::new(1).unwrap();
         let path = CoordPath::new([c0, c1]);
@@ -873,7 +877,7 @@ mod tests {
 
     #[test]
     fn tree2_insert_overwrite() {
-        let mut map = CoordMap::<2, u32>::new();
+        let mut map = TreeMap::<2, u32>::new();
         let path = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
         map.insert_path(&path, 1);
         assert_eq!(map.insert_path(&path, 2), Some(1));
@@ -883,7 +887,7 @@ mod tests {
 
     #[test]
     fn tree2_remove() {
-        let mut map = CoordMap::<2, u32>::new();
+        let mut map = TreeMap::<2, u32>::new();
         let path = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
         map.insert_path(&path, 42);
         assert_eq!(map.remove_path(&path), Some(42));
@@ -893,7 +897,7 @@ mod tests {
 
     #[test]
     fn tree2_independent_paths() {
-        let mut map = CoordMap::<2, u32>::new();
+        let mut map = TreeMap::<2, u32>::new();
         let path_a = CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]);
         let path_b = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
         map.insert_path(&path_a, 10);
@@ -905,7 +909,7 @@ mod tests {
 
     #[test]
     fn tree2_remaining_paths_after_remove() {
-        let mut map = CoordMap::<2, u32>::new();
+        let mut map = TreeMap::<2, u32>::new();
         let path_a = CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]);
         let path_b = CoordPath::new([Coord::new(0).unwrap(), Coord::new(1).unwrap()]);
         map.insert_path(&path_a, 10);
@@ -916,11 +920,11 @@ mod tests {
         assert_eq!(map.get_path(&path_b), Some(&20));
     }
 
-    // ── CoordMap<6, _> — UUID-scale ──
+    // ── TreeMap<6, _> — UUID-scale ──
 
     #[test]
     fn tree6_basic() {
-        let mut map = CoordMap::<6, String>::new();
+        let mut map = TreeMap::<6, String>::new();
         let coords = [
             Coord::new(0).unwrap(),
             Coord::new(1).unwrap(),
@@ -936,7 +940,7 @@ mod tests {
 
     #[test]
     fn tree6_missing_path() {
-        let map = CoordMap::<6, u32>::new();
+        let map = TreeMap::<6, u32>::new();
         let path = CoordPath::new([
             Coord::new(0).unwrap(),
             Coord::new(0).unwrap(),
@@ -952,16 +956,16 @@ mod tests {
 
     #[test]
     fn type_aliases_exist() {
-        let _m1: CoordMap1<u32> = CoordMap::new();
-        let _m2: CoordMap2<u32> = CoordMap::new();
-        let _m6: CoordMap6<u32> = CoordMap::new();
-        let _m12: CoordMap12<u32> = CoordMap::new();
-        let _m19: CoordMap19<u32> = CoordMap::new();
+        let _m1: TreeMap1<u32> = TreeMap::new();
+        let _m2: TreeMap2<u32> = TreeMap::new();
+        let _m6: TreeMap6<u32> = TreeMap::new();
+        let _m12: TreeMap12<u32> = TreeMap::new();
+        let _m19: TreeMap19<u32> = TreeMap::new();
     }
 
     #[test]
     fn coord_map1_is_coord_map_1() {
-        let mut m1: CoordMap1<u32> = CoordMap::new();
+        let mut m1: TreeMap1<u32> = TreeMap::new();
         let c = Coord::new(0).unwrap();
         m1.insert(c, 42);
         assert_eq!(m1.get(c), Some(&42));
@@ -969,7 +973,7 @@ mod tests {
 
     #[test]
     fn coord_map6_uuid_scale() {
-        let mut map: CoordMap6<u32> = CoordMap::new();
+        let mut map: TreeMap6<u32> = TreeMap::new();
         let path = CoordPath::new([
             Coord::new(0).unwrap(),
             Coord::new(0).unwrap(),
@@ -984,7 +988,7 @@ mod tests {
 
     #[test]
     fn max_depth_insert() {
-        let mut map = CoordMap::<19, u32>::new();
+        let mut map = TreeMap::<19, u32>::new();
         let coords = [
             Coord::new(0).unwrap(),
             Coord::new(1).unwrap(),
