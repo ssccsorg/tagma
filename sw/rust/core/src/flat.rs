@@ -2,7 +2,7 @@ use crate::coord::Coord;
 use crate::path::CoordPath;
 
 // ---------------------------------------------------------------------------
-// FlatMap: no_alloc, single-syllable direct-address table
+// CoordFlatMap: no_alloc, single-syllable direct-address table
 // ---------------------------------------------------------------------------
 
 /// A hash-less, collision-free, single-syllable address table with zero
@@ -18,15 +18,15 @@ use crate::path::CoordPath;
 /// slots[coord]  →  O(1), single array access
 /// ```
 #[derive(Clone, Debug)]
-pub struct FlatMap<V> {
+pub struct CoordFlatMap<V> {
     slots: [Option<V>; 11172],
     len: usize,
 }
 
-impl<V> FlatMap<V> {
+impl<V> CoordFlatMap<V> {
     // ── construction ────────────────────────────────────────────────────
 
-    /// Creates an empty `FlatMap`.
+    /// Creates an empty `CoordFlatMap`.
     ///
     /// All 11,172 slots are initialized to `None`.
     #[inline]
@@ -35,7 +35,7 @@ impl<V> FlatMap<V> {
         // represented as all-zeroes for any V (Option<V> has a niche).
         // This avoids running 11172 drop-and-replace instructions.
         let slots = unsafe { core::mem::zeroed() };
-        FlatMap { slots, len: 0 }
+        CoordFlatMap { slots, len: 0 }
     }
 
     /// Returns the number of entries.
@@ -182,7 +182,7 @@ impl<V> FlatMap<V> {
     }
 }
 
-impl<V> Default for FlatMap<V> {
+impl<V> Default for CoordFlatMap<V> {
     #[inline]
     fn default() -> Self {
         Self::new()
@@ -214,7 +214,7 @@ impl<'a, V> Iterator for FlatIter<'a, V> {
 }
 
 pub struct FlatDrain<'a, V> {
-    map: &'a mut FlatMap<V>,
+    map: &'a mut CoordFlatMap<V>,
     idx: u16,
 }
 
@@ -253,7 +253,7 @@ pub enum FlatEntry<'a, V> {
 }
 
 pub struct FlatOccupiedEntry<'a, V> {
-    map: &'a mut FlatMap<V>,
+    map: &'a mut CoordFlatMap<V>,
     coord: Coord,
 }
 
@@ -276,7 +276,7 @@ impl<'a, V> FlatOccupiedEntry<'a, V> {
 }
 
 pub struct FlatVacantEntry<'a, V> {
-    map: &'a mut FlatMap<V>,
+    map: &'a mut CoordFlatMap<V>,
     coord: Coord,
 }
 
@@ -328,7 +328,7 @@ impl<'a, V> FlatEntry<'a, V> {
 
 // ── FromIterator / IntoIterator ────────────────────────
 
-impl<V> FromIterator<(Coord, V)> for FlatMap<V> {
+impl<V> FromIterator<(Coord, V)> for CoordFlatMap<V> {
     fn from_iter<I: IntoIterator<Item = (Coord, V)>>(iter: I) -> Self {
         let mut map = Self::new();
         for (coord, value) in iter {
@@ -338,7 +338,7 @@ impl<V> FromIterator<(Coord, V)> for FlatMap<V> {
     }
 }
 
-impl<V> IntoIterator for FlatMap<V> {
+impl<V> IntoIterator for CoordFlatMap<V> {
     type Item = (Coord, V);
     type IntoIter = FlatIntoIter<V>;
     fn into_iter(mut self) -> Self::IntoIter {
@@ -348,7 +348,7 @@ impl<V> IntoIterator for FlatMap<V> {
 }
 
 pub struct FlatIntoIter<V> {
-    map: FlatMap<V>,
+    map: CoordFlatMap<V>,
     idx: u16,
 }
 
@@ -370,7 +370,7 @@ impl<V> Iterator for FlatIntoIter<V> {
     }
 }
 
-impl<'a, V> IntoIterator for &'a FlatMap<V> {
+impl<'a, V> IntoIterator for &'a CoordFlatMap<V> {
     type Item = (Coord, &'a V);
     type IntoIter = FlatIter<'a, V>;
     fn into_iter(self) -> Self::IntoIter {
@@ -380,36 +380,37 @@ impl<'a, V> IntoIterator for &'a FlatMap<V> {
 
 // ── Index ──────────────────────────────────────────────
 
-impl<V> core::ops::Index<Coord> for FlatMap<V> {
+impl<V> core::ops::Index<Coord> for CoordFlatMap<V> {
     type Output = V;
     fn index(&self, coord: Coord) -> &V {
-        self.get(coord).expect("FlatMap::index: key not present")
+        self.get(coord)
+            .expect("CoordFlatMap::index: key not present")
     }
 }
 
-impl<V> core::ops::IndexMut<Coord> for FlatMap<V> {
+impl<V> core::ops::IndexMut<Coord> for CoordFlatMap<V> {
     fn index_mut(&mut self, coord: Coord) -> &mut V {
         self.get_mut(coord)
-            .expect("FlatMap::index_mut: key not present")
+            .expect("CoordFlatMap::index_mut: key not present")
     }
 }
 
 // ── Eq ─────────────────────────────────────────────────
 
-impl<V: PartialEq> PartialEq for FlatMap<V> {
+impl<V: PartialEq> PartialEq for CoordFlatMap<V> {
     fn eq(&self, other: &Self) -> bool {
         self.len == other.len && self.slots == other.slots
     }
 }
-impl<V: PartialEq> Eq for FlatMap<V> {}
+impl<V: PartialEq> Eq for CoordFlatMap<V> {}
 
 // ── Type alias ─────────────────────────────────────────
 
 /// Default single-syllable address table. No allocator required.
-pub type CoordMap<V> = FlatMap<V>;
+pub type CoordMap<V> = CoordFlatMap<V>;
 
 /// 1-syllable: 11,172 identifiers. No allocator required.
-pub type CoordMap1<V> = FlatMap<V>;
+pub type CoordMap1<V> = CoordFlatMap<V>;
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -422,7 +423,7 @@ mod tests {
 
     #[test]
     fn new_map_is_empty() {
-        let map: FlatMap<u32> = FlatMap::new();
+        let map: CoordFlatMap<u32> = CoordFlatMap::new();
         assert!(map.is_empty());
         assert_eq!(map.len(), 0);
         assert_eq!(map.capacity(), 11172);
@@ -430,7 +431,7 @@ mod tests {
 
     #[test]
     fn insert_and_get() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         assert_eq!(map.insert(c, 42), None);
         assert_eq!(map.get(c), Some(&42));
@@ -439,7 +440,7 @@ mod tests {
 
     #[test]
     fn insert_overwrite() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 1);
         assert_eq!(map.insert(c, 2), Some(1));
@@ -449,7 +450,7 @@ mod tests {
 
     #[test]
     fn remove() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 42);
         assert_eq!(map.remove(c), Some(42));
@@ -458,7 +459,7 @@ mod tests {
 
     #[test]
     fn contains_key() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         assert!(!map.contains_key(c));
         map.insert(c, ());
@@ -467,7 +468,7 @@ mod tests {
 
     #[test]
     fn clear() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         map.insert(Coord::new(0).unwrap(), 1);
         map.insert(Coord::new(100).unwrap(), 2);
         map.clear();
@@ -477,7 +478,7 @@ mod tests {
 
     #[test]
     fn iter_non_empty() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c1 = Coord::new(0).unwrap();
         let c2 = Coord::new(9999).unwrap();
         map.insert(c1, 10);
@@ -490,7 +491,7 @@ mod tests {
 
     #[test]
     fn into_iter() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(42).unwrap();
         map.insert(c, "hello");
         let collected: Vec<_> = map.into_iter().collect();
@@ -502,13 +503,13 @@ mod tests {
     #[test]
     fn from_iterator() {
         let pairs: Vec<_> = (0..5u16).map(|i| (Coord::new(i).unwrap(), i)).collect();
-        let map: FlatMap<u16> = pairs.into_iter().collect();
+        let map: CoordFlatMap<u16> = pairs.into_iter().collect();
         assert_eq!(map.len(), 5);
     }
 
     #[test]
     fn entry_or_insert() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         map.entry(c).or_insert(42);
         assert_eq!(map.get(c), Some(&42));
@@ -518,7 +519,7 @@ mod tests {
 
     #[test]
     fn index_trait() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(5).unwrap();
         map.insert(c, 42);
         assert_eq!(map[c], 42);
@@ -528,7 +529,7 @@ mod tests {
 
     #[test]
     fn retain() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         map.insert(Coord::new(0).unwrap(), 1);
         map.insert(Coord::new(1).unwrap(), 2);
         map.retain(|_, v| *v > 1);
@@ -537,7 +538,7 @@ mod tests {
 
     #[test]
     fn drain() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         map.insert(Coord::new(0).unwrap(), 1);
         map.insert(Coord::new(1).unwrap(), 2);
         let drained: Vec<_> = map.drain().collect();
@@ -547,7 +548,7 @@ mod tests {
 
     #[test]
     fn path_api() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         let c = Coord::new(42).unwrap();
         map.insert_path(&CoordPath::new([c]), 100);
         assert_eq!(map.get_path(&CoordPath::new([c])), Some(&100));
@@ -557,7 +558,7 @@ mod tests {
 
     #[test]
     fn insert_11172_values() {
-        let mut map = FlatMap::new();
+        let mut map = CoordFlatMap::new();
         for i in 0u16..11172 {
             assert_eq!(map.insert(Coord::new(i).unwrap(), i), None);
         }
@@ -569,8 +570,8 @@ mod tests {
 
     #[test]
     fn eq() {
-        let mut a = FlatMap::new();
-        let mut b = FlatMap::new();
+        let mut a = CoordFlatMap::new();
+        let mut b = CoordFlatMap::new();
         a.insert(Coord::new(0).unwrap(), 1);
         b.insert(Coord::new(0).unwrap(), 1);
         assert_eq!(a, b);
@@ -580,7 +581,7 @@ mod tests {
 
     #[test]
     fn default() {
-        let map: FlatMap<u32> = Default::default();
+        let map: CoordFlatMap<u32> = Default::default();
         assert!(map.is_empty());
     }
 }

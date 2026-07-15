@@ -16,9 +16,9 @@ pub mod flat;
 #[cfg(feature = "alloc")]
 pub mod map;
 
-// CoordRecMap: dynamic depth, heap-backed trie.
+// DynCoordMap: dynamic depth, heap-backed trie.
 #[cfg(feature = "alloc")]
-pub mod coord_rec;
+pub mod dyn_coord;
 
 pub use coord::Coord;
 pub use path::CoordPath;
@@ -31,11 +31,15 @@ pub use flat::CoordMap;
 pub use flat::CoordMap1;
 
 #[cfg(feature = "alloc")]
-pub use coord_rec::CoordRecMap;
+pub use dyn_coord::DynCoordMap;
 #[cfg(feature = "alloc")]
 pub use map::CoordMap12;
 #[cfg(feature = "alloc")]
 pub use map::CoordMap19;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap2;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap3;
 #[cfg(feature = "alloc")]
 pub use map::CoordMap6;
 
