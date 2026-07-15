@@ -49,7 +49,7 @@ fn bench_tagma_insert_all(c: &mut Criterion) {
     let coords = all_coords();
     c.bench_function("TagmaMap/insert/all_11172", |b| {
         b.iter(|| {
-            let mut map = tagma_core::FlatMap::new();
+            let mut map = tagma_core::CoordMap1::new();
             for &coord in &coords {
                 black_box(map.insert(coord, coord.index()));
             }
@@ -75,7 +75,7 @@ fn bench_tagma_insert_random(c: &mut Criterion) {
     let coords = shuffled_coords();
     c.bench_function("TagmaMap/insert/random_11172", |b| {
         b.iter(|| {
-            let mut map = tagma_core::FlatMap::new();
+            let mut map = tagma_core::CoordMap1::new();
             for &coord in &coords {
                 black_box(map.insert(coord, coord.index()));
             }
@@ -103,7 +103,7 @@ fn bench_std_insert_random(c: &mut Criterion) {
 
 fn bench_tagma_get_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::FlatMap::new();
+    let mut map = tagma_core::CoordMap1::new();
     for &coord in &coords {
         map.insert(coord, coord.index());
     }
@@ -137,7 +137,7 @@ fn bench_std_get_all(c: &mut Criterion) {
 
 fn bench_tagma_overwrite_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::FlatMap::new();
+    let mut map = tagma_core::CoordMap1::new();
     for &coord in &coords {
         map.insert(coord, 0);
     }
@@ -171,7 +171,7 @@ fn bench_std_overwrite_all(c: &mut Criterion) {
 
 fn bench_tagma_remove_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::FlatMap::new();
+    let mut map = tagma_core::CoordMap1::new();
     for &coord in &coords {
         map.insert(coord, coord.index());
     }
@@ -209,7 +209,7 @@ fn bench_std_remove_all(c: &mut Criterion) {
 
 fn bench_tagma_iter(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::FlatMap::new();
+    let mut map = tagma_core::CoordMap1::new();
     for &coord in &coords {
         map.insert(coord, coord.index());
     }
@@ -245,7 +245,7 @@ fn bench_tagma_entry(c: &mut Criterion) {
     let coords = all_coords();
     c.bench_function("TagmaMap/entry/all_11172", |b| {
         b.iter(|| {
-            let mut map = tagma_core::FlatMap::new();
+            let mut map = tagma_core::CoordMap1::new();
             for &coord in &coords {
                 map.entry(coord).or_insert_with(|| coord.index());
             }
@@ -273,7 +273,7 @@ fn bench_std_entry(c: &mut Criterion) {
 
 fn bench_tagma_retain_half(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::FlatMap::new();
+    let mut map = tagma_core::CoordMap1::new();
     for &coord in &coords {
         map.insert(coord, coord.index());
     }
@@ -307,7 +307,7 @@ fn bench_std_retain_half(c: &mut Criterion) {
 
 fn bench_tagma_drain_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::FlatMap::new();
+    let mut map = tagma_core::CoordMap1::new();
     for &coord in &coords {
         map.insert(coord, coord.index());
     }
@@ -345,7 +345,7 @@ fn bench_std_drain_all(c: &mut Criterion) {
 
 fn bench_tagma_get_single(c: &mut Criterion) {
     let coord = tagma_core::Coord::new(5000).unwrap();
-    let mut map = tagma_core::FlatMap::new();
+    let mut map = tagma_core::CoordMap1::new();
     map.insert(coord, 42u64);
     let map = map; // freeze
 
@@ -374,7 +374,7 @@ fn bench_tagma_insert_single(c: &mut Criterion) {
     let coord = tagma_core::Coord::new(5000).unwrap();
     c.bench_function("TagmaMap/insert/single", |b| {
         b.iter(|| {
-            let mut map = tagma_core::FlatMap::new();
+            let mut map = tagma_core::CoordMap1::new();
             black_box(map.insert(black_box(coord), 42u64));
         })
     });
@@ -397,7 +397,7 @@ fn bench_std_insert_single(c: &mut Criterion) {
 
 fn bench_tagma_mixed_500k(c: &mut Criterion) {
     let ops = mixed_workload(500_000);
-    let map = tagma_core::FlatMap::new();
+    let map = tagma_core::CoordMap1::new();
 
     c.bench_function("TagmaMap/stress/mixed_500k", |b| {
         b.iter(|| {

@@ -675,20 +675,20 @@ impl<V> core::ops::IndexMut<Coord> for TreeMap<1, V> {
 // ---------------------------------------------------------------------------
 
 /// 1-syllable:  11,172 identifiers (heap-allocated flat array).
-/// For no_alloc, use `FlatMap`.
+/// For no_alloc, use `CoordMap1`.
 pub type TreeMap1<V> = TreeMap<1, V>;
 
 /// 2-syllable:  1.25 × 10⁸ identifiers — small KV.
 pub type TreeMap2<V> = TreeMap<2, V>;
 
 /// 6-syllable:  1.94 × 10²⁴ identifiers — UUID-scale.
-pub type TreeMap6<V> = TreeMap<6, V>;
+pub type CoordMap6<V> = TreeMap<6, V>;
 
 /// 12-syllable: 2.41 × 10⁶⁷ identifiers — between UUID and SHA-256.
-pub type TreeMap12<V> = TreeMap<12, V>;
+pub type CoordMap12<V> = TreeMap<12, V>;
 
 /// 19-syllable: 1.94 × 10⁷⁷ identifiers — SHA-256-scale (2²⁵⁶).
-pub type TreeMap19<V> = TreeMap<19, V>;
+pub type CoordMap19<V> = TreeMap<19, V>;
 
 // ---------------------------------------------------------------------------
 // Tests (inline)
@@ -958,9 +958,9 @@ mod tests {
     fn type_aliases_exist() {
         let _m1: TreeMap1<u32> = TreeMap::new();
         let _m2: TreeMap2<u32> = TreeMap::new();
-        let _m6: TreeMap6<u32> = TreeMap::new();
-        let _m12: TreeMap12<u32> = TreeMap::new();
-        let _m19: TreeMap19<u32> = TreeMap::new();
+        let _m6: CoordMap6<u32> = TreeMap::new();
+        let _m12: CoordMap12<u32> = TreeMap::new();
+        let _m19: CoordMap19<u32> = TreeMap::new();
     }
 
     #[test]
@@ -973,7 +973,7 @@ mod tests {
 
     #[test]
     fn coord_map6_uuid_scale() {
-        let mut map: TreeMap6<u32> = TreeMap::new();
+        let mut map: CoordMap6<u32> = TreeMap::new();
         let path = CoordPath::new([
             Coord::new(0).unwrap(),
             Coord::new(0).unwrap(),
