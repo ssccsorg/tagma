@@ -1,10 +1,10 @@
-use tagma_core::{Coord, CoordMap1, CoordMap6, CoordMap19, CoordPath};
+use tagma_core::{Coord, CoordMap, CoordMap6, CoordMap19, CoordPath};
 
-// ── CoordMap1 — no_alloc single-syllable ──
+// ── CoordMap — no_alloc single-syllable ──
 
 #[test]
-fn cm1_insert_11172_values() {
-    let mut map = CoordMap1::new();
+fn cm_insert_11172_values() {
+    let mut map = CoordMap::new();
     for i in 0u16..11172 {
         assert_eq!(map.insert(Coord::new(i).unwrap(), i as u32), None);
     }
@@ -12,8 +12,8 @@ fn cm1_insert_11172_values() {
 }
 
 #[test]
-fn cm1_all_11172_accessible() {
-    let mut map = CoordMap1::new();
+fn cm_all_11172_accessible() {
+    let mut map = CoordMap::new();
     for i in 0u16..11172 {
         map.insert(Coord::new(i).unwrap(), i);
     }
@@ -23,8 +23,8 @@ fn cm1_all_11172_accessible() {
 }
 
 #[test]
-fn cm1_path_api() {
-    let mut map = CoordMap1::new();
+fn cm_path_api() {
+    let mut map = CoordMap::new();
     let c = Coord::new(5555).unwrap();
     map.insert(c, 100);
     assert_eq!(map.get(c), Some(&100));
@@ -32,8 +32,8 @@ fn cm1_path_api() {
 }
 
 #[test]
-fn cm1_remove_all() {
-    let mut map = CoordMap1::new();
+fn cm_remove_all() {
+    let mut map = CoordMap::new();
     for i in 0u16..11172 {
         map.insert(Coord::new(i).unwrap(), i as u32);
     }
@@ -44,8 +44,8 @@ fn cm1_remove_all() {
 }
 
 #[test]
-fn cm1_clear() {
-    let mut map = CoordMap1::new();
+fn cm_clear() {
+    let mut map = CoordMap::new();
     for i in 0u16..100 {
         map.insert(Coord::new(i).unwrap(), i);
     }
@@ -103,11 +103,11 @@ fn cm19_multiple_paths() {
     assert_eq!(map.get_path(&path_b), Some(&"second"));
 }
 
-// ── Boundary and consistency ──
+// ── Consistency ──
 
 #[test]
 fn all_series_use_same_pattern() {
-    let _m1: CoordMap1<u32> = CoordMap1::new();
+    let _m: CoordMap<u32> = CoordMap::new();
     let _m6: CoordMap6<u32> = CoordMap6::new();
     let _m19: CoordMap19<u32> = CoordMap19::new();
 }

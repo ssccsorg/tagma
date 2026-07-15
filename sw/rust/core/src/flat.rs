@@ -405,6 +405,9 @@ impl<V: PartialEq> Eq for FlatMap<V> {}
 
 // ── Type alias ─────────────────────────────────────────
 
+/// Default single-syllable address table. No allocator required.
+pub type CoordMap<V> = FlatMap<V>;
+
 /// 1-syllable: 11,172 identifiers. No allocator required.
 pub type CoordMap1<V> = FlatMap<V>;
 

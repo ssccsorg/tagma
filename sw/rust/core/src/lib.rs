@@ -23,16 +23,17 @@ pub use set::CoordSet;
 // ── CoordMap series — unified naming ──
 
 /// 1-syllable: 11,172 identifiers. No allocator required.
+pub use flat::CoordMap;
 pub use flat::CoordMap1;
 
-#[cfg(feature = "alloc")]
-pub use map::CoordMap6;
 #[cfg(feature = "alloc")]
 pub use map::CoordMap12;
 #[cfg(feature = "alloc")]
 pub use map::CoordMap19;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap6;
 
 // Internal types (used by CoordMap1):
+pub use flat::FlatDrain;
 pub use flat::FlatEntry;
 pub use flat::FlatIter;
-pub use flat::FlatDrain;
