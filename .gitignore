@@ -66,6 +66,7 @@
 # docs/build.py
 # ============================================================
 _docsbuild/
+_publish/
 _agent/
 _pages/
 _jupyter_cache/

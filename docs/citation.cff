@@ -1,0 +1,35 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: 'Tagma: Hashless Direct Identification by Fixed 3‑Axis Coordinate Primitive'
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Taeho
+    family-names: Lee
+    email: lee@ssccs.org
+    affiliation: SSCCS Foundation
+    orcid: 'https://orcid.org/0009-0006-8767-8069'
+identifiers:
+  - type: doi
+    value: 10.5281/zenodo.21326541
+    description: White paper
+repository-code: 'https://github.com/ssccsorg/tagma'
+url: 'https://ssccs.org'
+abstract: >-
+  Tagma is a structural identity primitive: a 16-bit coordinate space
+  embedded in the Unicode Hangul syllable block that replaces hash-based
+  identity generation with a combinational decoder — collision-free,
+  zero hash, single-cycle decode.
+keywords:
+  - content-addressable
+  - Hangul coordinate space
+  - structural identity
+  - hash-less addressing
+  - combinational decoder
+license: Apache-2.0
+version: tagma-10.5281/zenodo.21302508-68a7ec-260714
+date-released: '2026-07-14'

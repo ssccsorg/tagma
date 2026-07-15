@@ -29,7 +29,7 @@ website:
         
 metadata-files:
   - ./_include/format.html.yml
-
+latex-clean: false
 format:
   html:
     directory-index: true
