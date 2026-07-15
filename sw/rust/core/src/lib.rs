@@ -1,21 +1,34 @@
 #![no_std]
 
+#[cfg(feature = "alloc")]
 extern crate alloc;
 
 pub mod coord;
-pub mod map;
 pub mod path;
 pub mod set;
 
+#[cfg(feature = "alloc")]
+pub mod map;
+
 pub use coord::Coord;
-pub use map::CoordMap;
-pub use map::CoordMap1;
-pub use map::CoordMap2;
-pub use map::CoordMap6;
-pub use map::CoordMap12;
-pub use map::CoordMap19;
-pub use map::Entry;
-pub use map::OccupiedEntry;
-pub use map::VacantEntry;
 pub use path::CoordPath;
 pub use set::CoordSet;
+
+#[cfg(feature = "alloc")]
+pub use map::CoordMap;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap1;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap2;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap6;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap12;
+#[cfg(feature = "alloc")]
+pub use map::CoordMap19;
+#[cfg(feature = "alloc")]
+pub use map::Entry;
+#[cfg(feature = "alloc")]
+pub use map::OccupiedEntry;
+#[cfg(feature = "alloc")]
+pub use map::VacantEntry;

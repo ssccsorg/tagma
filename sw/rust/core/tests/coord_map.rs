@@ -1,4 +1,4 @@
-use tagma_core::{Coord, CoordMap, CoordMap1, CoordMap2, CoordMap19, CoordPath};
+use tagma_core::{Coord, CoordMap, CoordMap1, CoordMap19, CoordMap2, CoordPath};
 
 // ── CoordMap<1> — flat map integration tests ──
 

@@ -122,21 +122,21 @@ impl<V> Node<V> {
 
     /// Returns a reference to the child at `index`.
     #[inline]
-    fn get_child(&self, index: usize) -> Option<&Box<Node<V>>> {
+    fn get_child(&self, index: usize) -> Option<&Node<V>> {
         debug_assert!(!self.is_leaf);
         unsafe {
             let arr = &*(self.items as *const [Option<Box<Node<V>>>; 11172]);
-            (*arr)[index].as_ref()
+            (*arr)[index].as_deref()
         }
     }
 
     /// Returns a mutable reference to the child at `index`, or `None` if absent.
     #[inline]
-    fn get_child_mut_existing(&mut self, index: usize) -> Option<&mut Box<Node<V>>> {
+    fn get_child_mut_existing(&mut self, index: usize) -> Option<&mut Node<V>> {
         debug_assert!(!self.is_leaf);
         unsafe {
             let arr = &mut *(self.items as *mut [Option<Box<Node<V>>>; 11172]);
-            (*arr)[index].as_mut()
+            (*arr)[index].as_deref_mut()
         }
     }
 
@@ -313,7 +313,9 @@ impl<const N: usize, V> CoordMap<N, V> {
     /// Inserts a value at `path`, returning the previous value if any.
     pub fn insert_path(&mut self, path: &CoordPath<N>, value: V) -> Option<V> {
         if N == 1 {
-            let old = self.root.set_value(path.coords()[0].index() as usize, value);
+            let old = self
+                .root
+                .set_value(path.coords()[0].index() as usize, value);
             if old.is_none() {
                 self.len += 1;
             }
@@ -489,26 +491,24 @@ impl<'a, V> Iterator for Iter<'a, V> {
 }
 
 pub struct IterMut<'a, V> {
-    node: &'a mut Node<V>,
+    node: *mut Node<V>,
     idx: u16,
+    _marker: core::marker::PhantomData<&'a mut Node<V>>,
 }
 
 impl<'a, V> Iterator for IterMut<'a, V> {
     type Item = (Coord, &'a mut V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while self.idx < 11172 {
-            let coord = Coord::new(self.idx).unwrap();
-            self.idx += 1;
-            // SAFETY: we yield each index at most once.
-            let ptr = self.node.get_value_mut(coord.index() as usize)?;
-            // Work around borrow checker: get_value_mut borrows self.node,
-            // but we can reborrow through the raw pointer since each
-            // index is yielded exactly once.
-            let val = unsafe { &mut *(ptr as *mut V) };
-            return Some((coord, val));
+        if self.idx >= 11172 {
+            return None;
         }
-        None
+        let coord = Coord::new(self.idx).unwrap();
+        self.idx += 1;
+        // SAFETY: unique mutable access guaranteed by &'a mut Node<V>
+        let ptr = unsafe { (*self.node).get_value_mut(coord.index() as usize)? as *mut V };
+        let val = unsafe { &mut *ptr };
+        Some((coord, val))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -526,8 +526,9 @@ impl<V> CoordMap<1, V> {
 
     pub fn iter_mut(&mut self) -> IterMut<'_, V> {
         IterMut {
-            node: &mut self.root,
+            node: &mut self.root as *mut Node<V>,
             idx: 0,
+            _marker: core::marker::PhantomData,
         }
     }
 
@@ -541,6 +542,58 @@ impl<V> CoordMap<1, V> {
 
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> + '_ {
         self.iter_mut().map(|(_, v)| v)
+    }
+
+    pub fn retain<F: FnMut(Coord, &mut V) -> bool>(&mut self, mut f: F) {
+        let mut idx = 0u16;
+        while idx < 11172 {
+            let coord = Coord::new(idx).unwrap();
+            idx += 1;
+            if let Some(val) = self.root.get_value_mut(coord.index() as usize) {
+                if !f(coord, val) {
+                    self.root.take_value(coord.index() as usize);
+                    self.len -= 1;
+                }
+            }
+        }
+    }
+
+    pub fn drain(&mut self) -> Drain<'_, V> {
+        Drain { map: self, idx: 0 }
+    }
+}
+
+pub struct Drain<'a, V> {
+    map: &'a mut CoordMap<1, V>,
+    idx: u16,
+}
+
+impl<'a, V> Iterator for Drain<'a, V> {
+    type Item = (Coord, V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        while self.idx < 11172 {
+            let coord = Coord::new(self.idx).unwrap();
+            self.idx += 1;
+            if let Some(val) = self.map.remove(coord) {
+                return Some((coord, val));
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(11172 - self.idx as usize))
+    }
+}
+
+impl<'a, V> Drop for Drain<'a, V> {
+    fn drop(&mut self) {
+        while self.idx < 11172 {
+            let coord = Coord::new(self.idx).unwrap();
+            self.idx += 1;
+            self.map.remove(coord);
+        }
     }
 }
 
@@ -933,15 +986,24 @@ mod tests {
     fn max_depth_insert() {
         let mut map = CoordMap::<19, u32>::new();
         let coords = [
-            Coord::new(0).unwrap(), Coord::new(1).unwrap(),
-            Coord::new(2).unwrap(), Coord::new(3).unwrap(),
-            Coord::new(4).unwrap(), Coord::new(5).unwrap(),
-            Coord::new(6).unwrap(), Coord::new(7).unwrap(),
-            Coord::new(8).unwrap(), Coord::new(9).unwrap(),
-            Coord::new(10).unwrap(), Coord::new(11).unwrap(),
-            Coord::new(12).unwrap(), Coord::new(13).unwrap(),
-            Coord::new(14).unwrap(), Coord::new(15).unwrap(),
-            Coord::new(16).unwrap(), Coord::new(17).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(1).unwrap(),
+            Coord::new(2).unwrap(),
+            Coord::new(3).unwrap(),
+            Coord::new(4).unwrap(),
+            Coord::new(5).unwrap(),
+            Coord::new(6).unwrap(),
+            Coord::new(7).unwrap(),
+            Coord::new(8).unwrap(),
+            Coord::new(9).unwrap(),
+            Coord::new(10).unwrap(),
+            Coord::new(11).unwrap(),
+            Coord::new(12).unwrap(),
+            Coord::new(13).unwrap(),
+            Coord::new(14).unwrap(),
+            Coord::new(15).unwrap(),
+            Coord::new(16).unwrap(),
+            Coord::new(17).unwrap(),
             Coord::new(18).unwrap(),
         ];
         let path = CoordPath::new(coords);
