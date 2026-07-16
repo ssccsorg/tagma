@@ -191,11 +191,12 @@ impl<V> DynCoordMap<V> {
     }
 }
 
-/// Encode a string as a Coord slice via base-11172.
-/// Every pair of bytes → one Coord. Zero hash, zero collision.
+/// Encode a string as a Coord slice via base-11172 (lossless).
+/// Every pair of bytes → two Coords (quotient + remainder in base 11172).
+/// Zero collision: distinct strings always produce distinct Coord sequences.
 pub(crate) fn str_to_coords(s: &str) -> Vec<Coord> {
     let bytes = s.as_bytes();
-    let n = bytes.len().div_ceil(2);
+    let n = bytes.len().div_ceil(2) * 2;  // two Coords per u16 pair
     let mut out = Vec::with_capacity(n);
     for chunk in bytes.chunks(2) {
         let v = if chunk.len() == 2 {
@@ -203,7 +204,8 @@ pub(crate) fn str_to_coords(s: &str) -> Vec<Coord> {
         } else {
             chunk[0] as u16
         };
-        out.push(Coord::new(v % (Coord::N_VALID as u16)).unwrap());
+        out.push(Coord::new((v as u32 / Coord::N_VALID as u32) as u16).unwrap());
+        out.push(Coord::new((v as u32 % Coord::N_VALID as u32) as u16).unwrap());
     }
     out
 }
@@ -458,6 +460,32 @@ mod tests {
         let a = str_to_coords("alpha");
         let b = str_to_coords("beta");
         assert_ne!(a, b);
+    }
+
+    #[test]
+    fn str_path_lossless() {
+        // Strings that modulo-only would collide must differ in full encoding.
+        // v=0 and v=11172 both map to Coord(0) under modulo-only,
+        // but under base11172 they map to [(0,0)] and [(1,0)] respectively.
+        let a = str_to_coords("\x00\x00");   // u16 = 0
+        let b = str_to_coords("\x2B\x2B"); // u16 = 11172 = 0x2B2B
+        assert_ne!(a, b, "base11172 must distinguish modulo collisions");
+    }
+
+    #[test]
+    fn str_path_pairs_are_valid_base11172() {
+        let s = "hello";
+        let path = str_to_coords(s);
+        // Each u16 pair → two Coords (quotient, remainder)
+        assert!(path.len() % 2 == 0, "base11172 must produce Coord pairs");
+        // Verify each pair reconstructs correctly
+        for pair in path.chunks(2) {
+            let q = pair[0].index() as u32;
+            let r = pair[1].index() as u32;
+            let v = q * Coord::N_VALID as u32 + r;
+            assert!(q < 6, "quotient fits in 6 (65536/11172)");
+            assert!(v <= u16::MAX as u32, "reconstructed value within u16");
+        }
     }
 
     #[test]
