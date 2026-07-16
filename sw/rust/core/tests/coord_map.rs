@@ -1,6 +1,5 @@
 use tagma_core::{
-    Coord, CoordMap, CoordMap12, CoordMap19, CoordMap2, CoordMap3, CoordMap6, CoordPath,
-    CoordSet,
+    Coord, CoordMap, CoordMap12, CoordMap19, CoordMap2, CoordMap3, CoordMap6, CoordPath, CoordSet,
 };
 
 // ── CoordMap — no_alloc single-syllable ──
@@ -122,7 +121,10 @@ fn cm2_fih_cube() {
     }
     assert_eq!(map.len(), 100);
     // Query: Fact=5, Intent=7
-    let r = map.get_path(&CoordPath::new([Coord::new(5).unwrap(), Coord::new(7).unwrap()]));
+    let r = map.get_path(&CoordPath::new([
+        Coord::new(5).unwrap(),
+        Coord::new(7).unwrap(),
+    ]));
     assert_eq!(r, Some(&5070));
 }
 
@@ -141,9 +143,15 @@ fn cm2_sparse_coverage() {
 #[test]
 fn cm2_clone_independent() {
     let mut a = CoordMap2::new();
-    a.insert_path(&CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]), 1);
+    a.insert_path(
+        &CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]),
+        1,
+    );
     let mut b = a.clone();
-    b.insert_path(&CoordPath::new([Coord::new(1).unwrap(), Coord::new(1).unwrap()]), 2);
+    b.insert_path(
+        &CoordPath::new([Coord::new(1).unwrap(), Coord::new(1).unwrap()]),
+        2,
+    );
     assert_eq!(a.len(), 1);
     assert_eq!(b.len(), 2);
 }
@@ -273,11 +281,11 @@ fn set_operations() {
         b.insert(Coord::new(i * 3).unwrap());
     }
     let intersection = a.intersection(&b);
-    assert!(intersection.contains(Coord::new(0).unwrap()));   // 0: even × multiple of 3
-    assert!(intersection.contains(Coord::new(6).unwrap()));   // 6: 2×3, 3×2
-    assert!(intersection.contains(Coord::new(12).unwrap()));  // 12: 2×6, 3×4
-    assert!(!intersection.contains(Coord::new(2).unwrap()));  // 2: even, not multiple of 3
-    assert!(!intersection.contains(Coord::new(3).unwrap()));  // 3: multiple of 3, not even
+    assert!(intersection.contains(Coord::new(0).unwrap())); // 0: even × multiple of 3
+    assert!(intersection.contains(Coord::new(6).unwrap())); // 6: 2×3, 3×2
+    assert!(intersection.contains(Coord::new(12).unwrap())); // 12: 2×6, 3×4
+    assert!(!intersection.contains(Coord::new(2).unwrap())); // 2: even, not multiple of 3
+    assert!(!intersection.contains(Coord::new(3).unwrap())); // 3: multiple of 3, not even
     let union = a.union(&b);
     assert!(union.contains(Coord::new(2).unwrap()));
     assert!(union.contains(Coord::new(3).unwrap()));
@@ -353,7 +361,9 @@ fn dyn_coord_clear_reuse() {
     map.insert(&[Coord::new(1).unwrap(), Coord::new(0).unwrap()], 2);
     map.clear();
     assert!(map.get(&[Coord::new(0).unwrap()]).is_none());
-    assert!(map.get(&[Coord::new(1).unwrap(), Coord::new(0).unwrap()]).is_none());
+    assert!(map
+        .get(&[Coord::new(1).unwrap(), Coord::new(0).unwrap()])
+        .is_none());
     // Reuse after clear
     map.insert(&[Coord::new(5).unwrap()], 10);
     assert_eq!(map.get(&[Coord::new(5).unwrap()]), Some(&10));

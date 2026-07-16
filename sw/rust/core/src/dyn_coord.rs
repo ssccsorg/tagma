@@ -85,7 +85,10 @@ impl<V> DynCoordMap<V> {
     ///
     /// Panics if `path` is empty (a path must contain at least one coordinate).
     pub fn insert(&mut self, path: &[Coord], value: V) -> Option<V> {
-        assert!(!path.is_empty(), "DynCoordMap::insert: path must not be empty");
+        assert!(
+            !path.is_empty(),
+            "DynCoordMap::insert: path must not be empty"
+        );
         self.insert_rec(path, 0, value)
     }
 
