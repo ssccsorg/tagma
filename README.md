@@ -10,8 +10,8 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 
 | Level | Feature flags | Heap | Available types |
 |-------|---------------|------|-----------------|
-| **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordFlatMap (CoordMap) |
-| **alloc** | `alloc` (default) | Optional | + CoordTreeMap\<N\>, DynCoordMap |
+| **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordFlatMap (CoordSpace) |
+| **alloc** | `alloc` (default) | Optional | + CoordSpace\<N\>, DynCoordSpace |
 
 ## Type reference
 
@@ -22,18 +22,18 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | **Coord** | 16-bit atomic coordinate (0..11172), 3-axis composition/decomposition, Hamming distance, Hangul display | `core/src/coord.rs` |
 | **CoordPath\<N\>** | Index path (not a hash key), compile-time N-element Coord array. `From<Coord>`, `From<[Coord; N]>` | `core/src/path.rs` |
 | **CoordSet** | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/set.rs` |
-| **CoordMap\<V\>** ($\equiv$ CoordFlatMap) | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/flat.rs` |
+| **CoordSpace\<V\>** ($\equiv$ CoordFlatMap) | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/flat.rs` |
 
 ### Requires alloc (default feature)
 
 | Type | Description | File |
 |------|-------------|------|
-| **CoordTreeMap\<N, V\>** | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/map.rs` |
-| **CoordMap2\<V\>** | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordTreeMap<2, V>` | `core/src/map.rs` |
-| **CoordMap6\<V\>** | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordTreeMap<6, V>` | `core/src/map.rs` |
-| **CoordMap12\<V\>** | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordTreeMap<12, V>` | `core/src/map.rs` |
-| **CoordMap19\<V\>** | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordTreeMap<19, V>` | `core/src/map.rs` |
-| **DynCoordMap\<V\>** | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord.rs` |
+| **CoordSpace\<N, V\>** | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/map.rs` |
+| **CoordSpace2\<V\>** | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/map.rs` |
+| **CoordSpace6\<V\>** | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/map.rs` |
+| **CoordSpace12\<V\>** | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/map.rs` |
+| **CoordSpace19\<V\>** | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/map.rs` |
+| **DynCoordSpace\<V\>** | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord.rs` |
 
 ## Quick start
 
@@ -55,7 +55,7 @@ cargo build --no-default-features  # Verify no_alloc build
 ## Usage
 
 ```rust
-use tagma_core::{Coord, CoordMap, CoordSet};
+use tagma_core::{Coord, CoordSpace, CoordSet};
 
 // Compose a coordinate from three axes
 let c = Coord::from_axes(5, 10, 15).unwrap();
@@ -63,7 +63,7 @@ assert_eq!(c.to_axes(), (5, 10, 15));
 assert_eq!(c.to_char(), '걐');  // Hangul syllable display
 
 // Single-syllable direct-address (no allocator)
-let mut map = CoordMap::new();
+let mut map = CoordSpaceN::new();
 map.insert(c, "tagma");
 assert_eq!(map.get(&c), Some(&"tagma"));
 *map.entry(c).or_insert("default") = "updated";
@@ -81,9 +81,9 @@ assert!(set.contains(c));
 | Coord | ✅ | ✅ |
 | CoordPath\<N\> | ✅ | ✅ |
 | CoordSet | ✅ | ✅ |
-| CoordMap (inline array) | ✅ | ✅ |
-| CoordTreeMap\<N\> (heap tree) | ❌ | ✅ |
-| DynCoordMap (runtime trie) | ❌ | ✅ |
+| CoordSpace (inline array) | ✅ | ✅ |
+| CoordSpace\<N\> (heap tree) | ❌ | ✅ |
+| DynCoordSpace (runtime trie) | ❌ | ✅ |
 
 ## How it works
 

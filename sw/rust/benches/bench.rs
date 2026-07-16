@@ -47,13 +47,13 @@ struct MixedOp {
 
 fn bench_tagma_insert_all(c: &mut Criterion) {
     let coords = all_coords();
-    c.bench_function("TagmaMap/insert/all_11172", |b| {
+    c.bench_function("CoordSpace/insert/all_11172", |b| {
         b.iter(|| {
-            let mut map = tagma_core::CoordMap::new();
+            let mut space = tagma_core::CoordSpace::new();
             for &coord in &coords {
-                black_box(map.insert(coord, coord.index()));
+                black_box(space.place(coord, coord.index()));
             }
-            black_box(map);
+            black_box(space);
         })
     });
 }
@@ -73,13 +73,13 @@ fn bench_std_insert_all(c: &mut Criterion) {
 
 fn bench_tagma_insert_random(c: &mut Criterion) {
     let coords = shuffled_coords();
-    c.bench_function("TagmaMap/insert/random_11172", |b| {
+    c.bench_function("CoordSpace/insert/random_11172", |b| {
         b.iter(|| {
-            let mut map = tagma_core::CoordMap::new();
+            let mut space = tagma_core::CoordSpace::new();
             for &coord in &coords {
-                black_box(map.insert(coord, coord.index()));
+                black_box(space.place(coord, coord.index()));
             }
-            black_box(map);
+            black_box(space);
         })
     });
 }
@@ -103,14 +103,14 @@ fn bench_std_insert_random(c: &mut Criterion) {
 
 fn bench_tagma_get_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::CoordMap::new();
+    let mut space = tagma_core::CoordSpace::new();
     for &coord in &coords {
-        map.insert(coord, coord.index());
+        space.place(coord, coord.index());
     }
-    c.bench_function("TagmaMap/get/all_11172", |b| {
+    c.bench_function("CoordSpace/get/all_11172", |b| {
         b.iter(|| {
             for &coord in &coords {
-                black_box(black_box(&map).get(&coord));
+                black_box(black_box(&space).at(&coord));
             }
         })
     });
@@ -137,14 +137,14 @@ fn bench_std_get_all(c: &mut Criterion) {
 
 fn bench_tagma_overwrite_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::CoordMap::new();
+    let mut space = tagma_core::CoordSpace::new();
     for &coord in &coords {
-        map.insert(coord, 0);
+        space.place(coord, 0);
     }
-    c.bench_function("TagmaMap/overwrite/all_11172", |b| {
+    c.bench_function("CoordSpace/overwrite/all_11172", |b| {
         b.iter(|| {
             for &coord in &coords {
-                black_box(map.insert(coord, coord.index()));
+                black_box(space.place(coord, coord.index()));
             }
         })
     });
@@ -171,15 +171,15 @@ fn bench_std_overwrite_all(c: &mut Criterion) {
 
 fn bench_tagma_remove_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::CoordMap::new();
+    let mut space = tagma_core::CoordSpace::new();
     for &coord in &coords {
-        map.insert(coord, coord.index());
+        space.place(coord, coord.index());
     }
-    c.bench_function("TagmaMap/remove/all_11172", |b| {
+    c.bench_function("CoordSpace/remove/all_11172", |b| {
         b.iter(|| {
-            let mut m = map.clone();
+            let mut m = space.clone();
             for &coord in &coords {
-                black_box(m.remove(&coord));
+                black_box(m.vacate(&coord));
             }
             black_box(m);
         })
@@ -209,13 +209,13 @@ fn bench_std_remove_all(c: &mut Criterion) {
 
 fn bench_tagma_iter(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::CoordMap::new();
+    let mut space = tagma_core::CoordSpace::new();
     for &coord in &coords {
-        map.insert(coord, coord.index());
+        space.place(coord, coord.index());
     }
-    c.bench_function("TagmaMap/iter/all_11172", |b| {
+    c.bench_function("CoordSpace/iter/all_11172", |b| {
         b.iter(|| {
-            for (k, v) in black_box(&map) {
+            for (k, v) in black_box(&space) {
                 black_box((k, v));
             }
         })
@@ -243,13 +243,13 @@ fn bench_std_iter(c: &mut Criterion) {
 
 fn bench_tagma_entry(c: &mut Criterion) {
     let coords = all_coords();
-    c.bench_function("TagmaMap/entry/all_11172", |b| {
+    c.bench_function("CoordSpace/entry/all_11172", |b| {
         b.iter(|| {
-            let mut map = tagma_core::CoordMap::new();
+            let mut space = tagma_core::CoordSpace::new();
             for &coord in &coords {
-                map.entry(coord).or_insert_with(|| coord.index());
+                space.entry(coord).or_insert_with(|| coord.index());
             }
-            black_box(map);
+            black_box(space);
         })
     });
 }
@@ -273,13 +273,13 @@ fn bench_std_entry(c: &mut Criterion) {
 
 fn bench_tagma_retain_half(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::CoordMap::new();
+    let mut space = tagma_core::CoordSpace::new();
     for &coord in &coords {
-        map.insert(coord, coord.index());
+        space.place(coord, coord.index());
     }
-    c.bench_function("TagmaMap/retain/half", |b| {
+    c.bench_function("CoordSpace/retain/half", |b| {
         b.iter(|| {
-            let mut m = map.clone();
+            let mut m = space.clone();
             m.retain(|_, v| *v % 2 == 0);
             black_box(m);
         })
@@ -307,13 +307,13 @@ fn bench_std_retain_half(c: &mut Criterion) {
 
 fn bench_tagma_drain_all(c: &mut Criterion) {
     let coords = all_coords();
-    let mut map = tagma_core::CoordMap::new();
+    let mut space = tagma_core::CoordSpace::new();
     for &coord in &coords {
-        map.insert(coord, coord.index());
+        space.place(coord, coord.index());
     }
-    c.bench_function("TagmaMap/drain/all_11172", |b| {
+    c.bench_function("CoordSpace/drain/all_11172", |b| {
         b.iter(|| {
-            let mut m = map.clone();
+            let mut m = space.clone();
             for (k, v) in m.drain() {
                 black_box((k, v));
             }
@@ -345,13 +345,13 @@ fn bench_std_drain_all(c: &mut Criterion) {
 
 fn bench_tagma_get_single(c: &mut Criterion) {
     let coord = tagma_core::Coord::new(5000).unwrap();
-    let mut map = tagma_core::CoordMap::new();
-    map.insert(coord, 42u64);
-    let map = map; // freeze
+    let mut space = tagma_core::CoordSpace::new();
+    space.place(coord, 42u64);
+    let space = space; // freeze
 
-    c.bench_function("TagmaMap/get/single", |b| {
+    c.bench_function("CoordSpace/get/single", |b| {
         b.iter(|| {
-            black_box(black_box(&map).get(black_box(&coord)));
+            black_box(black_box(&space).at(black_box(&coord)));
         })
     });
 }
@@ -372,10 +372,10 @@ fn bench_std_get_single(c: &mut Criterion) {
 
 fn bench_tagma_insert_single(c: &mut Criterion) {
     let coord = tagma_core::Coord::new(5000).unwrap();
-    c.bench_function("TagmaMap/insert/single", |b| {
+    c.bench_function("CoordSpace/insert/single", |b| {
         b.iter(|| {
-            let mut map = tagma_core::CoordMap::new();
-            black_box(map.insert(black_box(coord), 42u64));
+            let mut space = tagma_core::CoordSpace::new();
+            black_box(space.place(black_box(coord), 42u64));
         })
     });
 }
@@ -397,24 +397,24 @@ fn bench_std_insert_single(c: &mut Criterion) {
 
 fn bench_tagma_mixed_500k(c: &mut Criterion) {
     let ops = mixed_workload(500_000);
-    let map = tagma_core::CoordMap::new();
+    let space = tagma_core::CoordSpace::new();
 
-    c.bench_function("TagmaMap/stress/mixed_500k", |b| {
+    c.bench_function("CoordSpace/stress/mixed_500k", |b| {
         b.iter(|| {
-            let mut m = map.clone();
+            let mut m = space.clone();
             for op in &ops {
                 match op.kind {
                     0 => {
-                        black_box(m.insert(op.coord, 1));
+                        black_box(m.place(op.coord, 1));
                     }
                     1 => {
-                        black_box(m.get(&op.coord));
+                        black_box(m.at(&op.coord));
                     }
                     2 => {
-                        black_box(m.remove(&op.coord));
+                        black_box(m.vacate(&op.coord));
                     }
                     _ => {
-                        black_box(m.insert(op.coord, 2));
+                        black_box(m.place(op.coord, 2));
                     }
                 }
             }
@@ -468,20 +468,20 @@ fn bench_baseline_iterate(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// CoordMap2 (N=2) benchmarks — cross-product FIH-like scenario
+// CoordSpace2 (N=2) benchmarks — cross-product FIH-like scenario
 // ===========================================================================
 
 fn bench_cm2_insert_1000(c: &mut Criterion) {
-    c.bench_function("CoordMap2/insert/1000", |b| {
+    c.bench_function("CoordSpace2/insert/1000", |b| {
         b.iter(|| {
-            let mut map = tagma_core::CoordMap2::new();
+            let mut map = tagma_core::CoordSpace2::new();
             for i in 0u16..100 {
                 for j in 0u16..10 {
                     let path = tagma_core::CoordPath::new([
                         tagma_core::Coord::new(i).unwrap(),
                         tagma_core::Coord::new(j).unwrap(),
                     ]);
-                    black_box(map.insert_path(&path, (i * 100 + j) as u32));
+                    black_box(map.place_path(&path, (i * 100 + j) as u32));
                 }
             }
             black_box(map);
@@ -490,17 +490,17 @@ fn bench_cm2_insert_1000(c: &mut Criterion) {
 }
 
 fn bench_cm2_get_1000(c: &mut Criterion) {
-    let mut map = tagma_core::CoordMap2::new();
+    let mut map = tagma_core::CoordSpace2::new();
     for i in 0u16..100 {
         for j in 0u16..10 {
             let path = tagma_core::CoordPath::new([
                 tagma_core::Coord::new(i).unwrap(),
                 tagma_core::Coord::new(j).unwrap(),
             ]);
-            map.insert_path(&path, (i * 100 + j) as u32);
+            map.place_path(&path, (i * 100 + j) as u32);
         }
     }
-    c.bench_function("CoordMap2/get/1000", |b| {
+    c.bench_function("CoordSpace2/get/1000", |b| {
         b.iter(|| {
             for i in 0u16..100 {
                 for j in 0u16..10 {
@@ -508,7 +508,7 @@ fn bench_cm2_get_1000(c: &mut Criterion) {
                         tagma_core::Coord::new(i).unwrap(),
                         tagma_core::Coord::new(j).unwrap(),
                     ]);
-                    black_box(black_box(&map).get_path(&path));
+                    black_box(black_box(&map).at_path(&path));
                 }
             }
         })
