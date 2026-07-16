@@ -308,6 +308,20 @@ impl<const N: usize, V> CoordTreeMap<N, V> {
         node.get_value(last)
     }
 
+    /// Returns a mutable reference to the value stored at `path`.
+    pub fn get_path_mut(&mut self, path: &CoordPath<N>) -> Option<&mut V> {
+        if N == 1 {
+            return self.root.get_value_mut(path.coords()[0].index() as usize);
+        }
+        let mut node = &mut self.root;
+        for i in 0..(N - 1) {
+            let idx = path.coords()[i].index() as usize;
+            node = node.get_child_mut_existing(idx)?;
+        }
+        let last = path.coords()[N - 1].index() as usize;
+        node.get_value_mut(last)
+    }
+
     /// Inserts a value at `path`, returning the previous value if any.
     pub fn insert_path(&mut self, path: &CoordPath<N>, value: V) -> Option<V> {
         if N == 1 {

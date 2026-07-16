@@ -4,6 +4,7 @@
 extern crate alloc;
 
 pub mod coord;
+pub mod key;
 pub mod path;
 pub mod set;
 
@@ -20,6 +21,10 @@ pub mod map;
 #[cfg(feature = "alloc")]
 pub mod dyn_coord;
 
+// CoordKey + CoordHashMap: HashMap-compatible wrapper.
+#[cfg(feature = "alloc")]
+pub mod hashmap;
+
 pub use coord::Coord;
 pub use path::CoordPath;
 pub use set::CoordSet;
@@ -34,6 +39,9 @@ pub use flat::CoordMap1;
 pub use dyn_coord::DynCoordMap;
 #[cfg(feature = "alloc")]
 pub use dyn_coord::DynIter;
+#[cfg(feature = "alloc")]
+pub use hashmap::CoordHashMap;
+pub use key::CoordKey;
 #[cfg(feature = "alloc")]
 pub use map::CoordMap12;
 #[cfg(feature = "alloc")]
