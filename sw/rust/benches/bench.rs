@@ -494,6 +494,89 @@ fn bench_spatial_axis_filter(c: &mut Criterion) {
     group.finish();
 }
 
+fn bench_spatial_axis_filter_range(c: &mut Criterion) {
+    // Range query: initial axis in [3,7]. ~5×21×28 = 2940 entries match.
+    let mut cs = tagma_core::CoordSpace::new();
+    let mut hm: std::collections::HashMap<tagma_core::Coord, u32> =
+        std::collections::HashMap::new();
+    for i in 0u16..11172 {
+        let coord = tagma_core::Coord::new(i).unwrap();
+        cs.place(coord, i as u32);
+        hm.insert(coord, i as u32);
+    }
+
+    let mut group = c.benchmark_group("Spatial/axis_filter_range_3_7");
+    group.throughput(criterion::Throughput::Elements(2940));
+
+    group.bench_function("CoordSpace", |b| {
+        b.iter(|| {
+            let count = cs
+                .iter()
+                .filter(|(c, _)| (3..=7).contains(&c.to_axes().0))
+                .count();
+            black_box(count);
+        })
+    });
+
+    group.bench_function("HashMap", |b| {
+        b.iter(|| {
+            let count = hm
+                .iter()
+                .filter(|(c, _)| (3..=7).contains(&c.to_axes().0))
+                .count();
+            black_box(count);
+        })
+    });
+
+    group.finish();
+}
+
+fn bench_spatial_cs2_prefix_scan(c: &mut Criterion) {
+    // CoordSpace2: 10000 entries with shared prefixes vs HashMap<(Coord,Coord),V>.
+    // Query: find all entries matching a specific prefix (first coord).
+    // CoordSpace2 can restrict iteration to the sub-tree at that prefix;
+    // HashMap must scan every entry.
+    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut hm: std::collections::HashMap<(u16, u16), u32> =
+        std::collections::HashMap::new();
+    // 100 prefixes × 100 suffixes = 10,000 entries
+    for p in 0u16..100 {
+        for s in 0u16..100 {
+            let path = tagma_core::CoordPath::new([
+                tagma_core::Coord::new(p).unwrap(),
+                tagma_core::Coord::new(s).unwrap(),
+            ]);
+            cs2.place_path(&path, (p * 1000 + s).into());
+            hm.insert((p, s), (p * 1000 + s).into());
+        }
+    }
+
+    let mut group = c.benchmark_group("Spatial/cs2_prefix_42");
+    // 100 entries share prefix=42
+    group.throughput(criterion::Throughput::Elements(100));
+
+    group.bench_function("CoordSpace2", |b| {
+        let prefix = tagma_core::Coord::new(42).unwrap();
+        b.iter(|| {
+            // Iterate all entries, filter by first coord == prefix
+            let count = cs2
+                .iter_tree()
+                .filter(|(path, _)| path.coords()[0] == prefix)
+                .count();
+            black_box(count);
+        })
+    });
+
+    group.bench_function("HashMap", |b| {
+        b.iter(|| {
+            let count = hm.iter().filter(|(&(p, _), _)| p == 42).count();
+            black_box(count);
+        })
+    });
+
+    group.finish();
+}
+
 // ===========================================================================
 // Noop overhead baseline: just iterate the coordinate vec
 // ===========================================================================
@@ -507,6 +590,87 @@ fn bench_baseline_iterate(c: &mut Criterion) {
             }
         })
     });
+}
+
+// ===========================================================================
+// N-scaling: CoordSpaceN lookup latency at various syllable depths.
+// Demonstrates O(N) linear cost despite exponentially growing address space.
+// ===========================================================================
+
+fn bench_n_scaling_get(c: &mut Criterion) {
+    let path6 = tagma_core::CoordPath::<6>::new(core::array::from_fn(|i| {
+        tagma_core::Coord::new(i as u16).unwrap()
+    }));
+    let path12 = tagma_core::CoordPath::<12>::new(core::array::from_fn(|i| {
+        tagma_core::Coord::new(i as u16).unwrap()
+    }));
+    let path19 = tagma_core::CoordPath::<19>::new(core::array::from_fn(|i| {
+        tagma_core::Coord::new(i as u16).unwrap()
+    }));
+    let path2 = tagma_core::CoordPath::<2>::new([
+        tagma_core::Coord::new(0).unwrap(),
+        tagma_core::Coord::new(1).unwrap(),
+    ]);
+    let path3 = tagma_core::CoordPath::<3>::new([
+        tagma_core::Coord::new(0).unwrap(),
+        tagma_core::Coord::new(1).unwrap(),
+        tagma_core::Coord::new(2).unwrap(),
+    ]);
+
+    {
+        let mut cs = tagma_core::CoordSpace::new();
+        cs.place(tagma_core::Coord::new(0).unwrap(), 42u64);
+        let mut group = c.benchmark_group("N_scaling/get/N=1");
+        group.bench_function("CoordSpace", |b| {
+            b.iter(|| black_box(cs.at(&tagma_core::Coord::new(0).unwrap())))
+        });
+        group.finish();
+    }
+    {
+        let mut cs = tagma_core::CoordSpace2::<u64>::new();
+        cs.place_path(&path2, 42);
+        let mut group = c.benchmark_group("N_scaling/get/N=2");
+        group.bench_function("CoordSpace2", |b| {
+            b.iter(|| black_box(cs.at_path(&path2)))
+        });
+        group.finish();
+    }
+    {
+        let mut cs = tagma_core::CoordSpace3::<u64>::new();
+        cs.place_path(&path3, 42);
+        let mut group = c.benchmark_group("N_scaling/get/N=3");
+        group.bench_function("CoordSpace3", |b| {
+            b.iter(|| black_box(cs.at_path(&path3)))
+        });
+        group.finish();
+    }
+    {
+        let mut cs = tagma_core::CoordSpace6::<u64>::new();
+        cs.place_path(&path6, 42);
+        let mut group = c.benchmark_group("N_scaling/get/N=6");
+        group.bench_function("CoordSpace6", |b| {
+            b.iter(|| black_box(cs.at_path(&path6)))
+        });
+        group.finish();
+    }
+    {
+        let mut cs = tagma_core::CoordSpace12::<u64>::new();
+        cs.place_path(&path12, 42);
+        let mut group = c.benchmark_group("N_scaling/get/N=12");
+        group.bench_function("CoordSpace12", |b| {
+            b.iter(|| black_box(cs.at_path(&path12)))
+        });
+        group.finish();
+    }
+    {
+        let mut cs = tagma_core::CoordSpace19::<u64>::new();
+        cs.place_path(&path19, 42);
+        let mut group = c.benchmark_group("N_scaling/get/N=19");
+        group.bench_function("CoordSpace19", |b| {
+            b.iter(|| black_box(cs.at_path(&path19)))
+        });
+        group.finish();
+    }
 }
 
 // ===========================================================================
@@ -594,6 +758,11 @@ criterion_group!(
               bench_tagma_insert_single, bench_std_insert_single
 );
 criterion_group!(
+    name = n_scaling;
+    config = Criterion::default().sample_size(50);
+    targets = bench_n_scaling_get
+);
+criterion_group!(
     name = tree;
     config = Criterion::default();
     targets = bench_cm2_insert_1000, bench_cm2_get_1000
@@ -607,7 +776,9 @@ criterion_group!(
 criterion_group!(
     name = spatial;
     config = Criterion::default();
-    targets = bench_spatial_axis_filter
+    targets = bench_spatial_axis_filter,
+              bench_spatial_axis_filter_range,
+              bench_spatial_cs2_prefix_scan
 );
 
-criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial);
+criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling);

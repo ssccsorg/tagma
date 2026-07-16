@@ -107,28 +107,27 @@ how this recursive structure is mapped onto physical topologies.
 
 ## Benchmark
 
-On Apple M1 (development platform):
+## Identity generation (Apple M1)
 
-```
-Tagma (1-syll):         2 ns/op    (space: 1.1e4)
-Tagma (6-syll):        11 ns/op    (space: 1.9e24, UUID-scale)
-Tagma (19-syll):       35 ns/op    (space: 2^256)
-SHA-256:              227 ns/op
+| Metric | SHA-256 | Tagma (1-syll) | Tagma (6-syll) | Tagma (19-syll) |
+|--------|---------|---------------|---------------|----------------|
+| Latency | 227 ns/op | 2 ns/op | 11 ns/op | 35 ns/op |
+| Speedup | baseline | 115x | 21x | 6.5x |
+| Address space | 2^256 | 1.1e4 | 1.9e24 | 2^256 |
 
-Speedup vs SHA-256:
-  1-syll:   115x
-  6-syll:    21x
-  19-syll:    6.5x
-```
+## Spatial query vs HashMap (Apple M1)
 
-On GitHub CI (x86_64, ubuntu-latest) for reproducibility:
+Same algorithm (iterate + decompose + filter on axis), different memory layout.
+CoordSpace stores values in contiguous `[Option<V>; 11172]` — no hash, no collision, no fragmentation. HashMap scatters across buckets.
 
-```
-Tagma (1-syll):        20 ns/op
-Tagma (6-syll):       153 ns/op
-Tagma (19-syll):      456 ns/op
-SHA-256:             4437 ns/op
-```
+| Operation | CoordSpace | HashMap | Ratio |
+|-----------|-----------|---------|-------|
+| **Insert** 11,172 | 26.5 µs | 377 µs | **14x** |
+| **Get** 11,172 | 6.49 µs | 101 µs | **16x** |
+| **Remove** 11,172 | 15.0 µs | 268 µs | **18x** |
+| **Axis filter** (medial=10) | 58.2 Melem/s | 24.2 Melem/s | **2.4x** |
+| **Range filter** (initial 3--7) | 312 Melem/s | 139 Melem/s | **2.3x** |
+| **Get single** (random coord) | 0.81 ns | 8.9 ns | **11x** |
 
 ## Documentation
 
