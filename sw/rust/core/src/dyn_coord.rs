@@ -388,14 +388,6 @@ mod tests {
         m.insert(&[], 42);
     }
 
-
-
-
-
-
-
-
-
     #[test]
     fn clone_independent() {
         let mut a = DynCoordMap::new();

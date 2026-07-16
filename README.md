@@ -10,8 +10,8 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 
 | Level | Feature flags | Heap | Available types |
 |-------|---------------|------|-----------------|
-| **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordFlatMap (CoordMap), CoordKey trait |
-| **alloc** | `alloc` (default) | Optional | + CoordTreeMap\<N\>, DynCoordMap, CoordKeyMap, CoordKey impls for String |
+| **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordFlatMap (CoordMap) |
+| **alloc** | `alloc` (default) | Optional | + CoordTreeMap\<N\>, DynCoordMap |
 
 ## Type reference
 
@@ -23,7 +23,6 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | **CoordPath\<N\>** | Index path (not a hash key), compile-time N-element Coord array. `From<Coord>`, `From<[Coord; N]>` | `core/src/path.rs` |
 | **CoordSet** | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/set.rs` |
 | **CoordMap\<V\>** ($\equiv$ CoordFlatMap) | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/flat.rs` |
-| **CoordKey\<N\>** (trait) | Converts application key types to CoordPath for direct addressing. Implemented for `Coord`, `&Coord`, `u128`, `[u8; 16]`, `[u8; 32]` | `core/src/key.rs` |
 
 ### Requires alloc (default feature)
 
@@ -35,7 +34,6 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | **CoordMap12\<V\>** | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordTreeMap<12, V>` | `core/src/map.rs` |
 | **CoordMap19\<V\>** | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordTreeMap<19, V>` | `core/src/map.rs` |
 | **DynCoordMap\<V\>** | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord.rs` |
-| **CoordKeyMap\<N, K, V\>** | HashMap-compatible wrapper over CoordTreeMap. `insert(key, value)`, `get(&key)` — identical to std HashMap | `core/src/keymap.rs` |
 
 ## Quick start
 
@@ -49,7 +47,7 @@ Or directly:
 
 ```sh
 cd sw/rust
-cargo test --release       # All 187 tests
+cargo test --release       # All tests
 cargo bench -- stress      # 500k mixed-operation stress benchmark
 cargo build --no-default-features  # Verify no_alloc build
 ```
@@ -57,22 +55,18 @@ cargo build --no-default-features  # Verify no_alloc build
 ## Usage
 
 ```rust
-use tagma_core::{Coord, CoordKeyMap, CoordMap, CoordSet};
+use tagma_core::{Coord, CoordMap, CoordSet};
 
 // Compose a coordinate from three axes
 let c = Coord::from_axes(5, 10, 15).unwrap();
 assert_eq!(c.to_axes(), (5, 10, 15));
 assert_eq!(c.to_char(), '걐');  // Hangul syllable display
 
-// UUID-scale map with zero collisions
-let mut map: CoordKeyMap<6, u128, &str> = CoordKeyMap::new();
-map.insert(0x0123456789ABCDEF0123456789ABCDEFu128, "tagma");
-assert_eq!(map.get(&0x0123456789ABCDEF0123456789ABCDEFu128), Some(&"tagma"));
-
 // Single-syllable direct-address (no allocator)
-let mut flat = CoordMap::new();
-flat.insert(c, "zero heap");
-assert_eq!(flat.get(&c), Some(&"zero heap"));
+let mut map = CoordMap::new();
+map.insert(c, "tagma");
+assert_eq!(map.get(&c), Some(&"tagma"));
+*map.entry(c).or_insert("default") = "updated";
 
 // Bit-array set
 let mut set = CoordSet::new();
@@ -88,12 +82,8 @@ assert!(set.contains(c));
 | CoordPath\<N\> | ✅ | ✅ |
 | CoordSet | ✅ | ✅ |
 | CoordMap (inline array) | ✅ | ✅ |
-| CoordKey trait | ✅ | ✅ |
 | CoordTreeMap\<N\> (heap tree) | ❌ | ✅ |
 | DynCoordMap (runtime trie) | ❌ | ✅ |
-| CoordKeyMap (HashMap API) | ❌ | ✅ |
-
-| base11172 serialization | ❌ | ✅ |
 
 ## How it works
 
