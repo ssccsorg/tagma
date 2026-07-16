@@ -1,12 +1,28 @@
 use crate::key::CoordKey;
 use crate::map::CoordTreeMap;
 use crate::path::CoordPath;
-use alloc::vec::Vec;
+use alloc::string::String;
 use core::marker::PhantomData;
 
 // ---------------------------------------------------------------------------
 // CoordHashMap — HashMap-compatible, hash-free, collision-free map
 // ---------------------------------------------------------------------------
+
+// ── CoordKey impls for String (alloc only) ──────────────────────────
+
+impl CoordKey<1> for String {
+    #[inline]
+    fn to_path(&self) -> CoordPath<1> {
+        self.as_str().to_path()
+    }
+}
+
+impl CoordKey<6> for String {
+    #[inline]
+    fn to_path(&self) -> CoordPath<6> {
+        self.as_str().to_path()
+    }
+}
 
 /// A HashMap-compatible map backed by Tagma direct addressing.
 ///
@@ -375,5 +391,17 @@ mod tests {
         let mut map: CoordHashMap<1, String, u32> = CoordHashMap::new();
         map.insert("key".to_string(), 42);
         assert_eq!(map.get(&"key".to_string()), Some(&42));
+    }
+
+    #[test]
+    fn string_coord_key_matches_str() {
+        let s: String = String::from("test");
+        let a: CoordPath<1> = s.to_path();
+        let b: CoordPath<1> = s.as_str().to_path();
+        assert_eq!(a, b);
+
+        let c: CoordPath<6> = s.to_path();
+        let d: CoordPath<6> = s.as_str().to_path();
+        assert_eq!(c, d);
     }
 }
