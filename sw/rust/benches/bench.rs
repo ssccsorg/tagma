@@ -453,6 +453,48 @@ fn bench_std_mixed_500k(c: &mut Criterion) {
 }
 
 // ===========================================================================
+// Spatial query: axis filter — same scan+filter, different memory layout
+//
+// Both structures store the same 11,172 coords. The query "find all entries
+// where medial == 10" scans every entry and decomposes each Coord into its
+// three axis values to check the medial field. The filter logic is identical;
+// the only difference is the memory layout:
+//   CoordSpace  → contiguous [Option<V>; 11172]
+//   HashMap     → fragmented bucket chain
+// ===========================================================================
+
+fn bench_spatial_axis_filter(c: &mut Criterion) {
+    let mut cs = tagma_core::CoordSpace::new();
+    let mut hm: std::collections::HashMap<tagma_core::Coord, u32> =
+        std::collections::HashMap::new();
+    for i in 0u16..11172 {
+        let coord = tagma_core::Coord::new(i).unwrap();
+        cs.place(coord, i as u32);
+        hm.insert(coord, i as u32);
+    }
+
+    let mut group = c.benchmark_group("Spatial/axis_filter_medial_10");
+    // ~19 initial × 28 final = 532 entries have medial=10
+    group.throughput(criterion::Throughput::Elements(532));
+
+    group.bench_function("CoordSpace", |b| {
+        b.iter(|| {
+            let count = cs.iter().filter(|(c, _)| c.to_axes().1 == 10).count();
+            black_box(count);
+        })
+    });
+
+    group.bench_function("HashMap", |b| {
+        b.iter(|| {
+            let count = hm.iter().filter(|(c, _)| c.to_axes().1 == 10).count();
+            black_box(count);
+        })
+    });
+
+    group.finish();
+}
+
+// ===========================================================================
 // Noop overhead baseline: just iterate the coordinate vec
 // ===========================================================================
 
@@ -562,4 +604,10 @@ criterion_group!(
     targets = bench_tagma_mixed_500k, bench_std_mixed_500k
 );
 
-criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress);
+criterion_group!(
+    name = spatial;
+    config = Criterion::default();
+    targets = bench_spatial_axis_filter
+);
+
+criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial);

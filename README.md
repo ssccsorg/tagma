@@ -1,8 +1,6 @@
 # Tagma
 
-**Content-addressable structural primitive defined by the Unicode Hangul syllable block.**
-
-Tagma replaces hash-based identity generation with direct structural addressing over a fixed 16-bit coordinate space. Every valid 16-bit value in the Hangul syllable block (U+AC00--U+D7AF) decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
+Tagma is a computing primitive where the address is the coordinate — not a flat pointer, but a point in an N-dimensional geometric space. This is made possible by a 16-bit Unicode block allocated to a 3-axis writing system, which provides a collision-free, hash-less, structurally addressable coordinate space. Every valid 16-bit value in the Hangul syllable block (U+AC00--U+D7AF) decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
 
 ## Feature levels
 
@@ -10,8 +8,8 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 
 | Level | Feature flags | Heap | Available types |
 |-------|---------------|------|-----------------|
-| **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordFlatMap (CoordSpace) |
-| **alloc** | `alloc` (default) | Optional | + CoordSpace\<N\>, DynCoordSpace |
+| **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordSpace |
+| **alloc** | `alloc` (default) | Optional | + CoordSpaceN\<N\>, DynCoordSpace |
 
 ## Type reference
 
@@ -20,20 +18,20 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | Type | Description | File |
 |------|-------------|------|
 | **Coord** | 16-bit atomic coordinate (0..11172), 3-axis composition/decomposition, Hamming distance, Hangul display | `core/src/coord.rs` |
-| **CoordPath\<N\>** | Index path (not a hash key), compile-time N-element Coord array. `From<Coord>`, `From<[Coord; N]>` | `core/src/path.rs` |
-| **CoordSet** | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/set.rs` |
-| **CoordSpace\<V\>** ($\equiv$ CoordFlatMap) | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/flat.rs` |
+| **CoordPath\<N\>** | Index path (not a hash key), compile-time N-element Coord array | `core/src/coord_path.rs` |
+| **CoordSet** | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/coord_set.rs` |
+| **CoordSpace\<V\>** | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
 
 ### Requires alloc (default feature)
 
 | Type | Description | File |
 |------|-------------|------|
-| **CoordSpace\<N, V\>** | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/map.rs` |
-| **CoordSpace2\<V\>** | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/map.rs` |
-| **CoordSpace6\<V\>** | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/map.rs` |
-| **CoordSpace12\<V\>** | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/map.rs` |
-| **CoordSpace19\<V\>** | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/map.rs` |
-| **DynCoordSpace\<V\>** | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord.rs` |
+| **CoordSpaceN\<N, V\>** | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/coord_space_n.rs` |
+| **CoordSpace2\<V\>** | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/coord_space_n.rs` |
+| **CoordSpace6\<V\>** | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/coord_space_n.rs` |
+| **CoordSpace12\<V\>** | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/coord_space_n.rs` |
+| **CoordSpace19\<V\>** | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/coord_space_n.rs` |
+| **DynCoordSpace\<V\>** | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord_space.rs` |
 
 ## Quick start
 
@@ -62,11 +60,11 @@ let c = Coord::from_axes(5, 10, 15).unwrap();
 assert_eq!(c.to_axes(), (5, 10, 15));
 assert_eq!(c.to_char(), '걐');  // Hangul syllable display
 
-// Single-syllable direct-address (no allocator)
-let mut map = CoordSpaceN::new();
-map.insert(c, "tagma");
-assert_eq!(map.get(&c), Some(&"tagma"));
-*map.entry(c).or_insert("default") = "updated";
+// Single-syllable direct-address space (no allocator)
+let mut space = CoordSpace::new();
+space.place(c, "tagma");
+assert_eq!(space.at(&c), Some(&"tagma"));
+*space.entry(c).or_insert("default") = "updated";
 
 // Bit-array set
 let mut set = CoordSet::new();
@@ -82,7 +80,7 @@ assert!(set.contains(c));
 | CoordPath\<N\> | ✅ | ✅ |
 | CoordSet | ✅ | ✅ |
 | CoordSpace (inline array) | ✅ | ✅ |
-| CoordSpace\<N\> (heap tree) | ❌ | ✅ |
+| CoordSpaceN (heap tree, N>1) | ❌ | ✅ |
 | DynCoordSpace (runtime trie) | ❌ | ✅ |
 
 ## How it works
