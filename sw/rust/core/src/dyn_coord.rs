@@ -172,33 +172,6 @@ impl<V> DynCoordMap<V> {
             *slot = None;
         }
     }
-
-    // ── String key API (zero hash, base11172 encoding) ─────────────────────
-
-    /// Returns a reference to the value at a string-derived path.
-    /// Encodes the string bytes via base-11172, then traverses the trie.
-    /// O(key.len()), zero hash, zero collision.
-    pub fn get_str(&self, key: &str) -> Option<&V> {
-        self.get(&str_to_coords(key))
-    }
-
-    /// Inserts a value at a string-derived path.
-    /// The string is encoded deterministically into Coord slices.
-    pub fn insert_str(&mut self, key: &str, value: V) -> Option<V> {
-        let path = str_to_coords(key);
-        self.insert(&path, value)
-    }
-
-    /// Removes the value at a string-derived path.
-    pub fn remove_str(&mut self, key: &str) -> Option<V> {
-        self.remove(&str_to_coords(key))
-    }
-}
-
-/// Map each byte directly to one Coord slot.
-/// 256 byte values fit in 11,172 slots — zero collision, zero encoding cost.
-pub(crate) fn str_to_coords(s: &str) -> Vec<Coord> {
-    s.as_bytes().iter().map(|&b| Coord::new(b as u16).unwrap()).collect()
 }
 
 // ── Iteration (internal) ───────────────────────────────────────────────
@@ -415,69 +388,13 @@ mod tests {
         m.insert(&[], 42);
     }
 
-    #[test]
-    fn insert_str_and_get_str() {
-        let mut m = DynCoordMap::new();
-        m.insert_str("hello", 42);
-        assert_eq!(m.get_str("hello"), Some(&42));
-    }
 
-    #[test]
-    fn insert_str_deterministic() {
-        let mut m = DynCoordMap::new();
-        m.insert_str("alpha", 1);
-        m.insert_str("beta", 2);
-        assert_eq!(m.get_str("alpha"), Some(&1));
-        assert_eq!(m.get_str("beta"), Some(&2));
-    }
 
-    #[test]
-    fn remove_str() {
-        let mut m = DynCoordMap::new();
-        m.insert_str("key", 42);
-        assert_eq!(m.remove_str("key"), Some(42));
-        assert!(m.get_str("key").is_none());
-    }
 
-    #[test]
-    fn str_path_deterministic() {
-        let a = str_to_coords("hello");
-        let b = str_to_coords("hello");
-        assert_eq!(a, b);
-    }
 
-    #[test]
-    fn str_path_differs_for_diff_strings() {
-        let a = str_to_coords("alpha");
-        let b = str_to_coords("beta");
-        assert_ne!(a, b);
-    }
 
-    #[test]
-    fn str_path_lossless() {
-        // Strings that modulo-only would collide must differ in full encoding.
-        // v=0 and v=11172 both map to Coord(0) under modulo-only,
-        // but under base11172 they map to [(0,0)] and [(1,0)] respectively.
-        let a = str_to_coords("\x00\x00");   // u16 = 0
-        let b = str_to_coords("\x2B\x2B"); // u16 = 11172 = 0x2B2B
-        assert_ne!(a, b, "base11172 must distinguish modulo collisions");
-    }
 
-    #[test]
-    fn str_path_pairs_are_valid_base11172() {
-        let s = "hello";
-        let path = str_to_coords(s);
-        // Each u16 pair → two Coords (quotient, remainder)
-        assert!(path.len() % 2 == 0, "base11172 must produce Coord pairs");
-        // Verify each pair reconstructs correctly
-        for pair in path.chunks(2) {
-            let q = pair[0].index() as u32;
-            let r = pair[1].index() as u32;
-            let v = q * Coord::N_VALID as u32 + r;
-            assert!(q < 6, "quotient fits in 6 (65536/11172)");
-            assert!(v <= u16::MAX as u32, "reconstructed value within u16");
-        }
-    }
+
 
     #[test]
     fn clone_independent() {
