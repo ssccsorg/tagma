@@ -195,23 +195,10 @@ impl<V> DynCoordMap<V> {
     }
 }
 
-/// Encode a string as a Coord slice via base-11172 (lossless).
-/// Every pair of bytes → two Coords (quotient + remainder in base 11172).
-/// Zero collision: distinct strings always produce distinct Coord sequences.
+/// Map each byte directly to one Coord slot.
+/// 256 byte values fit in 11,172 slots — zero collision, zero encoding cost.
 pub(crate) fn str_to_coords(s: &str) -> Vec<Coord> {
-    let bytes = s.as_bytes();
-    let n = bytes.len().div_ceil(2) * 2;  // two Coords per u16 pair
-    let mut out = Vec::with_capacity(n);
-    for chunk in bytes.chunks(2) {
-        let v = if chunk.len() == 2 {
-            u16::from_le_bytes([chunk[0], chunk[1]])
-        } else {
-            chunk[0] as u16
-        };
-        out.push(Coord::new((v as u32 / Coord::N_VALID as u32) as u16).unwrap());
-        out.push(Coord::new((v as u32 % Coord::N_VALID as u32) as u16).unwrap());
-    }
-    out
+    s.as_bytes().iter().map(|&b| Coord::new(b as u16).unwrap()).collect()
 }
 
 // ── Iteration (internal) ───────────────────────────────────────────────
