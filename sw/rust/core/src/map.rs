@@ -464,8 +464,76 @@ impl<'a, V> Iterator for IterMut<'a, V> {
     }
 }
 
+// ---------------------------------------------------------------------------
+// TreeIter — general N tree iterator
+// ---------------------------------------------------------------------------
+
+pub struct TreeIter<'a, const N: usize, V> {
+    map: &'a CoordTreeMap<N, V>,
+    indices: alloc::vec::IntoIter<[u16; N]>,
+}
+
+impl<'a, const N: usize, V> Iterator for TreeIter<'a, N, V> {
+    type Item = (CoordPath<N>, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let indices = self.indices.next()?;
+        let coords = core::array::from_fn(|i| Coord::new(indices[i]).unwrap());
+        let path = CoordPath::new(coords);
+        let val = self.map.get_path(&path).unwrap();
+        Some((path, val))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.indices.size_hint()
+    }
+}
+
+fn collect_leaves<const M: usize, V>(
+    node: &Node<V>,
+    depth: usize,
+    current: &mut [u16; M],
+    out: &mut Vec<[u16; M]>,
+) {
+    match node {
+        Node::Leaf(slots) => {
+            for (i, slot) in slots.iter().enumerate() {
+                if slot.is_some() {
+                    current[depth] = i as u16;
+                    out.push(*current);
+                }
+            }
+        }
+        Node::Branch(children) => {
+            for (i, child) in children.iter().enumerate() {
+                if let Some(child) = child {
+                    current[depth] = i as u16;
+                    collect_leaves::<M, V>(child, depth + 1, current, out);
+                }
+            }
+        }
+    }
+}
+
+impl<const N: usize, V> CoordTreeMap<N, V> {
+    /// Returns an iterator over all `(path, value)` pairs in the tree.
+    pub fn iter(&self) -> TreeIter<'_, N, V> {
+        let mut indices = Vec::new();
+        let mut current = [0u16; N];
+        collect_leaves::<N, V>(&self.root, 0, &mut current, &mut indices);
+        TreeIter {
+            map: self,
+            indices: indices.into_iter(),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Existing 1-syllable iteration
+// ---------------------------------------------------------------------------
+
 impl<V> CoordTreeMap<1, V> {
-    pub fn iter(&self) -> Iter<'_, V> {
+    pub fn iter_flat(&self) -> Iter<'_, V> {
         Iter {
             node: &self.root,
             idx: 0,
@@ -481,11 +549,11 @@ impl<V> CoordTreeMap<1, V> {
     }
 
     pub fn keys(&self) -> impl Iterator<Item = Coord> + '_ {
-        self.iter().map(|(k, _)| k)
+        self.iter_flat().map(|(k, _)| k)
     }
 
     pub fn values(&self) -> impl Iterator<Item = &V> + '_ {
-        self.iter().map(|(_, v)| v)
+        self.iter_flat().map(|(_, v)| v)
     }
 
     pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> + '_ {
@@ -582,8 +650,8 @@ impl<'a, V> IntoIterator for &'a CoordTreeMap<1, V> {
     type Item = (Coord, &'a V);
     type IntoIter = Iter<'a, V>;
 
-    fn into_iter(self) -> Iter<'a, V> {
-        self.iter()
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter_flat()
     }
 }
 
@@ -715,7 +783,7 @@ mod tests {
     #[test]
     fn iter_empty() {
         let map: CoordTreeMap<1, u32> = CoordTreeMap::new();
-        assert_eq!(map.iter().count(), 0);
+        assert_eq!(map.iter_flat().count(), 0);
     }
 
     #[test]
@@ -725,7 +793,7 @@ mod tests {
         let c2 = Coord::new(9999).unwrap();
         map.insert(c1, 10);
         map.insert(c2, 20);
-        let entries: Vec<_> = map.iter().collect();
+        let entries: Vec<_> = map.iter_flat().collect();
         assert_eq!(entries.len(), 2);
         assert!(entries.contains(&(c1, &10)));
         assert!(entries.contains(&(c2, &20)));

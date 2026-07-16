@@ -198,6 +198,18 @@ fn cm6_fan_out() {
     assert_eq!(map.len(), 100);
 }
 
+#[test]
+fn cm6_iterate() {
+    let mut map = CoordMap6::new();
+    for i in 0u16..10 {
+        let mut coords = [Coord::new(0).unwrap(); 6];
+        coords[0] = Coord::new(i).unwrap();
+        map.insert_path(&CoordPath::new(coords), i);
+    }
+    let count = map.iter().count();
+    assert_eq!(count, 10);
+}
+
 // ── CoordMap19 — SHA-256-scale tree ──
 
 #[test]
