@@ -59,37 +59,37 @@ impl<V> CoordFlatMap<V> {
     // ── read ────────────────────────────────────────────────────────────
 
     #[inline]
-    fn slot(&self, coord: Coord) -> &Option<V> {
+    fn slot(&self, coord: &Coord) -> &Option<V> {
         unsafe { self.slots.get_unchecked(coord.index() as usize) }
     }
 
     #[inline]
-    fn slot_mut(&mut self, coord: Coord) -> &mut Option<V> {
+    fn slot_mut(&mut self, coord: &Coord) -> &mut Option<V> {
         unsafe { self.slots.get_unchecked_mut(coord.index() as usize) }
     }
 
     /// Returns a reference to the value at `coord`.
     #[inline]
-    pub fn get(&self, coord: Coord) -> Option<&V> {
-        self.slot(coord).as_ref()
+    pub fn get(&self, coord: &Coord) -> Option<&V> {
+        self.slot(&coord).as_ref()
     }
 
     /// Returns a mutable reference to the value at `coord`.
     #[inline]
-    pub fn get_mut(&mut self, coord: Coord) -> Option<&mut V> {
-        self.slot_mut(coord).as_mut()
+    pub fn get_mut(&mut self, coord: &Coord) -> Option<&mut V> {
+        self.slot_mut(&coord).as_mut()
     }
 
     /// Returns `true` if the map contains an entry for `coord`.
     #[inline]
-    pub fn contains_key(&self, coord: Coord) -> bool {
-        self.slot(coord).is_some()
+    pub fn contains_key(&self, coord: &Coord) -> bool {
+        self.slot(&coord).is_some()
     }
 
     /// Returns a reference to the value at `path` (single-syllable path API).
     #[inline]
     pub fn get_path(&self, path: &CoordPath<1>) -> Option<&V> {
-        self.get(path.coords()[0])
+        self.get(&path.coords()[0])
     }
 
     // ── write ───────────────────────────────────────────────────────────
@@ -97,7 +97,7 @@ impl<V> CoordFlatMap<V> {
     /// Inserts a value at `coord`, returning the previous value if any.
     #[inline]
     pub fn insert(&mut self, coord: Coord, value: V) -> Option<V> {
-        let slot = self.slot_mut(coord);
+        let slot = self.slot_mut(&coord);
         let old = slot.take();
         *slot = Some(value);
         if old.is_none() {
@@ -114,8 +114,8 @@ impl<V> CoordFlatMap<V> {
 
     /// Removes the value at `coord`, returning it if present.
     #[inline]
-    pub fn remove(&mut self, coord: Coord) -> Option<V> {
-        let slot = self.slot_mut(coord);
+    pub fn remove(&mut self, coord: &Coord) -> Option<V> {
+        let slot = self.slot_mut(&coord);
         let old = slot.take();
         if old.is_some() {
             self.len -= 1;
@@ -126,7 +126,7 @@ impl<V> CoordFlatMap<V> {
     /// Removes the value at `path` (single-syllable path API).
     #[inline]
     pub fn remove_path(&mut self, path: &CoordPath<1>) -> Option<V> {
-        self.remove(path.coords()[0])
+        self.remove(&path.coords()[0])
     }
 
     /// Clears the map, removing all entries.
@@ -174,7 +174,7 @@ impl<V> CoordFlatMap<V> {
     // ── entry API ──────────────────────────────────────────────────────
 
     pub fn entry(&mut self, coord: Coord) -> FlatEntry<'_, V> {
-        if self.contains_key(coord) {
+        if self.contains_key(&coord) {
             FlatEntry::Occupied(FlatOccupiedEntry { map: self, coord })
         } else {
             FlatEntry::Vacant(FlatVacantEntry { map: self, coord })
@@ -224,7 +224,7 @@ impl<'a, V> Iterator for FlatDrain<'a, V> {
         while self.idx < 11172 {
             let coord = Coord::new(self.idx).unwrap();
             self.idx += 1;
-            if let Some(val) = self.map.remove(coord) {
+            if let Some(val) = self.map.remove(&coord) {
                 return Some((coord, val));
             }
         }
@@ -240,7 +240,7 @@ impl<'a, V> Drop for FlatDrain<'a, V> {
         while self.idx < 11172 {
             let coord = Coord::new(self.idx).unwrap();
             self.idx += 1;
-            self.map.remove(coord);
+            self.map.remove(&coord);
         }
     }
 }
@@ -262,16 +262,16 @@ impl<'a, V> FlatOccupiedEntry<'a, V> {
         self.coord
     }
     pub fn get(&self) -> &V {
-        unsafe { self.map.get(self.coord).unwrap_unchecked() }
+        unsafe { self.map.get(&self.coord).unwrap_unchecked() }
     }
     pub fn get_mut(&mut self) -> &mut V {
-        unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
+        unsafe { self.map.get_mut(&self.coord).unwrap_unchecked() }
     }
     pub fn insert(&mut self, value: V) -> V {
         unsafe { self.map.insert(self.coord, value).unwrap_unchecked() }
     }
     pub fn remove_entry(self) -> V {
-        unsafe { self.map.remove(self.coord).unwrap_unchecked() }
+        unsafe { self.map.remove(&self.coord).unwrap_unchecked() }
     }
 }
 
@@ -289,7 +289,7 @@ impl<'a, V> FlatVacantEntry<'a, V> {
     }
     pub fn insert(self, value: V) -> &'a mut V {
         let _ = self.map.insert(self.coord, value);
-        unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
+        unsafe { self.map.get_mut(&self.coord).unwrap_unchecked() }
     }
 }
 
@@ -305,13 +305,13 @@ impl<'a, V> FlatEntry<'a, V> {
     }
     pub fn or_insert_with<F: FnOnce() -> V>(self, f: F) -> &'a mut V {
         match self {
-            FlatEntry::Occupied(e) => unsafe { e.map.get_mut(e.coord).unwrap_unchecked() },
+            FlatEntry::Occupied(e) => unsafe { e.map.get_mut(&e.coord).unwrap_unchecked() },
             FlatEntry::Vacant(e) => e.insert(f()),
         }
     }
     pub fn or_insert_with_key<F: FnOnce(Coord) -> V>(self, f: F) -> &'a mut V {
         match self {
-            FlatEntry::Occupied(e) => unsafe { e.map.get_mut(e.coord).unwrap_unchecked() },
+            FlatEntry::Occupied(e) => unsafe { e.map.get_mut(&e.coord).unwrap_unchecked() },
             FlatEntry::Vacant(e) => {
                 let v = f(e.coord);
                 e.insert(v)
@@ -383,14 +383,14 @@ impl<'a, V> IntoIterator for &'a CoordFlatMap<V> {
 impl<V> core::ops::Index<Coord> for CoordFlatMap<V> {
     type Output = V;
     fn index(&self, coord: Coord) -> &V {
-        self.get(coord)
+        self.get(&coord)
             .expect("CoordFlatMap::index: key not present")
     }
 }
 
 impl<V> core::ops::IndexMut<Coord> for CoordFlatMap<V> {
     fn index_mut(&mut self, coord: Coord) -> &mut V {
-        self.get_mut(coord)
+        self.get_mut(&coord)
             .expect("CoordFlatMap::index_mut: key not present")
     }
 }
@@ -434,7 +434,7 @@ mod tests {
         let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         assert_eq!(map.insert(c, 42), None);
-        assert_eq!(map.get(c), Some(&42));
+        assert_eq!(map.get(&c), Some(&42));
         assert_eq!(map.len(), 1);
     }
 
@@ -444,7 +444,7 @@ mod tests {
         let c = Coord::new(0).unwrap();
         map.insert(c, 1);
         assert_eq!(map.insert(c, 2), Some(1));
-        assert_eq!(map.get(c), Some(&2));
+        assert_eq!(map.get(&c), Some(&2));
         assert_eq!(map.len(), 1);
     }
 
@@ -453,7 +453,7 @@ mod tests {
         let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 42);
-        assert_eq!(map.remove(c), Some(42));
+        assert_eq!(map.remove(&c), Some(42));
         assert!(map.is_empty());
     }
 
@@ -461,9 +461,9 @@ mod tests {
     fn contains_key() {
         let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
-        assert!(!map.contains_key(c));
+        assert!(!map.contains_key(&c));
         map.insert(c, ());
-        assert!(map.contains_key(c));
+        assert!(map.contains_key(&c));
     }
 
     #[test]
@@ -512,9 +512,9 @@ mod tests {
         let mut map = CoordFlatMap::new();
         let c = Coord::new(0).unwrap();
         map.entry(c).or_insert(42);
-        assert_eq!(map.get(c), Some(&42));
+        assert_eq!(map.get(&c), Some(&42));
         map.entry(c).or_insert(99);
-        assert_eq!(map.get(c), Some(&42));
+        assert_eq!(map.get(&c), Some(&42));
     }
 
     #[test]
@@ -564,7 +564,7 @@ mod tests {
         }
         assert_eq!(map.len(), 11172);
         for i in 0u16..11172 {
-            assert_eq!(map.get(Coord::new(i).unwrap()), Some(&i));
+            assert_eq!(map.get(&Coord::new(i).unwrap()), Some(&i));
         }
     }
 

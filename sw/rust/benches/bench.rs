@@ -110,7 +110,7 @@ fn bench_tagma_get_all(c: &mut Criterion) {
     c.bench_function("TagmaMap/get/all_11172", |b| {
         b.iter(|| {
             for &coord in &coords {
-                black_box(black_box(&map).get(coord));
+                black_box(black_box(&map).get(&coord));
             }
         })
     });
@@ -179,7 +179,7 @@ fn bench_tagma_remove_all(c: &mut Criterion) {
         b.iter(|| {
             let mut m = map.clone();
             for &coord in &coords {
-                black_box(m.remove(coord));
+                black_box(m.remove(&coord));
             }
             black_box(m);
         })
@@ -351,7 +351,7 @@ fn bench_tagma_get_single(c: &mut Criterion) {
 
     c.bench_function("TagmaMap/get/single", |b| {
         b.iter(|| {
-            black_box(black_box(&map).get(black_box(coord)));
+            black_box(black_box(&map).get(black_box(&coord)));
         })
     });
 }
@@ -408,10 +408,10 @@ fn bench_tagma_mixed_500k(c: &mut Criterion) {
                         black_box(m.insert(op.coord, 1));
                     }
                     1 => {
-                        black_box(m.get(op.coord));
+                        black_box(m.get(&op.coord));
                     }
                     2 => {
-                        black_box(m.remove(op.coord));
+                        black_box(m.remove(&op.coord));
                     }
                     _ => {
                         black_box(m.insert(op.coord, 2));

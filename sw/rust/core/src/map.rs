@@ -193,20 +193,20 @@ impl<const N: usize, V> Default for CoordTreeMap<N, V> {
 impl<V> CoordTreeMap<1, V> {
     /// Returns a reference to the value stored at `coord`.
     #[inline]
-    pub fn get(&self, coord: Coord) -> Option<&V> {
+    pub fn get(&self, coord: &Coord) -> Option<&V> {
         self.root.get_value(coord.index() as usize)
     }
 
     /// Returns a mutable reference to the value stored at `coord`.
     #[inline]
-    pub fn get_mut(&mut self, coord: Coord) -> Option<&mut V> {
+    pub fn get_mut(&mut self, coord: &Coord) -> Option<&mut V> {
         self.root.get_value_mut(coord.index() as usize)
     }
 
     /// Returns `true` if the map contains an entry for `coord`.
     #[inline]
-    pub fn contains_key(&self, coord: Coord) -> bool {
-        self.get(coord).is_some()
+    pub fn contains_key(&self, coord: &Coord) -> bool {
+        self.get(&coord).is_some()
     }
 
     /// Inserts a value at `coord`, returning the previous value if any.
@@ -221,7 +221,7 @@ impl<V> CoordTreeMap<1, V> {
 
     /// Removes the value at `coord`, returning it if present.
     #[inline]
-    pub fn remove(&mut self, coord: Coord) -> Option<V> {
+    pub fn remove(&mut self, coord: &Coord) -> Option<V> {
         let old = self.root.take_value(coord.index() as usize);
         if old.is_some() {
             self.len -= 1;
@@ -313,7 +313,7 @@ impl<const N: usize, V> CoordTreeMap<N, V> {
 impl<V> CoordTreeMap<1, V> {
     /// Gets the entry for `coord` for in-place manipulation.
     pub fn entry(&mut self, coord: Coord) -> Entry<'_, V> {
-        if self.contains_key(coord) {
+        if self.contains_key(&coord) {
             Entry::Occupied(OccupiedEntry { map: self, coord })
         } else {
             Entry::Vacant(VacantEntry { map: self, coord })
@@ -337,11 +337,11 @@ impl<'a, V> OccupiedEntry<'a, V> {
     }
 
     pub fn get(&self) -> &V {
-        unsafe { self.map.get(self.coord).unwrap_unchecked() }
+        unsafe { self.map.get(&self.coord).unwrap_unchecked() }
     }
 
     pub fn get_mut(&mut self) -> &mut V {
-        unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
+        unsafe { self.map.get_mut(&self.coord).unwrap_unchecked() }
     }
 
     pub fn insert(&mut self, value: V) -> V {
@@ -349,7 +349,7 @@ impl<'a, V> OccupiedEntry<'a, V> {
     }
 
     pub fn remove_entry(self) -> V {
-        unsafe { self.map.remove(self.coord).unwrap_unchecked() }
+        unsafe { self.map.remove(&self.coord).unwrap_unchecked() }
     }
 }
 
@@ -369,7 +369,7 @@ impl<'a, V> VacantEntry<'a, V> {
 
     pub fn insert(self, value: V) -> &'a mut V {
         let _ = self.map.insert(self.coord, value);
-        unsafe { self.map.get_mut(self.coord).unwrap_unchecked() }
+        unsafe { self.map.get_mut(&self.coord).unwrap_unchecked() }
     }
 }
 
@@ -387,14 +387,14 @@ impl<'a, V> Entry<'a, V> {
 
     pub fn or_insert_with<F: FnOnce() -> V>(self, f: F) -> &'a mut V {
         match self {
-            Entry::Occupied(e) => unsafe { e.map.get_mut(e.coord).unwrap_unchecked() },
+            Entry::Occupied(e) => unsafe { e.map.get_mut(&e.coord).unwrap_unchecked() },
             Entry::Vacant(e) => e.insert(f()),
         }
     }
 
     pub fn or_insert_with_key<F: FnOnce(Coord) -> V>(self, f: F) -> &'a mut V {
         match self {
-            Entry::Occupied(e) => unsafe { e.map.get_mut(e.coord).unwrap_unchecked() },
+            Entry::Occupied(e) => unsafe { e.map.get_mut(&e.coord).unwrap_unchecked() },
             Entry::Vacant(e) => {
                 let v = f(e.coord);
                 e.insert(v)
@@ -523,7 +523,7 @@ impl<'a, V> Iterator for Drain<'a, V> {
         while self.idx < 11172 {
             let coord = Coord::new(self.idx).unwrap();
             self.idx += 1;
-            if let Some(val) = self.map.remove(coord) {
+            if let Some(val) = self.map.remove(&coord) {
                 return Some((coord, val));
             }
         }
@@ -540,7 +540,7 @@ impl<'a, V> Drop for Drain<'a, V> {
         while self.idx < 11172 {
             let coord = Coord::new(self.idx).unwrap();
             self.idx += 1;
-            self.map.remove(coord);
+            self.map.remove(&coord);
         }
     }
 }
@@ -604,14 +604,14 @@ impl<V> core::ops::Index<Coord> for CoordTreeMap<1, V> {
     type Output = V;
 
     fn index(&self, coord: Coord) -> &V {
-        self.get(coord)
+        self.get(&coord)
             .expect("CoordTreeMap::index: key not present")
     }
 }
 
 impl<V> core::ops::IndexMut<Coord> for CoordTreeMap<1, V> {
     fn index_mut(&mut self, coord: Coord) -> &mut V {
-        self.get_mut(coord)
+        self.get_mut(&coord)
             .expect("CoordTreeMap::index_mut: key not present")
     }
 }
@@ -669,7 +669,7 @@ mod tests {
         let mut map = CoordTreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         assert_eq!(map.insert(c, 42), None);
-        assert_eq!(map.get(c), Some(&42));
+        assert_eq!(map.get(&c), Some(&42));
         assert_eq!(map.len(), 1);
     }
 
@@ -679,7 +679,7 @@ mod tests {
         let c = Coord::new(0).unwrap();
         map.insert(c, 1);
         assert_eq!(map.insert(c, 2), Some(1));
-        assert_eq!(map.get(c), Some(&2));
+        assert_eq!(map.get(&c), Some(&2));
         assert_eq!(map.len(), 1);
     }
 
@@ -688,8 +688,8 @@ mod tests {
         let mut map = CoordTreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.insert(c, 42);
-        assert_eq!(map.remove(c), Some(42));
-        assert_eq!(map.get(c), None);
+        assert_eq!(map.remove(&c), Some(42));
+        assert_eq!(map.get(&c), None);
         assert!(map.is_empty());
     }
 
@@ -697,9 +697,9 @@ mod tests {
     fn contains_key() {
         let mut map = CoordTreeMap::<1, ()>::new();
         let c = Coord::new(0).unwrap();
-        assert!(!map.contains_key(c));
+        assert!(!map.contains_key(&c));
         map.insert(c, ());
-        assert!(map.contains_key(c));
+        assert!(map.contains_key(&c));
     }
 
     #[test]
@@ -756,9 +756,9 @@ mod tests {
         let mut map = CoordTreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.entry(c).or_insert(42);
-        assert_eq!(map.get(c), Some(&42));
+        assert_eq!(map.get(&c), Some(&42));
         map.entry(c).or_insert(99);
-        assert_eq!(map.get(c), Some(&42));
+        assert_eq!(map.get(&c), Some(&42));
     }
 
     #[test]
@@ -766,9 +766,9 @@ mod tests {
         let mut map = CoordTreeMap::<1, u32>::new();
         let c = Coord::new(0).unwrap();
         map.entry(c).and_modify(|v| *v += 1).or_insert(1);
-        assert_eq!(map.get(c), Some(&1));
+        assert_eq!(map.get(&c), Some(&1));
         map.entry(c).and_modify(|v| *v += 1).or_insert(1);
-        assert_eq!(map.get(c), Some(&2));
+        assert_eq!(map.get(&c), Some(&2));
     }
 
     #[test]
@@ -802,7 +802,7 @@ mod tests {
         let mut map = CoordTreeMap::<1, u32>::new();
         let c = Coord::new(42).unwrap();
         map.insert_path(&CoordPath::new([c]), 100);
-        assert_eq!(map.get(c), Some(&100));
+        assert_eq!(map.get(&c), Some(&100));
     }
 
     #[test]
@@ -920,7 +920,7 @@ mod tests {
         let mut m1: CoordTreeMap1<u32> = CoordTreeMap::new();
         let c = Coord::new(0).unwrap();
         m1.insert(c, 42);
-        assert_eq!(m1.get(c), Some(&42));
+        assert_eq!(m1.get(&c), Some(&42));
     }
 
     #[test]

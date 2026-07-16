@@ -18,7 +18,7 @@ fn cm_all_11172_accessible() {
         map.insert(Coord::new(i).unwrap(), i);
     }
     for i in 0u16..11172 {
-        assert_eq!(map.get(Coord::new(i).unwrap()), Some(&i));
+        assert_eq!(map.get(&Coord::new(i).unwrap()), Some(&i));
     }
 }
 
@@ -27,7 +27,7 @@ fn cm_path_api() {
     let mut map = CoordMap::new();
     let c = Coord::new(5555).unwrap();
     map.insert(c, 100);
-    assert_eq!(map.get(c), Some(&100));
+    assert_eq!(map.get(&c), Some(&100));
     assert_eq!(map.get_path(&CoordPath::new([c])), Some(&100));
 }
 
@@ -38,7 +38,7 @@ fn cm_remove_all() {
         map.insert(Coord::new(i).unwrap(), i as u32);
     }
     for i in 0u16..11172 {
-        map.remove(Coord::new(i).unwrap());
+        map.remove(&Coord::new(i).unwrap());
     }
     assert!(map.is_empty());
 }
