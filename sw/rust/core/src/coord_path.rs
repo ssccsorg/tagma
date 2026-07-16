@@ -148,6 +148,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "alloc")]
     fn path_display() {
         let c = Coord::new(0).unwrap();
         let path = CoordPath::<1>::new([c]);

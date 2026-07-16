@@ -1069,13 +1069,13 @@ mod tests {
 
     #[test]
     fn coord_space12_basic() {
-            let mut space: CoordSpace12<String> = CoordSpaceN::new();
-            let path = CoordPath::new(core::array::from_fn(|i| Coord::new(i as u16).unwrap()));
-            space.place_path(&path, "hello".to_string());
-            assert_eq!(space.at_path(&path).map(|s| s.as_str()), Some("hello"));
-            assert_eq!(space.len(), 1);
-            assert_eq!(space.vacate_path(&path), Some("hello".to_string()));
-            assert!(space.is_empty());
+        let mut space: CoordSpace12<String> = CoordSpaceN::new();
+        let path = CoordPath::new(core::array::from_fn(|i| Coord::new(i as u16).unwrap()));
+        space.place_path(&path, "hello".to_string());
+        assert_eq!(space.at_path(&path).map(|s| s.as_str()), Some("hello"));
+        assert_eq!(space.len(), 1);
+        assert_eq!(space.vacate_path(&path), Some("hello".to_string()));
+        assert!(space.is_empty());
     }
 
     // ── Clear for N>1 ──
@@ -1188,25 +1188,25 @@ mod tests {
 
     #[test]
     fn coord_space1_is_coord_space_1() {
-            let mut s1: CoordSpace1<u32> = CoordSpaceN::new();
-            let c = Coord::new(0).unwrap();
-            s1.place(c, 42);
-            assert_eq!(s1.at(&c), Some(&42));
+        let mut s1: CoordSpace1<u32> = CoordSpaceN::new();
+        let c = Coord::new(0).unwrap();
+        s1.place(c, 42);
+        assert_eq!(s1.at(&c), Some(&42));
     }
 
     #[test]
     fn coord_space6_uuid_scale() {
-            let mut space: CoordSpace6<u32> = CoordSpaceN::new();
-            let path = CoordPath::new([
-                Coord::new(0).unwrap(),
-                Coord::new(0).unwrap(),
-                Coord::new(0).unwrap(),
-                Coord::new(0).unwrap(),
-                Coord::new(0).unwrap(),
-                Coord::new(0).unwrap(),
-            ]);
-            space.place_path(&path, 42);
-            assert_eq!(space.at_path(&path), Some(&42));
+        let mut space: CoordSpace6<u32> = CoordSpaceN::new();
+        let path = CoordPath::new([
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap(),
+        ]);
+        space.place_path(&path, 42);
+        assert_eq!(space.at_path(&path), Some(&42));
     }
 
     #[test]

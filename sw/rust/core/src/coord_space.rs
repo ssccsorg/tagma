@@ -185,7 +185,10 @@ impl<V> CoordSpace<V> {
     }
 
     pub fn drain(&mut self) -> FlatDrain<'_, V> {
-        FlatDrain { space: self, idx: 0 }
+        FlatDrain {
+            space: self,
+            idx: 0,
+        }
     }
 
     // ── entry API ──────────────────────────────────────────────────────
@@ -349,16 +352,16 @@ impl<'a, V> FlatEntry<'a, V> {
     pub fn or_insert_with<F: FnOnce() -> V>(self, f: F) -> &'a mut V {
         match self {
             FlatEntry::Occupied(e) => unsafe { e.space.at_mut(&e.coord).unwrap_unchecked() },
-                        FlatEntry::Vacant(e) => e.place(f()),
+            FlatEntry::Vacant(e) => e.place(f()),
         }
     }
     pub fn or_insert_with_key<F: FnOnce(Coord) -> V>(self, f: F) -> &'a mut V {
         match self {
             FlatEntry::Occupied(e) => unsafe { e.space.at_mut(&e.coord).unwrap_unchecked() },
-                        FlatEntry::Vacant(e) => {
-                            let v = f(e.coord);
-                            e.place(v)
-                        }
+            FlatEntry::Vacant(e) => {
+                let v = f(e.coord);
+                e.place(v)
+            }
         }
     }
     pub fn and_modify<F: FnOnce(&mut V)>(mut self, f: F) -> Self {
@@ -426,8 +429,7 @@ impl<'a, V> IntoIterator for &'a CoordSpace<V> {
 impl<V> core::ops::Index<Coord> for CoordSpace<V> {
     type Output = V;
     fn index(&self, coord: Coord) -> &V {
-        self.at(&coord)
-            .expect("CoordSpace::index: key not present")
+        self.at(&coord).expect("CoordSpace::index: key not present")
     }
 }
 

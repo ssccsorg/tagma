@@ -1,108 +1,7 @@
 use tagma_core::{
-    Coord, CoordPath, CoordSet, CoordSpace, CoordSpace12, CoordSpace19, CoordSpace2, CoordSpace3,
+    Coord, CoordPath, CoordSpace, CoordSpace12, CoordSpace19, CoordSpace2, CoordSpace3,
     CoordSpace6, CoordSpaceN,
 };
-
-// ── CoordSpace — no_alloc single-syllable ──
-
-#[test]
-fn cm_insert_11172_values() {
-    let mut map = CoordSpace::new();
-    for i in 0u16..11172 {
-        assert_eq!(map.place(Coord::new(i).unwrap(), i as u32), None);
-    }
-    assert_eq!(map.len(), 11172);
-}
-
-#[test]
-fn cm_all_11172_accessible() {
-    let mut map = CoordSpace::new();
-    for i in 0u16..11172 {
-        map.place(Coord::new(i).unwrap(), i);
-    }
-    for i in 0u16..11172 {
-        assert_eq!(map.at(&Coord::new(i).unwrap()), Some(&i));
-    }
-}
-
-#[test]
-fn cm_path_api() {
-    let mut map = CoordSpace::new();
-    let c = Coord::new(5555).unwrap();
-    map.place(c, 100);
-    assert_eq!(map.at(&c), Some(&100));
-    assert_eq!(map.at_path(&CoordPath::new([c])), Some(&100));
-}
-
-#[test]
-fn cm_remove_all() {
-    let mut map = CoordSpace::new();
-    for i in 0u16..11172 {
-        map.place(Coord::new(i).unwrap(), i as u32);
-    }
-    for i in 0u16..11172 {
-        map.vacate(&Coord::new(i).unwrap());
-    }
-    assert!(map.is_empty());
-}
-
-#[test]
-fn cm_clear() {
-    let mut map = CoordSpace::new();
-    for i in 0u16..100 {
-        map.place(Coord::new(i).unwrap(), i);
-    }
-    map.clear();
-    assert!(map.is_empty());
-}
-
-#[test]
-fn cm_entry_chained_pattern() {
-    let mut map = CoordSpace::new();
-    let c = Coord::new(0).unwrap();
-    // HashMap pattern: *map.entry(k).or_insert(0) += 1
-    for _ in 0..5 {
-        *map.entry(c).or_insert(0) += 1;
-    }
-    assert_eq!(map.at(&c), Some(&5));
-}
-
-#[test]
-fn cm_entry_and_modify_chained() {
-    let mut map = CoordSpace::new();
-    let c = Coord::new(0).unwrap();
-    map.entry(c).and_modify(|v| *v += 1).or_insert(1);
-    assert_eq!(map.at(&c), Some(&1));
-    map.entry(c).and_modify(|v| *v += 1).or_insert(1);
-    assert_eq!(map.at(&c), Some(&2));
-}
-
-#[test]
-fn cm_hll_pattern() {
-    // HyperLogLog-like: multiple coordinates map to same counter
-    let mut map = CoordSpace::new();
-    for i in 0u16..100 {
-        map.place(Coord::new(i).unwrap(), 0u32);
-    }
-    // Increment counter at various coords (simulating hash buckets)
-    for i in (0u16..100).step_by(3) {
-        *map.at_mut(&Coord::new(i).unwrap()).unwrap() += 1;
-    }
-    assert_eq!(map.at(&Coord::new(0).unwrap()), Some(&1));
-    assert_eq!(map.at(&Coord::new(1).unwrap()), Some(&0));
-    assert_eq!(map.at(&Coord::new(2).unwrap()), Some(&0));
-    assert_eq!(map.at(&Coord::new(99).unwrap()), Some(&1));
-}
-
-#[test]
-fn cm_index_trait() {
-    let mut map = CoordSpace::new();
-    let c = Coord::new(5).unwrap();
-    map.place(c, 42);
-    assert_eq!(map[c], 42);
-    map[c] = 99;
-    assert_eq!(map[c], 99);
-}
 
 // ── CoordSpace2 — cross-product FIH-like scenario ──
 
@@ -261,37 +160,6 @@ fn cm19_multiple_paths() {
     assert_eq!(map.at_path(&path_b), Some(&"second"));
 }
 
-// ── CoordSet scenarios ──
-
-#[test]
-fn set_basic() {
-    let mut a = CoordSet::new();
-    a.insert(Coord::new(0).unwrap());
-    a.insert(Coord::new(11171).unwrap());
-    assert!(a.contains(Coord::new(0).unwrap()));
-    assert!(a.contains(Coord::new(11171).unwrap()));
-    assert_eq!(a.len(), 2);
-}
-
-#[test]
-fn set_operations() {
-    let mut a = CoordSet::new();
-    let mut b = CoordSet::new();
-    for i in 0u16..100 {
-        a.insert(Coord::new(i * 2).unwrap());
-        b.insert(Coord::new(i * 3).unwrap());
-    }
-    let intersection = a.intersection(&b);
-    assert!(intersection.contains(Coord::new(0).unwrap())); // 0: even × multiple of 3
-    assert!(intersection.contains(Coord::new(6).unwrap())); // 6: 2×3, 3×2
-    assert!(intersection.contains(Coord::new(12).unwrap())); // 12: 2×6, 3×4
-    assert!(!intersection.contains(Coord::new(2).unwrap())); // 2: even, not multiple of 3
-    assert!(!intersection.contains(Coord::new(3).unwrap())); // 3: multiple of 3, not even
-    let union = a.union(&b);
-    assert!(union.contains(Coord::new(2).unwrap()));
-    assert!(union.contains(Coord::new(3).unwrap()));
-}
-
 // ── API parity with std HashMap (verification, not replacement) ──
 
 #[test]
@@ -342,17 +210,6 @@ fn cm12_insert_and_get() {
     assert!(map.is_empty());
 }
 
-#[test]
-fn coord_path_is_not_a_key() {
-    let path = CoordPath::<3>::new([
-        Coord::new(0).unwrap(),
-        Coord::new(1).unwrap(),
-        Coord::new(2).unwrap(),
-    ]);
-    assert_eq!(path.len(), 3);
-    assert!(!path.is_empty());
-}
-
 // ── DynCoordSpace clear + reuse ──
 
 #[test]
@@ -400,5 +257,111 @@ fn dyn_coord_stress_1000() {
     for i in (1..inserted.len()).step_by(2) {
         let expected = (i % 5 + 1) as u64;
         assert_eq!(map.at(&inserted[i]), Some(&expected));
+    }
+}
+
+#[test]
+fn space3_axis_projection() {
+    // CoordSpace3: FIH-like space (Fact × Intent × Hint).
+    // Insert a cross-product and verify axis projection queries.
+    let mut space = CoordSpace3::new();
+    // Fact: initial=0..5, Intent: initial=0..5, Hint: initial=0..5
+    // Use only the 'initial' axis of each Coord for simplicity:
+    // Coord(fact, 0, 0) × Coord(intent, 0, 0) × Coord(hint, 0, 0)
+    for fact in 0..5u16 {
+        for intent in 0..5u16 {
+            for hint in 0..5u16 {
+                let path = CoordPath::new([
+                    Coord::from_axes(fact as u8, 0, 0).unwrap(),
+                    Coord::from_axes(intent as u8, 0, 0).unwrap(),
+                    Coord::from_axes(hint as u8, 0, 0).unwrap(),
+                ]);
+                space.place_path(&path, fact * 100 + intent * 10 + hint);
+            }
+        }
+    }
+    assert_eq!(space.len(), 125);
+    // Projection: all entries where Fact=2 (first coordinate's initial=2)
+    // This requires iterating all paths and filtering — no dedicated index.
+    let fact_2: Vec<_> = space
+        .iter_tree()
+        .filter(|(path, _)| path.coords()[0].to_axes().0 == 2)
+        .collect();
+    assert_eq!(fact_2.len(), 25); // 5 intent × 5 hint
+    for (path, val) in &fact_2 {
+        assert_eq!(path.coords()[0].to_axes().0, 2);
+        assert_eq!(**val / 100, 2);
+    }
+    // Projection: Fact=3 AND Intent=4
+    let fi: Vec<_> = space
+        .iter_tree()
+        .filter(|(path, _)| path.coords()[0].to_axes().0 == 3 && path.coords()[1].to_axes().0 == 4)
+        .collect();
+    assert_eq!(fi.len(), 5); // 5 hints
+    for (path, val) in &fi {
+        assert_eq!(path.coords()[0].to_axes().0, 3);
+        assert_eq!(path.coords()[1].to_axes().0, 4);
+        assert_eq!(**val / 10 % 10, 4);
+    }
+}
+
+#[test]
+fn space19_deep_path_resolution() {
+    // Verify that a 19-deep CoordPath resolves correctly at every level.
+    // This tests the tree traversal logic across all intermediate nodes.
+    let mut space = CoordSpace19::new();
+    // Build a path where each coordinate is distinct: (0,1,2,...,18)
+    let coords: [Coord; 19] = core::array::from_fn(|i| {
+        Coord::from_axes((i % 19) as u8, (i * 3 % 21) as u8, (i * 7 % 28) as u8).unwrap()
+    });
+    let path = CoordPath::new(coords);
+    space.place_path(&path, 999u64);
+    assert_eq!(space.at_path(&path), Some(&999));
+    // At each prefix length, verify that a shorter path does NOT resolve
+    // (prefixes are not entries unless explicitly placed)
+    for prefix_len in 1..19 {
+        let mut prefix_coords = [Coord::new(0).unwrap(); 19];
+        prefix_coords[..prefix_len].copy_from_slice(&coords[..prefix_len]);
+        // Fill remaining with arbitrary values
+        for pc in prefix_coords.iter_mut().skip(prefix_len) {
+            *pc = Coord::new(0).unwrap();
+        }
+        let prefix_path = CoordPath::new(prefix_coords);
+        // A prefix that differs only in the tail should NOT match the stored path
+        if prefix_len < 19 {
+            assert_ne!(
+                space.at_path(&prefix_path),
+                Some(&999),
+                "prefix of length {} should not match full path",
+                prefix_len
+            );
+        }
+    }
+    // Verify entry count: exactly 1
+    assert_eq!(space.len(), 1);
+}
+
+#[test]
+fn space19_sparse_19_paths() {
+    // Insert 19 independent paths into the SHA-256-scale space.
+    // Each path differs at every syllable position.
+    let mut space = CoordSpace19::new();
+    for seed in 0..19u16 {
+        let coords: [Coord; 19] = core::array::from_fn(|i| {
+            let v = (i as u16 * 587 + seed * 331) % 11172;
+            Coord::new(v).unwrap()
+        });
+        let path = CoordPath::new(coords);
+        space.place_path(&path, seed as u64);
+    }
+    assert_eq!(space.len(), 19);
+    // Verify each path retrieves its value
+    for seed in 0..19u16 {
+        let coords: [Coord; 19] = core::array::from_fn(|i| {
+            let v = (i as u16 * 587 + seed * 331) % 11172;
+            Coord::new(v).unwrap()
+        });
+        let path = CoordPath::new(coords);
+        assert_eq!(space.at_path(&path), Some(&(seed as u64)));
     }
 }

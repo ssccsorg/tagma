@@ -21,7 +21,7 @@ check_checks() {
     (cd sw/rust && cargo clippy --all-targets)
     (cd sw/rust && cargo build --release)
     (cd sw/rust && cargo test --release)
-    # no_alloc: verify Coord, CoordPath, CoordSet, CoordFlatMap compile
+    # no_alloc: verify Coord, CoordPath, CoordSet, CoordSpace compile
     # without heap allocator (core types only).
     echo "--- no_alloc build + test ---"
     (cd sw/rust && cargo build --release --no-default-features)
