@@ -71,19 +71,19 @@ impl<V> CoordFlatMap<V> {
     /// Returns a reference to the value at `coord`.
     #[inline]
     pub fn get(&self, coord: &Coord) -> Option<&V> {
-        self.slot(&coord).as_ref()
+        self.slot(coord).as_ref()
     }
 
     /// Returns a mutable reference to the value at `coord`.
     #[inline]
     pub fn get_mut(&mut self, coord: &Coord) -> Option<&mut V> {
-        self.slot_mut(&coord).as_mut()
+        self.slot_mut(coord).as_mut()
     }
 
     /// Returns `true` if the map contains an entry for `coord`.
     #[inline]
     pub fn contains_key(&self, coord: &Coord) -> bool {
-        self.slot(&coord).is_some()
+        self.slot(coord).is_some()
     }
 
     /// Returns a reference to the value at `path` (single-syllable path API).
@@ -115,7 +115,7 @@ impl<V> CoordFlatMap<V> {
     /// Removes the value at `coord`, returning it if present.
     #[inline]
     pub fn remove(&mut self, coord: &Coord) -> Option<V> {
-        let slot = self.slot_mut(&coord);
+        let slot = self.slot_mut(coord);
         let old = slot.take();
         if old.is_some() {
             self.len -= 1;
@@ -165,6 +165,17 @@ impl<V> CoordFlatMap<V> {
                 }
             }
         }
+    }
+
+    pub fn iter_mut(&mut self) -> FlatIterMut<'_, V> {
+        FlatIterMut {
+            slots: self.slots.iter_mut(),
+            idx: 0,
+        }
+    }
+
+    pub fn values_mut(&mut self) -> impl Iterator<Item = &mut V> + '_ {
+        self.iter_mut().map(|(_, v)| v)
     }
 
     pub fn drain(&mut self) -> FlatDrain<'_, V> {
@@ -242,6 +253,32 @@ impl<'a, V> Drop for FlatDrain<'a, V> {
             self.idx += 1;
             self.map.remove(&coord);
         }
+    }
+}
+
+// ── IterMut ────────────────────────────────────────────
+
+pub struct FlatIterMut<'a, V> {
+    slots: core::slice::IterMut<'a, Option<V>>,
+    idx: u16,
+}
+
+impl<'a, V> Iterator for FlatIterMut<'a, V> {
+    type Item = (Coord, &'a mut V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        for slot in self.slots.by_ref() {
+            let coord = Coord::new(self.idx).unwrap();
+            self.idx += 1;
+            if let Some(val) = slot.as_mut() {
+                return Some((coord, val));
+            }
+        }
+        None
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (0, Some(self.slots.len()))
     }
 }
 

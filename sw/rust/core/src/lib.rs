@@ -47,3 +47,4 @@ pub use map::CoordMap6;
 pub use flat::FlatDrain;
 pub use flat::FlatEntry;
 pub use flat::FlatIter;
+pub use flat::FlatIterMut;

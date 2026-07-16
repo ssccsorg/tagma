@@ -206,7 +206,7 @@ fn cm6_iterate() {
         coords[0] = Coord::new(i).unwrap();
         map.insert_path(&CoordPath::new(coords), i);
     }
-    let count = map.iter().count();
+    let count = map.iter_tree().count();
     assert_eq!(count, 10);
 }
 
@@ -317,4 +317,36 @@ fn coord_path_is_not_a_key() {
     ]);
     assert_eq!(path.len(), 3);
     assert!(!path.is_empty());
+}
+
+// ── DynCoordMap stress test ──
+
+#[test]
+fn dyn_coord_stress_1000() {
+    use tagma_core::DynCoordMap;
+    let mut map = DynCoordMap::new();
+    let mut inserted: Vec<Vec<Coord>> = Vec::new();
+    // Phase 1: insert 100 random paths (depth 1..6)
+    for _ in 0..100 {
+        let depth = (inserted.len() % 5) + 1;
+        let path: Vec<Coord> = (0..depth)
+            .map(|i| Coord::new(((i * 587 + inserted.len()) % 11172) as u16).unwrap())
+            .collect();
+        map.insert(&path, depth as u64);
+        inserted.push(path);
+    }
+    // Phase 2: verify all inserted paths are retrievable
+    for (idx, path) in inserted.iter().enumerate() {
+        let expected = (idx % 5 + 1) as u64;
+        assert_eq!(map.get(path), Some(&expected), "path {:?} not found", path);
+    }
+    // Phase 3: remove every other path
+    for i in (0..inserted.len()).step_by(2) {
+        assert!(map.remove(&inserted[i]).is_some());
+    }
+    // Phase 4: verify remaining paths still accessible
+    for i in (1..inserted.len()).step_by(2) {
+        let expected = (i % 5 + 1) as u64;
+        assert_eq!(map.get(&inserted[i]), Some(&expected));
+    }
 }

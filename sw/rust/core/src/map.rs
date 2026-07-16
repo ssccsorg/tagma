@@ -31,6 +31,7 @@ use alloc::vec::Vec;
 /// ```
 ///
 /// No hashing, no collision resolution at any depth.
+#[derive(Clone)]
 pub struct CoordTreeMap<const N: usize, V> {
     root: Node<V>,
     len: usize,
@@ -40,6 +41,7 @@ pub struct CoordTreeMap<const N: usize, V> {
 ///
 /// - `Leaf`: boxed slice of 11,172 `Option<V>` slots.
 /// - `Branch`: boxed slice of 11,172 `Option<Box<Node<V>>>` slots.
+#[derive(Clone)]
 enum Node<V> {
     Leaf(Box<[Option<V>]>),
     Branch(Box<[Option<Box<Node<V>>>]>),
@@ -145,8 +147,13 @@ impl<const N: usize, V> CoordTreeMap<N, V> {
     ///
     /// For `N=1`, allocates a flat array of 11,172 slots.
     /// For `N>1`, allocates a single empty branch node (lazy).
+    ///
+    /// # Panics
+    ///
+    /// Panics if `N` is 0 (depth must be at least 1).
     #[inline]
     pub fn new() -> Self {
+        assert!(N > 0, "CoordTreeMap depth N must be at least 1");
         let root = if N == 1 {
             Node::new_leaf()
         } else {
@@ -187,6 +194,54 @@ impl<const N: usize, V> Default for CoordTreeMap<N, V> {
 }
 
 // ---------------------------------------------------------------------------
+// Debug, PartialEq — manual impls for compact output and value comparison
+// ---------------------------------------------------------------------------
+
+impl<V: core::fmt::Debug> core::fmt::Debug for Node<V> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        // Show occupied slot count instead of dumping 11,172 entries.
+        match self {
+            Node::Leaf(slots) => {
+                let occupied = slots.iter().filter(|s| s.is_some()).count();
+                f.debug_struct("Leaf").field("occupied", &occupied).finish()
+            }
+            Node::Branch(children) => {
+                let occupied = children.iter().filter(|c| c.is_some()).count();
+                f.debug_struct("Branch").field("children", &occupied).finish()
+            }
+        }
+    }
+}
+
+impl<const N: usize, V: core::fmt::Debug> core::fmt::Debug for CoordTreeMap<N, V> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("CoordTreeMap")
+            .field("N", &N)
+            .field("len", &self.len)
+            .field("root", &self.root)
+            .finish()
+    }
+}
+
+impl<V: PartialEq> PartialEq for Node<V> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Node::Leaf(a), Node::Leaf(b)) => a == b,
+            (Node::Branch(a), Node::Branch(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl<const N: usize, V: PartialEq> PartialEq for CoordTreeMap<N, V> {
+    fn eq(&self, other: &Self) -> bool {
+        self.len == other.len && self.root == other.root
+    }
+}
+
+impl<const N: usize, V: PartialEq> Eq for CoordTreeMap<N, V> {}
+
+// ---------------------------------------------------------------------------
 // Core read / write — single Coord (N=1 convenience)
 // ---------------------------------------------------------------------------
 
@@ -206,7 +261,7 @@ impl<V> CoordTreeMap<1, V> {
     /// Returns `true` if the map contains an entry for `coord`.
     #[inline]
     pub fn contains_key(&self, coord: &Coord) -> bool {
-        self.get(&coord).is_some()
+        self.get(coord).is_some()
     }
 
     /// Inserts a value at `coord`, returning the previous value if any.
@@ -227,13 +282,6 @@ impl<V> CoordTreeMap<1, V> {
             self.len -= 1;
         }
         old
-    }
-
-    /// Clears the map, removing all entries.
-    pub fn clear(&mut self) {
-        // Re-create the root as an empty leaf.
-        self.root = Node::new_leaf();
-        self.len = 0;
     }
 }
 
@@ -303,6 +351,28 @@ impl<const N: usize, V> CoordTreeMap<N, V> {
             self.len -= 1;
         }
         old
+    }
+
+    /// Removes all entries, preserving allocated tree structure.
+    /// O(entries) — walks the tree clearing occupied slots.
+    pub fn clear(&mut self) {
+        clear_node(&mut self.root);
+        self.len = 0;
+    }
+}
+
+fn clear_node<V>(node: &mut Node<V>) {
+    match node {
+        Node::Leaf(slots) => {
+            for slot in slots.iter_mut() {
+                *slot = None;
+            }
+        }
+        Node::Branch(children) => {
+            for child in children.iter_mut().flatten() {
+                clear_node(child);
+            }
+        }
     }
 }
 
@@ -517,7 +587,8 @@ fn collect_leaves<const M: usize, V>(
 
 impl<const N: usize, V> CoordTreeMap<N, V> {
     /// Returns an iterator over all `(path, value)` pairs in the tree.
-    pub fn iter(&self) -> TreeIter<'_, N, V> {
+    /// For N=1, consider using `iter_flat()` instead for `(Coord, &V)` items.
+    pub fn iter_tree(&self) -> TreeIter<'_, N, V> {
         let mut indices = Vec::new();
         let mut current = [0u16; N];
         collect_leaves::<N, V>(&self.root, 0, &mut current, &mut indices);

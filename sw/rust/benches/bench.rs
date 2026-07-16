@@ -468,6 +468,54 @@ fn bench_baseline_iterate(c: &mut Criterion) {
 }
 
 // ===========================================================================
+// CoordMap2 (N=2) benchmarks — cross-product FIH-like scenario
+// ===========================================================================
+
+fn bench_cm2_insert_1000(c: &mut Criterion) {
+    c.bench_function("CoordMap2/insert/1000", |b| {
+        b.iter(|| {
+            let mut map = tagma_core::CoordMap2::new();
+            for i in 0u16..100 {
+                for j in 0u16..10 {
+                    let path = tagma_core::CoordPath::new([
+                        tagma_core::Coord::new(i).unwrap(),
+                        tagma_core::Coord::new(j).unwrap(),
+                    ]);
+                    black_box(map.insert_path(&path, (i * 100 + j) as u32));
+                }
+            }
+            black_box(map);
+        })
+    });
+}
+
+fn bench_cm2_get_1000(c: &mut Criterion) {
+    let mut map = tagma_core::CoordMap2::new();
+    for i in 0u16..100 {
+        for j in 0u16..10 {
+            let path = tagma_core::CoordPath::new([
+                tagma_core::Coord::new(i).unwrap(),
+                tagma_core::Coord::new(j).unwrap(),
+            ]);
+            map.insert_path(&path, (i * 100 + j) as u32);
+        }
+    }
+    c.bench_function("CoordMap2/get/1000", |b| {
+        b.iter(|| {
+            for i in 0u16..100 {
+                for j in 0u16..10 {
+                    let path = tagma_core::CoordPath::new([
+                        tagma_core::Coord::new(i).unwrap(),
+                        tagma_core::Coord::new(j).unwrap(),
+                    ]);
+                    black_box(black_box(&map).get_path(&path));
+                }
+            }
+        })
+    });
+}
+
+// ===========================================================================
 // Group runner
 // ===========================================================================
 
@@ -504,9 +552,14 @@ criterion_group!(
               bench_tagma_insert_single, bench_std_insert_single
 );
 criterion_group!(
+    name = tree;
+    config = Criterion::default();
+    targets = bench_cm2_insert_1000, bench_cm2_get_1000
+);
+criterion_group!(
     name = stress;
     config = Criterion::default().sample_size(30).measurement_time(std::time::Duration::from_secs(10));
     targets = bench_tagma_mixed_500k, bench_std_mixed_500k
 );
 
-criterion_main!(inserts, lookup, mutate, iterate, micro, stress);
+criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress);

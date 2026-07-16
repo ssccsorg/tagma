@@ -24,6 +24,7 @@ pub struct DynCoordMap<V> {
 enum Slot<V> {
     Leaf(V),
     Node(Box<DynCoordMap<V>>),
+    Both(V, Box<DynCoordMap<V>>), // holds a value and a child node simultaneously
 }
 
 // ---------------------------------------------------------------------------
@@ -63,7 +64,9 @@ impl<V> DynCoordMap<V> {
             let idx = coord.index() as usize;
             match node.slots[idx].as_ref()? {
                 Slot::Leaf(v) if i == path.len() - 1 => return Some(v),
+                Slot::Both(v, _) if i == path.len() - 1 => return Some(v),
                 Slot::Node(child) => node = child,
+                Slot::Both(_, child) => node = child,
                 _ => return None,
             }
         }
@@ -82,6 +85,7 @@ impl<V> DynCoordMap<V> {
             let slot = &mut self.slots[idx];
             match slot {
                 Some(Slot::Leaf(old)) => Some(core::mem::replace(old, value)),
+                Some(Slot::Both(old, _)) => Some(core::mem::replace(old, value)),
                 Some(Slot::Node(_)) => {
                     *slot = Some(Slot::Leaf(value));
                     None
@@ -92,20 +96,29 @@ impl<V> DynCoordMap<V> {
                 }
             }
         } else {
-            let child = &mut self.slots[idx];
-            if child.is_none() {
-                *child = Some(Slot::Node(Box::default()));
+            let slot = &mut self.slots[idx];
+            if slot.is_none() {
+                *slot = Some(Slot::Node(Box::default()));
             }
-            match child.as_mut().unwrap() {
-                Slot::Node(sub) => sub.insert_rec(path, depth + 1, value),
-                Slot::Leaf(_) => {
-                    *child = Some(Slot::Node(Box::default()));
-                    match child.as_mut().unwrap() {
-                        Slot::Node(sub) => sub.insert_rec(path, depth + 1, value),
-                        _ => unreachable!(),
-                    }
+            // Take ownership of the slot so we can move values freely.
+            let taken = slot.take().unwrap();
+            let result;
+            *slot = Some(match taken {
+                Slot::Node(mut sub) => {
+                    result = sub.insert_rec(path, depth + 1, value);
+                    Slot::Node(sub)
                 }
-            }
+                Slot::Both(old_val, mut sub) => {
+                    result = sub.insert_rec(path, depth + 1, value);
+                    Slot::Both(old_val, sub)
+                }
+                Slot::Leaf(old_val) => {
+                    let mut sub: Box<DynCoordMap<V>> = Box::default();
+                    result = sub.insert_rec(path, depth + 1, value);
+                    Slot::Both(old_val, sub)
+                }
+            });
+            result
         }
     }
 
@@ -119,11 +132,13 @@ impl<V> DynCoordMap<V> {
         if depth == path.len() - 1 {
             match self.slots[idx].take() {
                 Some(Slot::Leaf(v)) => Some(v),
+                Some(Slot::Both(v, _)) => Some(v),
                 _ => None,
             }
         } else {
             match &mut self.slots[idx] {
                 Some(Slot::Node(sub)) => sub.remove_rec(path, depth + 1),
+                Some(Slot::Both(_, sub)) => sub.remove_rec(path, depth + 1),
                 _ => None,
             }
         }
@@ -218,11 +233,10 @@ mod tests {
             Coord::new(3).unwrap(),
         ];
         m.insert(&d1, 10);
-        // Inserting deeper at the same prefix overwrites the shallow value
         m.insert(&d3, 30);
         assert_eq!(m.get(&d3), Some(&30));
-        // d1 was destroyed because its coord slot was converted to a Node
-        assert_eq!(m.get(&d1), None);
+        // Both should now be accessible
+        assert_eq!(m.get(&d1), Some(&10));
     }
 
     #[test]
