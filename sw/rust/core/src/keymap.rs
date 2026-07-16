@@ -118,7 +118,27 @@ impl<const N: usize, K: CoordKey<N>, V> CoordKeyMap<N, K, V> {
     pub fn remove(&mut self, key: &K) -> Option<V> {
         self.inner.remove_path(&key.to_path())
     }
+}
 
+// ── &str convenience (N=1, K=String) ────────────────────────────────────
+
+impl<V> CoordKeyMap<1, String, V> {
+    /// Convenience: get with `&str` key, avoiding `String` allocation.
+    #[inline]
+    pub fn get_str(&self, key: &str) -> Option<&V> {
+        self.inner.get_path(&key.to_path())
+    }
+
+    /// Convenience: remove with `&str` key, avoiding `String` allocation.
+    #[inline]
+    pub fn remove_str(&mut self, key: &str) -> Option<V> {
+        self.inner.remove_path(&key.to_path())
+    }
+}
+
+// ── Bulk operations ────────────────────────────────────────────────────
+
+impl<const N: usize, K: CoordKey<N>, V> CoordKeyMap<N, K, V> {
     /// Removes all entries.
     #[inline]
     pub fn clear(&mut self) {
@@ -126,7 +146,6 @@ impl<const N: usize, K: CoordKey<N>, V> CoordKeyMap<N, K, V> {
     }
 
     /// Collects all values, cloning each.
-    /// For N=1, iterates all 11,172 slots; for N>1, walks the tree.
     pub fn values(&self) -> alloc::vec::Vec<V>
     where
         V: Clone,
