@@ -23,7 +23,7 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | **CoordPath\<N\>** | Index path (not a hash key), compile-time N-element Coord array. `From<Coord>`, `From<[Coord; N]>` | `core/src/path.rs` |
 | **CoordSet** | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/set.rs` |
 | **CoordMap\<V\>** ($\equiv$ CoordFlatMap) | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/flat.rs` |
-| **CoordKey\<N\>** (trait) | Converts application key types to CoordPath for direct addressing. Implemented for `Coord`, `&str`, `&[u8]`, `u128`, `[u8; 16]`, `[u8; 32]` | `core/src/key.rs` |
+| **CoordKey\<N\>** (trait) | Converts application key types to CoordPath for direct addressing. Implemented for `Coord`, `&Coord`, `u128`, `[u8; 16]`, `[u8; 32]` | `core/src/key.rs` |
 
 ### Requires alloc (default feature)
 
@@ -64,11 +64,10 @@ let c = Coord::from_axes(5, 10, 15).unwrap();
 assert_eq!(c.to_axes(), (5, 10, 15));
 assert_eq!(c.to_char(), '걐');  // Hangul syllable display
 
-// Hash-free map — identical API to std HashMap
-let mut map: CoordKeyMap<1, &str, &str> = CoordKeyMap::new();
-map.insert("user:42", "tagma");
-assert_eq!(map.get(&"user:42"), Some(&"tagma"));
-*map.entry("counter").or_insert("0") = "1";
+// UUID-scale map with zero collisions
+let mut map: CoordKeyMap<6, u128, &str> = CoordKeyMap::new();
+map.insert(0x0123456789ABCDEF0123456789ABCDEFu128, "tagma");
+assert_eq!(map.get(&0x0123456789ABCDEF0123456789ABCDEFu128), Some(&"tagma"));
 
 // Single-syllable direct-address (no allocator)
 let mut flat = CoordMap::new();
@@ -93,7 +92,7 @@ assert!(set.contains(c));
 | CoordTreeMap\<N\> (heap tree) | ❌ | ✅ |
 | DynCoordMap (runtime trie) | ❌ | ✅ |
 | CoordKeyMap (HashMap API) | ❌ | ✅ |
-| CoordKey for String | ❌ | ✅ |
+
 | base11172 serialization | ❌ | ✅ |
 
 ## How it works
