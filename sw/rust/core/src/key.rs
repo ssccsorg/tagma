@@ -2,27 +2,23 @@ use crate::coord::Coord;
 use crate::path::CoordPath;
 
 // ---------------------------------------------------------------------------
-// CoordKey — conversion from application key types to direct-address paths
+// CoordKey — conversion from key types to direct-address paths
 // ---------------------------------------------------------------------------
 
-/// Conversion from an application-level key type to a [`CoordPath`].
+/// Conversion from a key type to a [`CoordPath`] for direct addressing.
 ///
 /// `N` is the path depth (number of syllables). `N=1` covers 11,172 addresses;
-/// `N=6` covers UUID-scale ($1.94 \times 10^{24}$).
+/// `N=6` covers UUID-scale ($1.94 \times 10^{24}$); `N=19` covers $2^{256}$.
 ///
-/// # Collision model
+/// # Collision
 ///
-/// - **Direct keys** (`Coord`, `u128`, `[u8; 16]`): zero collisions.
-///   Every distinct key maps to a distinct `CoordPath`.
-/// - **Derived keys** (`&str`, `&[u8]`): probabilistic collisions
-///   during the hash-to-Coord conversion, identical to `HashMap`'s model.
-///   At the storage level, collisions remain zero (no bucket chains, no rehashing).
+/// Zero collisions. Every distinct key maps to a distinct `CoordPath`.
+/// Tagma is hashless — no hashing step, no probabilistic conversion.
 pub trait CoordKey<const N: usize> {
-    /// Convert this key to a `CoordPath<N>` for direct addressing.
     fn to_path(&self) -> CoordPath<N>;
 }
 
-// ── Direct key: Coord ───────────────────────────────────────────────────
+// ── Coord ───────────────────────────────────────────────────────────────
 
 impl CoordKey<1> for Coord {
     #[inline]
@@ -38,7 +34,7 @@ impl CoordKey<1> for &Coord {
     }
 }
 
-// ── Direct key: u128 (UUID integer) → CoordPath<6> ──────────────────────
+// ── u128 (UUID integer) → CoordPath<6> ──────────────────────────────────
 
 impl CoordKey<6> for u128 {
     fn to_path(&self) -> CoordPath<6> {
@@ -56,7 +52,7 @@ impl CoordKey<6> for u128 {
     }
 }
 
-// ── Direct key: [u8; 16] (UUID bytes) → CoordPath<6> ────────────────────
+// ── [u8; 16] (UUID bytes) → CoordPath<6> ────────────────────────────────
 
 impl CoordKey<6> for [u8; 16] {
     fn to_path(&self) -> CoordPath<6> {
@@ -64,7 +60,7 @@ impl CoordKey<6> for [u8; 16] {
     }
 }
 
-// ── Direct key: [u8; 32] (SHA-256) → CoordPath<19> ──────────────────────
+// ── [u8; 32] (SHA-256) → CoordPath<19> ──────────────────────────────────
 
 impl CoordKey<19> for [u8; 32] {
     fn to_path(&self) -> CoordPath<19> {
@@ -77,64 +73,6 @@ impl CoordKey<19> for [u8; 32] {
     }
 }
 
-// ── Derived key: &str (hash-then-mod) → CoordPath<1> ────────────────────
-
-impl CoordKey<1> for &str {
-    fn to_path(&self) -> CoordPath<1> {
-        let h = fast_hash(self.as_bytes());
-        CoordPath::new([Coord::new((h % 11172) as u16).unwrap()])
-    }
-}
-
-// ── Derived key: &str → CoordPath<6> (UUID-scale, lower collision) ──────
-
-impl CoordKey<6> for &str {
-    fn to_path(&self) -> CoordPath<6> {
-        let h = fast_hash(self.as_bytes());
-        CoordPath::new([
-            Coord::new(((h >> 48) % 11172) as u16).unwrap(),
-            Coord::new(((h >> 32) % 11172) as u16).unwrap(),
-            Coord::new(((h >> 16) % 11172) as u16).unwrap(),
-            Coord::new((h % 11172) as u16).unwrap(),
-            Coord::new(0).unwrap(),
-            Coord::new(0).unwrap(),
-        ])
-    }
-}
-
-// ── Derived key: &[u8] (hash-then-mod) → CoordPath<1> ───────────────────
-
-impl CoordKey<1> for &[u8] {
-    fn to_path(&self) -> CoordPath<1> {
-        let h = fast_hash(self);
-        CoordPath::new([Coord::new((h % 11172) as u16).unwrap()])
-    }
-}
-
-impl<const L: usize> CoordKey<1> for [u8; L] {
-    #[inline]
-    fn to_path(&self) -> CoordPath<1> {
-        self.as_slice().to_path()
-    }
-}
-
-// ── Fast non-cryptographic hash ─────────────────────────────────────────
-
-fn fast_hash(bytes: &[u8]) -> u64 {
-    let mut h: u64 = 0x2f7b_8a6e_3c5d_1f49;
-    for chunk in bytes.chunks(8) {
-        let mut word = 0u64;
-        for (i, &b) in chunk.iter().enumerate() {
-            word |= (b as u64) << (i * 8);
-        }
-        h = h.wrapping_add(word);
-        h = h.wrapping_mul(0x9e37_79b9_7f4a_7c15);
-        h ^= h >> 31;
-    }
-    h ^= h >> 33;
-    h.wrapping_mul(0xff51_afd7_ed55_8ccd)
-}
-
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -142,7 +80,6 @@ fn fast_hash(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Coord;
 
     #[test]
     fn coord_direct_roundtrip() {
@@ -165,32 +102,23 @@ mod tests {
     }
 
     #[test]
-    fn str_derived_is_deterministic() {
-        let a: CoordPath<1> = "hello".to_path();
-        let b: CoordPath<1> = "hello".to_path();
+    fn sha256_bytes_to_path() {
+        let hash = [0u8; 32];
+        let path: CoordPath<19> = hash.to_path();
+        assert_eq!(path.len(), 19);
+    }
+
+    #[test]
+    fn u128_deterministic() {
+        let a: CoordPath<6> = 42u128.to_path();
+        let b: CoordPath<6> = 42u128.to_path();
         assert_eq!(a, b);
     }
 
     #[test]
-    fn str_differs_from_str() {
-        let a: CoordPath<1> = "alpha".to_path();
-        let b: CoordPath<1> = "beta".to_path();
+    fn distinct_u128s_differ() {
+        let a: CoordPath<6> = 1u128.to_path();
+        let b: CoordPath<6> = 2u128.to_path();
         assert_ne!(a, b);
-    }
-
-    #[test]
-    fn bytes_slice_matches_str() {
-        let a: CoordPath<1> = b"hello".as_slice().to_path();
-        let b: CoordPath<1> = "hello".to_path();
-        assert_eq!(a, b);
-    }
-
-    #[test]
-    fn coord_key_6_different_from_1() {
-        let a = "key";
-        let _path_1: CoordPath<1> = a.to_path();
-        let _path_6: CoordPath<6> = a.to_path();
-        assert_eq!(_path_6.len(), 6);
-        assert_eq!(_path_1.len(), 1);
     }
 }

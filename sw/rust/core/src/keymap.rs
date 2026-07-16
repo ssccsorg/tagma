@@ -1,28 +1,11 @@
 use crate::key::CoordKey;
 use crate::map::CoordTreeMap;
 use crate::path::CoordPath;
-use alloc::string::String;
 use core::marker::PhantomData;
 
 // ---------------------------------------------------------------------------
 // CoordKeyMap — HashMap-compatible, hash-free, collision-free map
 // ---------------------------------------------------------------------------
-
-// ── CoordKey impls for String (alloc only) ──────────────────────────
-
-impl CoordKey<1> for String {
-    #[inline]
-    fn to_path(&self) -> CoordPath<1> {
-        self.as_str().to_path()
-    }
-}
-
-impl CoordKey<6> for String {
-    #[inline]
-    fn to_path(&self) -> CoordPath<6> {
-        self.as_str().to_path()
-    }
-}
 
 /// A HashMap-compatible map backed by Tagma direct addressing.
 ///
@@ -38,11 +21,8 @@ impl CoordKey<6> for String {
 ///
 /// # Collision model
 ///
-/// Zero collisions at the storage level. For direct key types (`Coord`,
-/// `u128`, `[u8; 16]`), collisions are zero end-to-end. For derived key
-/// types (`&str`, `&[u8]`), collisions are probabilistic during the
-/// hash-to-Coord conversion, matching `HashMap`'s model. At the storage
-/// level, there are no bucket chains, no rehashing, and no load factor.
+/// Zero collisions. Every distinct key maps to a distinct `CoordPath`.
+/// Tagma is hashless — no hashing step, no probabilistic conversion.
 pub struct CoordKeyMap<const N: usize, K: CoordKey<N>, V> {
     inner: CoordTreeMap<N, V>,
     _key: PhantomData<K>,
@@ -120,21 +100,7 @@ impl<const N: usize, K: CoordKey<N>, V> CoordKeyMap<N, K, V> {
     }
 }
 
-// ── &str convenience (N=1, K=String) ────────────────────────────────────
 
-impl<V> CoordKeyMap<1, String, V> {
-    /// Convenience: get with `&str` key, avoiding `String` allocation.
-    #[inline]
-    pub fn get_str(&self, key: &str) -> Option<&V> {
-        self.inner.get_path(&key.to_path())
-    }
-
-    /// Convenience: remove with `&str` key, avoiding `String` allocation.
-    #[inline]
-    pub fn remove_str(&mut self, key: &str) -> Option<V> {
-        self.inner.remove_path(&key.to_path())
-    }
-}
 
 // ── Bulk operations ────────────────────────────────────────────────────
 
@@ -304,23 +270,13 @@ impl<const N: usize, K: CoordKey<N>, V: core::fmt::Debug> core::fmt::Debug
 mod tests {
     use super::*;
     use crate::Coord;
-    use alloc::string::String;
-    use alloc::string::ToString;
     use alloc::vec;
 
     #[test]
     fn new_map_is_empty() {
-        let map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
+        let map: CoordKeyMap<1, Coord, u32> = CoordKeyMap::new();
         assert!(map.is_empty());
         assert_eq!(map.len(), 0);
-    }
-
-    #[test]
-    fn insert_and_get_str() {
-        let mut map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
-        assert_eq!(map.insert("hello", 42), None);
-        assert_eq!(map.get(&"hello"), Some(&42));
-        assert_eq!(map.len(), 1);
     }
 
     #[test]
@@ -329,6 +285,7 @@ mod tests {
         let c = Coord::new(42).unwrap();
         assert_eq!(map.insert(c, 7), None);
         assert_eq!(map.get(&c), Some(&7));
+        assert_eq!(map.len(), 1);
     }
 
     #[test]
@@ -341,86 +298,76 @@ mod tests {
 
     #[test]
     fn insert_overwrite() {
-        let mut map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
-        map.insert("key", 1);
-        assert_eq!(map.insert("key", 2), Some(1));
-        assert_eq!(map.get(&"key"), Some(&2));
+        let mut map: CoordKeyMap<1, Coord, u32> = CoordKeyMap::new();
+        let c = Coord::new(0).unwrap();
+        map.insert(c, 1);
+        assert_eq!(map.insert(c, 2), Some(1));
+        assert_eq!(map.get(&c), Some(&2));
         assert_eq!(map.len(), 1);
     }
 
     #[test]
     fn remove() {
-        let mut map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
-        map.insert("key", 42);
-        assert_eq!(map.remove(&"key"), Some(42));
+        let mut map: CoordKeyMap<1, Coord, u32> = CoordKeyMap::new();
+        let c = Coord::new(42).unwrap();
+        map.insert(c, 42);
+        assert_eq!(map.remove(&c), Some(42));
         assert!(map.is_empty());
     }
 
     #[test]
     fn contains_key() {
-        let mut map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
-        assert!(!map.contains_key(&"key"));
-        map.insert("key", 1);
-        assert!(map.contains_key(&"key"));
+        let mut map: CoordKeyMap<1, Coord, u32> = CoordKeyMap::new();
+        let c = Coord::new(0).unwrap();
+        assert!(!map.contains_key(&c));
+        map.insert(c, 1);
+        assert!(map.contains_key(&c));
     }
 
     #[test]
     fn clear() {
-        let mut map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
-        map.insert("a", 1);
-        map.insert("b", 2);
+        let mut map: CoordKeyMap<1, Coord, u32> = CoordKeyMap::new();
+        map.insert(Coord::new(0).unwrap(), 1);
+        map.insert(Coord::new(1).unwrap(), 2);
         map.clear();
         assert!(map.is_empty());
     }
 
     #[test]
     fn entry_or_insert() {
-        let mut map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
-        map.entry("key").or_insert(42);
-        assert_eq!(map.get(&"key"), Some(&42));
-        map.entry("key").or_insert(99);
-        assert_eq!(map.get(&"key"), Some(&42));
+        let mut map: CoordKeyMap<1, Coord, u32> = CoordKeyMap::new();
+        let c = Coord::new(0).unwrap();
+        map.entry(c).or_insert(42);
+        assert_eq!(map.get(&c), Some(&42));
+        map.entry(c).or_insert(99);
+        assert_eq!(map.get(&c), Some(&42));
     }
 
     #[test]
     fn entry_and_modify() {
-        let mut map: CoordKeyMap<1, &str, u32> = CoordKeyMap::new();
-        map.entry("key").and_modify(|v| *v += 1).or_insert(1);
-        assert_eq!(map.get(&"key"), Some(&1));
-        map.entry("key").and_modify(|v| *v += 1).or_insert(1);
-        assert_eq!(map.get(&"key"), Some(&2));
+        let mut map: CoordKeyMap<1, Coord, u32> = CoordKeyMap::new();
+        let c = Coord::new(0).unwrap();
+        map.entry(c).and_modify(|v| *v += 1).or_insert(1);
+        assert_eq!(map.get(&c), Some(&1));
+        map.entry(c).and_modify(|v| *v += 1).or_insert(1);
+        assert_eq!(map.get(&c), Some(&2));
     }
 
     #[test]
     fn from_iterator() {
-        let entries = vec![("a", 1u32), ("b", 2), ("c", 3)];
-        let map: CoordKeyMap<1, &str, u32> = entries.into_iter().collect();
+        let entries = vec![
+            (Coord::new(0).unwrap(), 1u32),
+            (Coord::new(1).unwrap(), 2),
+            (Coord::new(2).unwrap(), 3),
+        ];
+        let map: CoordKeyMap<1, Coord, u32> = entries.into_iter().collect();
         assert_eq!(map.len(), 3);
-        assert_eq!(map.get(&"a"), Some(&1));
+        assert_eq!(map.get(&Coord::new(0).unwrap()), Some(&1));
     }
 
     #[test]
     fn default_is_empty() {
-        let map: CoordKeyMap<1, &str, u32> = Default::default();
+        let map: CoordKeyMap<1, Coord, u32> = Default::default();
         assert!(map.is_empty());
-    }
-
-    #[test]
-    fn string_key_matches_str() {
-        let mut map: CoordKeyMap<1, String, u32> = CoordKeyMap::new();
-        map.insert("key".to_string(), 42);
-        assert_eq!(map.get(&"key".to_string()), Some(&42));
-    }
-
-    #[test]
-    fn string_coord_key_matches_str() {
-        let s: String = String::from("test");
-        let a: CoordPath<1> = s.to_path();
-        let b: CoordPath<1> = s.as_str().to_path();
-        assert_eq!(a, b);
-
-        let c: CoordPath<6> = s.to_path();
-        let d: CoordPath<6> = s.as_str().to_path();
-        assert_eq!(c, d);
     }
 }
