@@ -57,8 +57,13 @@ impl<V> Default for DynCoordMap<V> {
 impl<V> DynCoordMap<V> {
     /// Returns a reference to the value at `path`.
     ///
+    /// Returns `None` if `path` is empty.
+    ///
     /// Time: O(path.len()) — one array access per coord.
     pub fn get(&self, path: &[Coord]) -> Option<&V> {
+        if path.is_empty() {
+            return None;
+        }
         let mut node = self;
         for (i, &coord) in path.iter().enumerate() {
             let idx = coord.index() as usize;
@@ -75,7 +80,12 @@ impl<V> DynCoordMap<V> {
 
     /// Inserts a value at `path`. Creates intermediate nodes as needed.
     /// Returns the previous value if the exact path already existed.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `path` is empty (a path must contain at least one coordinate).
     pub fn insert(&mut self, path: &[Coord], value: V) -> Option<V> {
+        assert!(!path.is_empty(), "DynCoordMap::insert: path must not be empty");
         self.insert_rec(path, 0, value)
     }
 
@@ -123,7 +133,12 @@ impl<V> DynCoordMap<V> {
     }
 
     /// Removes the value at `path`, returning it if present.
+    ///
+    /// Returns `None` if `path` is empty.
     pub fn remove(&mut self, path: &[Coord]) -> Option<V> {
+        if path.is_empty() {
+            return None;
+        }
         self.remove_rec(path, 0)
     }
 
@@ -269,5 +284,24 @@ mod tests {
             m.get(&[Coord::new(0).unwrap(), Coord::new(0).unwrap()]),
             None
         );
+    }
+
+    #[test]
+    fn empty_path_get_returns_none() {
+        let m: DynCoordMap<u32> = DynCoordMap::new();
+        assert_eq!(m.get(&[]), None);
+    }
+
+    #[test]
+    fn empty_path_remove_returns_none() {
+        let mut m: DynCoordMap<u32> = DynCoordMap::new();
+        assert_eq!(m.remove(&[]), None);
+    }
+
+    #[test]
+    #[should_panic(expected = "path must not be empty")]
+    fn empty_path_insert_panics() {
+        let mut m: DynCoordMap<u32> = DynCoordMap::new();
+        m.insert(&[], 42);
     }
 }
