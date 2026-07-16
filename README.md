@@ -71,6 +71,11 @@ N-syllable sequences (CoordPath) extend the address space to $11172^N$ identifie
 via row-major linearization. A 6-syllable identifier covers UUID-scale space;
 19 syllables match SHA-256's $2^{256}$ identifier space.
 
+The three-axis composition formula admits unbounded recursive embedding: each axis
+of a SynTagma can itself be a full CoordPath, producing $S_1 = (11,172^{19})^3
+\approx 7.30 \times 10^{231}$ addresses at the first recursion level. The SynTagma
+specification defines how this recursive structure is mapped onto physical topologies.
+
 ## Benchmark
 
 On default GitHub CI ubuntu linux x86_64
@@ -94,6 +99,7 @@ Speedup (vs SHA256):
 ## Documentation
 
 - **[White Paper](https://docs.ssccs.org/projects/tagma/paper/wp.html)** — Full technical analysis: coordinate space, decoder, hardware implementation, benchmarks
+- **[SynTagma](https://docs.ssccs.org/projects/tagma/paper/syn.html)** — External coordination layer: physical topology mapping, transport, distributed resolver, consistency model
 - **[Master Document](docs/index.qmd)** — Project overview, paradigm shift, core data structures
 - **[Specification](spec/coord-space.md)** — Language-independent coordinate space definition
 - **Rustdoc** — `cargo doc --no-deps -p tagma-core` for API reference
