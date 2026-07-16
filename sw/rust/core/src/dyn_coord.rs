@@ -15,12 +15,12 @@ use alloc::vec::Vec;
 /// the depth is determined at runtime by the length of the path slice.
 /// Memory is allocated lazily: only paths that are actually written to
 /// consume nodes.
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct DynCoordMap<V> {
     slots: Box<[Option<Slot<V>>]>,
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 enum Slot<V> {
     Leaf(V),
     Node(Box<DynCoordMap<V>>),
@@ -168,6 +168,77 @@ impl<V> DynCoordMap<V> {
             *slot = None;
         }
     }
+
+    /// Returns the number of entries across all depths.
+    /// O(entries) — walks the tree counting occupied leaf slots.
+    pub fn entry_count(&self) -> usize {
+        self.count_rec()
+    }
+
+    fn count_rec(&self) -> usize {
+        let mut count = 0;
+        for slot in self.slots.iter() {
+            match slot {
+                Some(Slot::Leaf(_)) => count += 1,
+                Some(Slot::Node(sub)) => count += sub.count_rec(),
+                Some(Slot::Both(_, sub)) => count += 1 + sub.count_rec(),
+                None => {}
+            }
+        }
+        count
+    }
+
+    /// Returns an iterator over all `(path, value)` pairs.
+    /// Paths are yielded in depth-first, coordinate-ascending order.
+    pub fn iter(&self) -> DynIter<'_, V> {
+        let mut entries = Vec::new();
+        let mut path = Vec::new();
+        self.collect_iter(&mut path, &mut entries);
+        DynIter {
+            entries: entries.into_iter(),
+        }
+    }
+
+    fn collect_iter<'a>(&'a self, path: &mut Vec<u16>, out: &mut Vec<(Vec<u16>, &'a V)>) {
+        for (i, slot) in self.slots.iter().enumerate() {
+            match slot {
+                Some(Slot::Leaf(v)) => {
+                    path.push(i as u16);
+                    out.push((path.clone(), v));
+                    path.pop();
+                }
+                Some(Slot::Node(sub)) => {
+                    path.push(i as u16);
+                    sub.collect_iter(path, out);
+                    path.pop();
+                }
+                Some(Slot::Both(v, sub)) => {
+                    path.push(i as u16);
+                    out.push((path.clone(), v));
+                    sub.collect_iter(path, out);
+                    path.pop();
+                }
+                None => {}
+            }
+        }
+    }
+}
+
+/// An iterator over `(path, value)` pairs in a `DynCoordMap`.
+pub struct DynIter<'a, V> {
+    entries: alloc::vec::IntoIter<(Vec<u16>, &'a V)>,
+}
+
+impl<'a, V> Iterator for DynIter<'a, V> {
+    type Item = (Vec<u16>, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.entries.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.entries.size_hint()
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -306,5 +377,37 @@ mod tests {
     fn empty_path_insert_panics() {
         let mut m: DynCoordMap<u32> = DynCoordMap::new();
         m.insert(&[], 42);
+    }
+
+    #[test]
+    fn clone_independent() {
+        let mut a = DynCoordMap::new();
+        a.insert(&[Coord::new(0).unwrap()], 1);
+        a.insert(
+            &[Coord::new(1).unwrap(), Coord::new(2).unwrap()],
+            2,
+        );
+        let mut b = a.clone();
+        b.insert(&[Coord::new(3).unwrap()], 3);
+        assert_eq!(a.entry_count(), 2);
+        assert_eq!(b.entry_count(), 3);
+    }
+
+    #[test]
+    fn iter_yields_all_entries() {
+        let mut m = DynCoordMap::new();
+        m.insert(&[Coord::new(0).unwrap()], 10);
+        m.insert(
+            &[Coord::new(1).unwrap(), Coord::new(2).unwrap()],
+            20,
+        );
+        let entries: Vec<_> = m.iter().collect();
+        assert_eq!(entries.len(), 2);
+    }
+
+    #[test]
+    fn iter_empty() {
+        let m: DynCoordMap<u32> = DynCoordMap::new();
+        assert_eq!(m.iter().count(), 0);
     }
 }

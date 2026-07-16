@@ -80,6 +80,12 @@ impl<V> CoordFlatMap<V> {
         self.slot_mut(coord).as_mut()
     }
 
+    /// Returns the key-value pair for `coord`.
+    #[inline]
+    pub fn get_key_value(&self, coord: &Coord) -> Option<(Coord, &V)> {
+        self.slot(coord).as_ref().map(|v| (*coord, v))
+    }
+
     /// Returns `true` if the map contains an entry for `coord`.
     #[inline]
     pub fn contains_key(&self, coord: &Coord) -> bool {

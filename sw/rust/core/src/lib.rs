@@ -32,6 +32,7 @@ pub use flat::CoordMap1;
 
 #[cfg(feature = "alloc")]
 pub use dyn_coord::DynCoordMap;
+pub use dyn_coord::DynIter;
 #[cfg(feature = "alloc")]
 pub use map::CoordMap12;
 #[cfg(feature = "alloc")]
