@@ -1,17 +1,30 @@
-# Tagma
+# synTagma
 
 Tagma is a computing primitive where the address is the coordinate — not a flat pointer, but a point in an N-dimensional geometric space. This is made possible by a 16-bit Unicode block allocated to a 3-axis writing system, which provides a collision-free, hash-less, structurally addressable coordinate space. Every valid 16-bit value in the Hangul syllable block (U+AC00--U+D7AF) decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
 
-## Feature levels
+synTagma is a spatial coordinate space computing system built on Tagma, a 16-bit coordinate primitive embedded in the Unicode Hangul syllable block (U+AC00--U+D7AF). Every valid 16-bit value decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
 
-Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-default-features`), all types are `no_std` + `no_alloc` — no heap allocator required, compatible with bare-metal MCUs and embedded targets.
+## Layers
+
+```
+synTagma (system)
+  └─ Coordination layer (protocol, topology, distributed resolver)
+  └─ Tagma core primitive (Coord, CoordPath, CoordSet, CoordSpace)
+```
+
+- **Tagma** — the core primitive: a 16-bit structural coordinate with closed-form composition, zero collisions, and single-cycle combinational decoding. The atomic identity primitive.
+- **synTagma coordination layer** — recursive coordinate space expansion, physical topology mapping, distributed routing, and consistency protocol. Defined in the [synTagma](https://docs.ssccs.org/projects/syntagma/tagma/syn.html).
+
+## Tagma primitive: Feature levels
+
+Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-default-features`), all Tagma types are `no_std` + `no_alloc`.
 
 | Level | Feature flags | Heap | Available types |
 |-------|---------------|------|-----------------|
 | **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordSpace |
 | **alloc** | `alloc` (default) | Optional | + CoordSpaceN\<N\>, DynCoordSpace |
 
-## Type reference
+## Tagma type reference
 
 ### Always available (no_std, no allocator)
 
@@ -21,6 +34,9 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | **CoordPath\<N\>** | Index path (not a hash key), compile-time N-element Coord array | `core/src/coord_path.rs` |
 | **CoordSet** | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/coord_set.rs` |
 | **CoordSpace\<V\>** | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
+| **base11172** | Self-validating serialization: arbitrary bytes to Hangul syllable strings | `base11172/src/lib.rs` |
+
+Test coverage: 163 unit/integration tests + 15 doc-tests, all passing. Zero clippy warnings. CI runs `cargo fmt --check`, `cargo clippy`, `cargo build --release`, `cargo test --release`, `cargo build --no-default-features` (no_alloc verification).
 
 ### Requires alloc (default feature)
 
@@ -36,8 +52,8 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 ## Quick start
 
 ```sh
-git clone https://github.com/ssccsorg/tagma
-cd tagma
+git clone https://github.com/ssccsorg/syntagma
+cd syntagma
 ./run.sh                # fmt → clippy → build → test → no_alloc check
 ```
 
@@ -83,31 +99,23 @@ assert!(set.contains(c));
 | CoordSpaceN (heap tree, N>1) | ❌ | ✅ |
 | DynCoordSpace (runtime trie) | ❌ | ✅ |
 
-## How it works
+## How Tagma works
 
-A Tagma coordinate is computed from three structural axes via the Hangul composition
-formula defined in ISO/IEC 10646:
+A Tagma coordinate is computed from three structural axes via the Hangul composition formula defined in ISO/IEC 10646:
 
 $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 21,\; 0 \leq f < 28$$
 
-Of 65,536 representable 16-bit states, only 11,172 satisfy this formula. The remaining
-54,364 are structurally invalid and hardware-detectable. Each valid value is:
+Of 65,536 representable 16-bit states, only 11,172 satisfy this formula. The remaining 54,364 are structurally invalid and hardware-detectable. Each valid value is:
 
 - A 1-D address (Unicode code point) for flat array indexing.
 - A 3-D coordinate (initial, medial, final) for structural queries.
 - A Hangul syllable for human-readable display.
 
-N-syllable sequences (CoordPath) extend the address space to $11172^N$ identifiers
-via direct-index tree traversal. A 6-syllable identifier covers UUID-scale space;
-19 syllables match SHA-256's $2^{256}$ identifier space.
+N-syllable sequences (CoordPath) extend the address space to $11172^N$ identifiers via direct-index tree traversal. A 6-syllable identifier covers UUID-scale space; 19 syllables match SHA-256's $2^{256}$ identifier space.
 
-The three-axis composition formula admits unbounded recursive embedding: each axis
-of a SynTagma can itself be a full CoordPath. The SynTagma specification defines
-how this recursive structure is mapped onto physical topologies.
+The three-axis composition formula admits unbounded recursive embedding: each axis of a synTagma coordinate can itself be a full CoordPath, enabling physical topology mapping across distributed nodes without modifying the core arithmetic.
 
-## Benchmark
-
-## Identity generation (Apple M1)
+## Benchmark: Tagma identity generation (Apple M1)
 
 | Metric | SHA-256 | Tagma (1-syll) | Tagma (6-syll) | Tagma (19-syll) |
 |--------|---------|---------------|---------------|----------------|
@@ -115,10 +123,9 @@ how this recursive structure is mapped onto physical topologies.
 | Speedup | baseline | 115x | 21x | 6.5x |
 | Address space | 2^256 | 1.1e4 | 1.9e24 | 2^256 |
 
-## Spatial query vs HashMap (Apple M1)
+## Benchmark: Spatial query vs HashMap (Apple M1)
 
-Same algorithm (iterate + decompose + filter on axis), different memory layout.
-CoordSpace stores values in contiguous `[Option<V>; 11172]` — no hash, no collision, no fragmentation. HashMap scatters across buckets.
+Same algorithm (iterate + decompose + filter on axis), different memory layout. CoordSpace stores values in contiguous `[Option<V>; 11172]` — no hash, no collision, no fragmentation. HashMap scatters across buckets.
 
 | Operation | CoordSpace | HashMap | Ratio |
 |-----------|-----------|---------|-------|
@@ -127,14 +134,16 @@ CoordSpace stores values in contiguous `[Option<V>; 11172]` — no hash, no coll
 | **Remove** 11,172 | 15.0 µs | 268 µs | **18x** |
 | **Axis filter** (medial=10) | 58.2 Melem/s | 24.2 Melem/s | **2.4x** |
 | **Range filter** (initial 3--7) | 312 Melem/s | 139 Melem/s | **2.3x** |
+| **CoordSet compound** (initial=3 AND medial=5) | 94.4 ns | 13.0 µs | **138x** |
 | **Get single** (random coord) | 0.81 ns | 8.9 ns | **11x** |
 
 ## Documentation
 
-- **[White Paper](https://docs.ssccs.org/projects/tagma/paper/wp.html)** — Full technical analysis: coordinate space, decoder, hardware implementation, benchmarks
-- **[SynTagma](https://docs.ssccs.org/projects/tagma/paper/syn.html)** — External coordination layer: physical topology mapping, transport, distributed resolver, consistency model
-- **[Master Document](docs/index.qmd)** — Project overview, paradigm shift, core data structures
-- **[Specification](spec/coord-space.md)** — Language-independent coordinate space definition
+- **[synTagma project page](https://docs.ssccs.org/projects/syntagma/)** — Project overview, paradigm shift, papers
+- **[White Paper](https://docs.ssccs.org/projects/syntagma/tagma/wp.html)** — Tagma coordinate space, decoder, hardware implementation, benchmarks
+- **[synTagma coordination layer](https://docs.ssccs.org/projects/syntagma/tagma/syn.html)** — Recursive topology mapping, transport, distributed resolver, consistency
+- **[Tagma-ID](https://docs.ssccs.org/projects/syntagma/tagma/id.html)** — Content-addressable identity without hash functions
+- **[Specification](spec/coord-space.md)** — Language-independent Tagma coordinate space definition
 - **Rustdoc** — `cargo doc --no-deps -p tagma-core` for API reference
 
 ## License

@@ -17,7 +17,7 @@ identifiers:
   - type: doi
     value: 10.5281/zenodo.21326541
     description: White paper
-repository-code: 'https://github.com/ssccsorg/tagma'
+repository-code: 'https://github.com/ssccsorg/syntagma'
 url: 'https://ssccs.org'
 abstract: >-
   Tagma is a structural identity primitive: a 16-bit coordinate space
