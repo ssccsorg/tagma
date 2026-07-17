@@ -581,19 +581,18 @@ fn bench_spatial_axis_filter_range(c: &mut Criterion) {
     group.finish();
 }
 
-// Spatial/cs2_prefix_42
-//   CoordSpace2  4.17 µs   240 Kelem/s   4.5x (with iter_prefix)
-//   HashMap     18.8  µs   5.4 Melem/s
+// Spatial/cs2_prefix_42 (100k entries, 1000 prefixes)
+//   CoordSpace2  4.2 µs     240 Kelem/s   4.5x (with iter_prefix)
+//   HashMap     188  µs     5.4 Melem/s
 fn bench_spatial_cs2_prefix_scan(c: &mut Criterion) {
     // CoordSpace2: 10000 entries with shared prefixes vs HashMap<(Coord,Coord),V>.
     // Query: find all entries matching a specific prefix (first coord).
     // CoordSpace2 can restrict iteration to the sub-tree at that prefix;
     // HashMap must scan every entry.
     let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
-    let mut hm: std::collections::HashMap<(u16, u16), u32> =
-        std::collections::HashMap::new();
-    // 100 prefixes × 100 suffixes = 10,000 entries
-    for p in 0u16..100 {
+    let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
+    // 1000 prefixes × 100 suffixes = 100,000 entries
+    for p in 0u16..1000 {
         for s in 0u16..100 {
             let path = tagma_core::CoordPath::new([
                 tagma_core::Coord::new(p).unwrap(),
@@ -623,6 +622,71 @@ fn bench_spatial_cs2_prefix_scan(c: &mut Criterion) {
         b.iter(|| {
             let count = hm.iter().filter(|(&(p, _), _)| p == 42).count();
             black_box(count);
+        })
+    });
+
+    group.finish();
+}
+
+// ===========================================================================
+// CoordSpace2 bulk 100k entries
+// ===========================================================================
+
+// CoordSpace2/bulk_100k (1000 prefixes, 100 suffixes each)
+//   CoordSpace/insert   ~1.5 ms
+//   HashMap/insert      ~2.5 ms
+//   CoordSpace/get      ~0.6 ms
+//   HashMap/get         ~1.2 ms
+fn bench_cs2_bulk_100k(c: &mut Criterion) {
+    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
+    let mut paths = Vec::with_capacity(100_000);
+    for p in 0u16..1000 {
+        for s in 0u16..100 {
+            let path = tagma_core::CoordPath::new([
+                tagma_core::Coord::new(p).unwrap(),
+                tagma_core::Coord::new(s).unwrap(),
+            ]);
+            paths.push((path, p, s));
+        }
+    }
+
+    let mut group = c.benchmark_group("CoordSpace2/bulk_100k");
+    group.throughput(criterion::Throughput::Elements(100_000));
+
+    group.bench_function("CoordSpace/insert", |b| {
+        b.iter(|| {
+            let mut cs = tagma_core::CoordSpace2::<u32>::new();
+            for (path, p, s) in &paths {
+                black_box(cs.place_path(path, (p * 1000 + s).into()));
+            }
+            black_box(cs);
+        })
+    });
+
+    group.bench_function("HashMap/insert", |b| {
+        b.iter(|| {
+            let mut m: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
+            for (_, p, s) in &paths {
+                black_box(m.insert((*p, *s), (p * 1000 + s).into()));
+            }
+            black_box(m);
+        })
+    });
+
+    group.bench_function("CoordSpace/get", |b| {
+        b.iter(|| {
+            for (path, _, _) in &paths {
+                black_box(cs2.at_path(path));
+            }
+        })
+    });
+
+    group.bench_function("HashMap/get", |b| {
+        b.iter(|| {
+            for (_, p, s) in &paths {
+                black_box(hm.get(&(*p, *s)));
+            }
         })
     });
 
@@ -696,8 +760,7 @@ fn bench_coordset_spatial_query(c: &mut Criterion) {
         .collect();
 
     // HashMap baseline: store all 11,172 coords
-    let mut hm: std::collections::HashMap<tagma_core::Coord, ()> =
-        std::collections::HashMap::new();
+    let mut hm: std::collections::HashMap<tagma_core::Coord, ()> = std::collections::HashMap::new();
     for i in 0u16..11172 {
         hm.insert(tagma_core::Coord::new(i).unwrap(), ());
     }
@@ -768,27 +831,21 @@ fn bench_n_scaling_get(c: &mut Criterion) {
         let mut cs = tagma_core::CoordSpace2::<u64>::new();
         cs.place_path(&path2, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=2");
-        group.bench_function("CoordSpace2", |b| {
-            b.iter(|| black_box(cs.at_path(&path2)))
-        });
+        group.bench_function("CoordSpace2", |b| b.iter(|| black_box(cs.at_path(&path2))));
         group.finish();
     }
     {
         let mut cs = tagma_core::CoordSpace3::<u64>::new();
         cs.place_path(&path3, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=3");
-        group.bench_function("CoordSpace3", |b| {
-            b.iter(|| black_box(cs.at_path(&path3)))
-        });
+        group.bench_function("CoordSpace3", |b| b.iter(|| black_box(cs.at_path(&path3))));
         group.finish();
     }
     {
         let mut cs = tagma_core::CoordSpace6::<u64>::new();
         cs.place_path(&path6, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=6");
-        group.bench_function("CoordSpace6", |b| {
-            b.iter(|| black_box(cs.at_path(&path6)))
-        });
+        group.bench_function("CoordSpace6", |b| b.iter(|| black_box(cs.at_path(&path6))));
         group.finish();
     }
     {
@@ -908,6 +965,11 @@ criterion_group!(
     targets = bench_cm2_insert_1000, bench_cm2_get_1000
 );
 criterion_group!(
+    name = large;
+    config = Criterion::default().sample_size(20).measurement_time(std::time::Duration::from_secs(5));
+    targets = bench_cs2_bulk_100k
+);
+criterion_group!(
     name = stress;
     config = Criterion::default().sample_size(30).measurement_time(std::time::Duration::from_secs(10));
     targets = bench_tagma_mixed_500k, bench_std_mixed_500k
@@ -922,4 +984,4 @@ criterion_group!(
               bench_coordset_spatial_query
 );
 
-criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling);
+criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling, large);
