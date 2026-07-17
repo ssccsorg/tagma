@@ -694,6 +694,89 @@ fn bench_cs2_bulk_100k(c: &mut Criterion) {
 }
 
 // ===========================================================================
+// Edge cases: scenarios where Tagma is NOT faster (transparency)
+// ===========================================================================
+
+// CoordSpace6/sparse_100: 100 entries at depth 6, each with a unique path.
+// CoordSpace6 must allocate 6 nodes × 89 KB = 534 KB per entry path.
+// HashMap stores 100 entries in ~8 KB. HashMap wins on memory and iteration.
+fn bench_cs6_sparse_100(c: &mut Criterion) {
+    let mut cs6 = tagma_core::CoordSpace6::<u64>::new();
+    let mut hm: std::collections::HashMap<[u16; 6], u64> = std::collections::HashMap::new();
+    let mut paths = Vec::with_capacity(100);
+    for i in 0u16..100 {
+        let coords: [u16; 6] = core::array::from_fn(|j| (i * 587 + j as u16 * 331) % 11172);
+        let path = tagma_core::CoordPath::new(core::array::from_fn(|j| {
+            tagma_core::Coord::new(coords[j]).unwrap()
+        }));
+        paths.push((path, coords));
+        cs6.place_path(&path, i as u64);
+        hm.insert(coords, i as u64);
+    }
+
+    let mut group = c.benchmark_group("Edge/cs6_sparse_100");
+    group.throughput(criterion::Throughput::Elements(100));
+
+    group.bench_function("CoordSpace6", |b| {
+        b.iter(|| {
+            for (path, _) in &paths {
+                black_box(cs6.at_path(path));
+            }
+        })
+    });
+
+    group.bench_function("HashMap", |b| {
+        b.iter(|| {
+            for (_, coords) in &paths {
+                black_box(hm.get(coords));
+            }
+        })
+    });
+
+    group.bench_function("CoordSpace6/iter", |b| {
+        b.iter(|| black_box(cs6.iter_tree().count()))
+    });
+
+    group.bench_function("HashMap/iter", |b| {
+        b.iter(|| black_box(hm.iter().count()))
+    });
+
+    group.finish();
+}
+
+// CoordSpace2/nonexistent_prefix: query a prefix that has no entries.
+// CoordSpace2 navigates to the prefix branch, finds None, returns immediately.
+// HashMap scans all entries, finds none, returns empty.
+// CoordSpace2 wins because it doesn't scan.
+fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
+    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
+    // 10 entries only
+    for i in 0u16..10 {
+        let path = tagma_core::CoordPath::new([
+            tagma_core::Coord::new(i).unwrap(),
+            tagma_core::Coord::new(i).unwrap(),
+        ]);
+        cs2.place_path(&path, i as u32);
+        hm.insert((i, i), i as u32);
+    }
+
+    let mut group = c.benchmark_group("Edge/cs2_nonexistent_prefix");
+    group.bench_function("CoordSpace2", |b| {
+        let missing = vec![tagma_core::Coord::new(9999).unwrap()];
+        b.iter(|| {
+            black_box(cs2.iter_prefix(&missing).map(|it| it.count()).unwrap_or(0))
+        })
+    });
+    group.bench_function("HashMap", |b| {
+        b.iter(|| {
+            black_box(hm.iter().filter(|(&(p, _), _)| p == 9999).count())
+        })
+    });
+    group.finish();
+}
+
+// ===========================================================================
 // Noop overhead baseline: just iterate the coordinate vec
 // ===========================================================================
 
@@ -970,6 +1053,11 @@ criterion_group!(
     targets = bench_cs2_bulk_100k
 );
 criterion_group!(
+    name = edge;
+    config = Criterion::default();
+    targets = bench_cs6_sparse_100, bench_cs2_nonexistent_prefix
+);
+criterion_group!(
     name = stress;
     config = Criterion::default().sample_size(30).measurement_time(std::time::Duration::from_secs(10));
     targets = bench_tagma_mixed_500k, bench_std_mixed_500k
@@ -984,4 +1072,4 @@ criterion_group!(
               bench_coordset_spatial_query
 );
 
-criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling, large);
+criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling, large, edge);
