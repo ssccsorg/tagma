@@ -1,8 +1,8 @@
 # synTagma
 
-Tagma is a computing primitive where the address is the coordinate — not a flat pointer, but a point in an N-dimensional geometric space. This is made possible by a 16-bit Unicode block allocated to a 3-axis writing system, which provides a collision-free, hash-less, structurally addressable coordinate space. Every valid 16-bit value in the Hangul syllable block (U+AC00--U+D7AF) decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
-
 synTagma is a spatial coordinate space computing system built on Tagma, a 16-bit coordinate primitive embedded in the Unicode Hangul syllable block (U+AC00--U+D7AF). Every valid 16-bit value decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
+
+Tagma is a computing primitive where the address is the coordinate — not a flat pointer, but a point in an N-dimensional geometric space. This is made possible by a 16-bit Unicode block allocated to a 3-axis writing system, which provides a collision-free, hash-less, structurally addressable coordinate space. Every valid 16-bit value in the Hangul syllable block (U+AC00--U+D7AF) decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
 
 ## Layers
 
@@ -12,8 +12,8 @@ synTagma (system)
   └─ Tagma core primitive (Coord, CoordPath, CoordSet, CoordSpace)
 ```
 
-- **Tagma** — the core primitive: a 16-bit structural coordinate with closed-form composition, zero collisions, and single-cycle combinational decoding. The atomic identity primitive.
-- **synTagma coordination layer** — recursive coordinate space expansion, physical topology mapping, distributed routing, and consistency protocol. Defined in the [synTagma](https://docs.ssccs.org/projects/syntagma/tagma/syn.html).
+- Tagma — the core primitive: a 16-bit structural coordinate with closed-form composition, zero collisions, and single-cycle combinational decoding. The atomic identity primitive.
+- synTagma coordination layer — recursive coordinate space expansion, physical topology mapping, distributed routing, and consistency protocol. Defined in the [synTagma](https://docs.ssccs.org/projects/syntagma/tagma/syn.html).
 
 ## Tagma primitive: Feature levels
 
@@ -21,8 +21,8 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 
 | Level | Feature flags | Heap | Available types |
 |-------|---------------|------|-----------------|
-| **no_alloc** | (none) | Never | Coord, CoordPath, CoordSet, CoordSpace |
-| **alloc** | `alloc` (default) | Optional | + CoordSpaceN\<N\>, DynCoordSpace |
+| no_alloc | (none) | Never | Coord, CoordPath, CoordSet, CoordSpace |
+| alloc | `alloc` (default) | Optional | + CoordSpaceN\<N\>, DynCoordSpace |
 
 ## Tagma type reference
 
@@ -30,11 +30,11 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 
 | Type | Description | File |
 |------|-------------|------|
-| **Coord** | 16-bit atomic coordinate (0..11172), 3-axis composition/decomposition, Hamming distance, Hangul display | `core/src/coord.rs` |
-| **CoordPath\<N\>** | Index path (not a hash key), compile-time N-element Coord array | `core/src/coord_path.rs` |
-| **CoordSet** | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/coord_set.rs` |
-| **CoordSpace\<V\>** | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
-| **base11172** | Self-validating serialization: arbitrary bytes to Hangul syllable strings | `base11172/src/lib.rs` |
+| Coord | 16-bit atomic coordinate (0..11172), 3-axis composition/decomposition, Hamming distance, Hangul display | `core/src/coord.rs` |
+| CoordPath\<N\> | Index path (not a hash key), compile-time N-element Coord array | `core/src/coord_path.rs` |
+| CoordSet | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/coord_set.rs` |
+| CoordSpace\<V\> | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
+| base11172 | Self-validating serialization: arbitrary bytes to Hangul syllable strings | `base11172/src/lib.rs` |
 
 Test coverage: 163 unit/integration tests + 15 doc-tests, all passing. Zero clippy warnings. CI runs `cargo fmt --check`, `cargo clippy`, `cargo build --release`, `cargo test --release`, `cargo build --no-default-features` (no_alloc verification).
 
@@ -42,12 +42,12 @@ Test coverage: 163 unit/integration tests + 15 doc-tests, all passing. Zero clip
 
 | Type | Description | File |
 |------|-------------|------|
-| **CoordSpaceN\<N, V\>** | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/coord_space_n.rs` |
-| **CoordSpace2\<V\>** | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/coord_space_n.rs` |
-| **CoordSpace6\<V\>** | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/coord_space_n.rs` |
-| **CoordSpace12\<V\>** | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/coord_space_n.rs` |
-| **CoordSpace19\<V\>** | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/coord_space_n.rs` |
-| **DynCoordSpace\<V\>** | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord_space.rs` |
+| CoordSpaceN\<N, V\> | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/coord_space_n.rs` |
+| CoordSpace2\<V\> | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/coord_space_n.rs` |
+| CoordSpace6\<V\> | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/coord_space_n.rs` |
+| CoordSpace12\<V\> | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/coord_space_n.rs` |
+| CoordSpace19\<V\> | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/coord_space_n.rs` |
+| DynCoordSpace\<V\> | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord_space.rs` |
 
 ## Quick start
 
@@ -129,22 +129,22 @@ Same algorithm (iterate + decompose + filter on axis), different memory layout. 
 
 | Operation | CoordSpace | HashMap | Ratio |
 |-----------|-----------|---------|-------|
-| **Insert** 11,172 | 26.5 µs | 377 µs | **14x** |
-| **Get** 11,172 | 6.49 µs | 101 µs | **16x** |
-| **Remove** 11,172 | 15.0 µs | 268 µs | **18x** |
-| **Axis filter** (medial=10) | 58.2 Melem/s | 24.2 Melem/s | **2.4x** |
-| **Range filter** (initial 3--7) | 312 Melem/s | 139 Melem/s | **2.3x** |
-| **CoordSet compound** (initial=3 AND medial=5) | 94.4 ns | 13.0 µs | **138x** |
-| **Get single** (random coord) | 0.81 ns | 8.9 ns | **11x** |
+| Insert 11,172 | 26.5 µs | 377 µs | 14x |
+| Get 11,172 | 6.49 µs | 101 µs | 16x |
+| Remove 11,172 | 15.0 µs | 268 µs | 18x |
+| Axis filter (medial=10) | 58.2 Melem/s | 24.2 Melem/s | 2.4x |
+| Range filter (initial 3--7) | 312 Melem/s | 139 Melem/s | 2.3x |
+| CoordSet compound (initial=3 AND medial=5) | 94.4 ns | 13.0 µs | 138x |
+| Get single (random coord) | 0.81 ns | 8.9 ns | 11x |
 
 ## Documentation
 
-- **[synTagma project page](https://docs.ssccs.org/projects/syntagma/)** — Project overview, paradigm shift, papers
-- **[White Paper](https://docs.ssccs.org/projects/syntagma/tagma/wp.html)** — Tagma coordinate space, decoder, hardware implementation, benchmarks
-- **[synTagma coordination layer](https://docs.ssccs.org/projects/syntagma/tagma/syn.html)** — Recursive topology mapping, transport, distributed resolver, consistency
-- **[Tagma-ID](https://docs.ssccs.org/projects/syntagma/tagma/id.html)** — Content-addressable identity without hash functions
-- **[Specification](spec/coord-space.md)** — Language-independent Tagma coordinate space definition
-- **Rustdoc** — `cargo doc --no-deps -p tagma-core` for API reference
+- [synTagma project page](https://docs.ssccs.org/projects/syntagma/) — Project overview, paradigm shift, papers
+- [White Paper](https://docs.ssccs.org/projects/syntagma/tagma/wp.html) — Tagma coordinate space, decoder, hardware implementation, benchmarks
+- [synTagma coordination layer](https://docs.ssccs.org/projects/syntagma/tagma/syn.html) — Recursive topology mapping, transport, distributed resolver, consistency
+- [Tagma-ID](https://docs.ssccs.org/projects/syntagma/tagma/id.html) — Content-addressable identity without hash functions
+- [Specification](spec/coord-space.md) — Language-independent Tagma coordinate space definition
+- Rustdoc — `cargo doc --no-deps -p tagma-core` for API reference
 
 ## License
 
