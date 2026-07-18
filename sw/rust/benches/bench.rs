@@ -806,15 +806,14 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
     group.finish();
 }
 
-// Edge/cs2_nonexistent_prefix: query a nonexistent key (10M entries stored).
-// CoordSpace2 navigates to the prefix branch, finds None, returns immediately.
-// HashMap computes hash + bucket probe, finds no match, returns None.
-// Both are now O(1) on the HashMap side — this measures the baseline cost
-// of hashing itself vs structural addressing for negative lookups.
+// Edge/cs2_nonexistent_prefix: query a nonexistent prefix (10M entries stored).
+// CoordSpace2 navigates to the branch at that prefix, finds Nothing, returns immediately.
+// HashMap has no structural notion of "prefix" — it must scan all 10M entries to
+// determine that no entry has first coord == 11111.
 // WHY THIS MATTERS: In distributed systems, content-addressed networks, and
 // sparse data structures, "negative" existence checks are as frequent as
 // positive lookups. Tagma answers them in 1.6 ns regardless of data volume
-// or depth. HashMap pays at minimum one hash computation even at O(1).
+// or depth. HashMap pays O(N) because it cannot answer structural queries.
 fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
     let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
@@ -835,7 +834,9 @@ fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
         let missing = vec![tagma_core::Coord::new(11111).unwrap()];
         b.iter(|| black_box(cs2.iter_prefix(&missing).map(|it| it.count()).unwrap_or(0)))
     });
-    group.bench_function("HashMap", |b| b.iter(|| black_box(hm.get(&(11111, 0)))));
+    group.bench_function("HashMap", |b| {
+        b.iter(|| black_box(hm.iter().filter(|(&(p, _), _)| p == 11111).count()))
+    });
     group.finish();
 }
 

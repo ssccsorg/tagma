@@ -136,9 +136,9 @@ Same algorithm (iterate + decompose + filter on axis), different memory layout. 
 | Spatial query | Axis filter (medial=10) | 58.0 Melem/s | 24.5 Melem/s | 2.4x |
 | Spatial query | CoordSet compound (initial=3 AND medial=5) | 85.0 ns | 11.5 µs | 135x |
 | Edge (CS2) | Sparse get 10M | 44.9 ms | 1.05 s | 23.4x |
-| Edge (CS2) | Nonexistent key (hash get) | 1.60 ns | 8.83 ns | 5.5x |
+| Edge (CS2) | Nonexistent prefix (iter scan) | 1.65 ns | 23.05 ms | 14.0Mx |
 
-*Nonexistent key (hash get): CoordSpace cost is depth-independent (~1.3–1.6 ns in both CS2 and CS19, variance is measurement noise). The ratio gap (CS2: 5.6x, CS19: 14.4x) comes entirely from HashMap — hashing a 19-element key costs more than a 2-element key, while CoordSpace returns None at the first nonexistent branch regardless of depth.*
+*Nonexistent prefix (structural vs iter scan): HashMap has no prefix index and must scan all 10M entries to determine that no entry has first coord == 11111. CoordSpace navigates to the branch at that prefix and returns None immediately. The gap (14.0Mx) reflects the difference between structural addressing and content scanning, not between two equivalent hash lookups.*
 
 ## Documentation
 
