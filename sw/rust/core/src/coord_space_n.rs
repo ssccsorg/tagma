@@ -625,11 +625,8 @@ impl<const N: usize, V> CoordSpaceN<N, V> {
     ///
     /// # Example
     ///
-    /// ```ignore
-    /// let prefix = CoordPath::new([Coord::new(42).unwrap()]);
-    /// for (path, val) in space.iter_prefix(&prefix) {
-    ///     // all entries where the first coord is 42
-    /// }
+    /// ```text
+    /// // See the #[test] fn iter_prefix_test below for a runnable example.
     /// ```
     pub fn iter_prefix(&self, prefix: &[Coord]) -> Option<TreeIter<'_, N, V>> {
         let k = prefix.len();
@@ -1278,5 +1275,30 @@ mod tests {
         map.place_path(&path, 42);
         assert_eq!(map.at_path(&path), Some(&42));
         assert_eq!(map.len(), 1);
+    }
+
+    #[test]
+    fn iter_prefix_test() {
+        let mut space: CoordSpaceN<2, u32> = CoordSpaceN::new();
+        space.place_path(
+            &CoordPath::new([Coord::new(42).unwrap(), Coord::new(1).unwrap()]),
+            10,
+        );
+        space.place_path(
+            &CoordPath::new([Coord::new(42).unwrap(), Coord::new(2).unwrap()]),
+            20,
+        );
+        space.place_path(
+            &CoordPath::new([Coord::new(99).unwrap(), Coord::new(0).unwrap()]),
+            30,
+        );
+        let prefix = [Coord::new(42).unwrap()];
+        let mut results: Vec<_> = space.iter_prefix(&prefix).unwrap().collect();
+        results.sort_by_key(|(_, v)| *v);
+        assert_eq!(results.len(), 2);
+        assert_eq!(*results[0].1, 10);
+        assert_eq!(*results[1].1, 20);
+        let missing = [Coord::new(11111).unwrap()];
+        assert!(space.iter_prefix(&missing).is_none());
     }
 }

@@ -666,7 +666,8 @@ fn bench_cs2_bulk_100k(c: &mut Criterion) {
 
     group.bench_function("HashMap/insert", |b| {
         b.iter(|| {
-            let mut m: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
+            let mut m: std::collections::HashMap<(u16, u16), u32> =
+                std::collections::HashMap::new();
             for (_, p, s) in &paths {
                 black_box(m.insert((*p, *s), (p * 1000 + s).into()));
             }
@@ -705,6 +706,7 @@ fn bench_cs2_bulk_100k(c: &mut Criterion) {
 // ===========================================================================
 
 // Edge/cs2_sparse_10M: 10,000,000 entries at depth 2, 10000 prefixes × 1000 suffixes.
+#[allow(non_snake_case)]
 fn bench_cs2_sparse_10M(c: &mut Criterion) {
     let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
@@ -717,7 +719,10 @@ fn bench_cs2_sparse_10M(c: &mut Criterion) {
             ]);
             paths.push((path, p, s));
             cs2.place_path(&path, (p * 1000 + s).into());
-            hm.insert(((p * 22) % 11172, (s * 587 + p) % 11172), (p * 1000 + s).into());
+            hm.insert(
+                ((p * 22) % 11172, (s * 587 + p) % 11172),
+                (p * 1000 + s).into(),
+            );
         }
     }
 
@@ -726,20 +731,22 @@ fn bench_cs2_sparse_10M(c: &mut Criterion) {
 
     group.bench_function("CoordSpace/get", |b| {
         b.iter(|| {
-            for (path, _, _) in &paths { black_box(cs2.at_path(path)); }
+            for (path, _, _) in &paths {
+                black_box(cs2.at_path(path));
+            }
         })
     });
     group.bench_function("HashMap/get", |b| {
         b.iter(|| {
-            for (_, p, s) in &paths { black_box(hm.get(&((p * 22) % 11172, (s * 587 + p) % 11172))); }
+            for (_, p, s) in &paths {
+                black_box(hm.get(&((p * 22) % 11172, (s * 587 + p) % 11172)));
+            }
         })
     });
     group.bench_function("CoordSpace/iter", |b| {
         b.iter(|| black_box(cs2.iter_tree().count()))
     });
-    group.bench_function("HashMap/iter", |b| {
-        b.iter(|| black_box(hm.iter().count()))
-    });
+    group.bench_function("HashMap/iter", |b| b.iter(|| black_box(hm.len())));
 
     group.finish();
 }
@@ -776,8 +783,7 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
             let count = cs2
                 .iter_tree()
                 .filter(|(path, _)| {
-                    path.coords()[0].to_axes().0 == 3
-                        && path.coords()[1].to_axes().1 == 7
+                    path.coords()[0].to_axes().0 == 3 && path.coords()[1].to_axes().1 == 7
                 })
                 .count();
             black_box(count);
@@ -825,14 +831,10 @@ fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
     group.throughput(criterion::Throughput::Elements(5_000_000));
     group.bench_function("CoordSpace2", |b| {
         let missing = vec![tagma_core::Coord::new(11111).unwrap()];
-        b.iter(|| {
-            black_box(cs2.iter_prefix(&missing).map(|it| it.count()).unwrap_or(0))
-        })
+        b.iter(|| black_box(cs2.iter_prefix(&missing).map(|it| it.count()).unwrap_or(0)))
     });
     group.bench_function("HashMap", |b| {
-        b.iter(|| {
-            black_box(hm.iter().filter(|(&(p, _), _)| p == 11111).count())
-        })
+        b.iter(|| black_box(hm.iter().filter(|(&(p, _), _)| p == 11111).count()))
     });
     group.finish();
 }
@@ -1139,7 +1141,9 @@ criterion_group!(
               bench_coordset_spatial_query
 );
 
-criterion_main!(inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling, large, edge, deep);
+criterion_main!(
+    inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling, large, edge, deep
+);
 
 // ===========================================================================
 // CoordSpace6 (N=6, UUID-scale) benchmarks — 1,000 entries at depth 6
@@ -1164,12 +1168,18 @@ fn bench_cs6_sparse_1k(c: &mut Criterion) {
                 for d in 0u16..5 {
                     for e in 0u16..4 {
                         let path = tagma_core::CoordPath::new([
-                            mk(a * 5586), mk(1117 + b* 2234),
-                            mk(2234 + cc* 1117), mk(4468 + d* 1117),
-                            mk(6698 + e* 1117), mk(8930 + (a + b + cc + d + e) % 11172),
+                            mk(a * 5586),
+                            mk(1117 + b * 2234),
+                            mk(2234 + cc * 1117),
+                            mk(4468 + d * 1117),
+                            mk(6698 + e * 1117),
+                            mk(8930 + (a + b + cc + d + e) % 11172),
                         ]);
-                        let val = a as u32 * 100_000 + b as u32 * 20_000
-                               + cc as u32 * 4_000 + d as u32 * 800 + e as u32 * 200;
+                        let val = a as u32 * 100_000
+                            + b as u32 * 20_000
+                            + cc as u32 * 4_000
+                            + d as u32 * 800
+                            + e as u32 * 200;
                         let hkey: [u16; 6] = std::array::from_fn(|i| path.coords()[i].index());
                         paths.push((path, hkey));
                         cs6.place_path(&path, val);
@@ -1185,20 +1195,22 @@ fn bench_cs6_sparse_1k(c: &mut Criterion) {
 
     group.bench_function("CoordSpace6/get", |b| {
         b.iter(|| {
-            for (path, _) in &paths { black_box(cs6.at_path(path)); }
+            for (path, _) in &paths {
+                black_box(cs6.at_path(path));
+            }
         })
     });
     group.bench_function("HashMap/get", |b| {
         b.iter(|| {
-            for (_, hk) in &paths { black_box(hm.get(hk)); }
+            for (_, hk) in &paths {
+                black_box(hm.get(hk));
+            }
         })
     });
     group.bench_function("CoordSpace6/iter", |b| {
         b.iter(|| black_box(cs6.iter_tree().count()))
     });
-    group.bench_function("HashMap/iter", |b| {
-        b.iter(|| black_box(hm.iter().count()))
-    });
+    group.bench_function("HashMap/iter", |b| b.iter(|| black_box(hm.len())));
 
     group.finish();
 }
@@ -1217,12 +1229,18 @@ fn bench_cs6_nonexistent_prefix(c: &mut Criterion) {
                 for d in 0u16..5 {
                     for e in 0u16..4 {
                         let path = tagma_core::CoordPath::new([
-                            mk(a * 5586), mk(1117 + b* 2234),
-                            mk(2234 + cc* 1117), mk(4468 + d* 1117),
-                            mk(6698 + e* 1117), mk(8930 + (a + b + cc + d + e) % 11172),
+                            mk(a * 5586),
+                            mk(1117 + b * 2234),
+                            mk(2234 + cc * 1117),
+                            mk(4468 + d * 1117),
+                            mk(6698 + e * 1117),
+                            mk(8930 + (a + b + cc + d + e) % 11172),
                         ]);
-                        let val = a as u32 * 100_000 + b as u32 * 20_000
-                               + cc as u32 * 4_000 + d as u32 * 800 + e as u32 * 200;
+                        let val = a as u32 * 100_000
+                            + b as u32 * 20_000
+                            + cc as u32 * 4_000
+                            + d as u32 * 800
+                            + e as u32 * 200;
                         let hkey: [u16; 6] = std::array::from_fn(|i| path.coords()[i].index());
                         cs6.place_path(&path, val);
                         hm.insert(hkey, val);
@@ -1232,21 +1250,15 @@ fn bench_cs6_nonexistent_prefix(c: &mut Criterion) {
         }
     }
 
-    let missing_prefix = tagma_core::CoordPath::new([
-        mk(9999), mk(0), mk(0), mk(0), mk(0), mk(0),
-    ]);
+    let missing_prefix = tagma_core::CoordPath::new([mk(9999), mk(0), mk(0), mk(0), mk(0), mk(0)]);
 
     let mut group = c.benchmark_group("Edge/cs6_nonexistent_prefix");
     group.bench_function("CoordSpace6", |b| {
-        b.iter(|| {
-            black_box(cs6.at_path(&missing_prefix))
-        })
+        b.iter(|| black_box(cs6.at_path(&missing_prefix)))
     });
     group.bench_function("HashMap", |b| {
         let hk: [u16; 6] = std::array::from_fn(|i| missing_prefix.coords()[i].index());
-        b.iter(|| {
-            black_box(hm.get(&hk))
-        })
+        b.iter(|| black_box(hm.get(&hk)))
     });
     group.finish();
 }
@@ -1266,12 +1278,18 @@ fn bench_cs6_md_axis_projection(c: &mut Criterion) {
                 for d in 0u16..5 {
                     for e in 0u16..4 {
                         let path = tagma_core::CoordPath::new([
-                            mk(a * 5586), mk(1117 + b* 2234),
-                            mk(2234 + cc* 1117), mk(4468 + d* 1117),
-                            mk(6698 + e* 1117), mk(8930 + (a + b + cc + d + e) % 11172),
+                            mk(a * 5586),
+                            mk(1117 + b * 2234),
+                            mk(2234 + cc * 1117),
+                            mk(4468 + d * 1117),
+                            mk(6698 + e * 1117),
+                            mk(8930 + (a + b + cc + d + e) % 11172),
                         ]);
-                        let val = a as u32 * 100_000 + b as u32 * 20_000
-                               + cc as u32 * 4_000 + d as u32 * 800 + e as u32 * 200;
+                        let val = a as u32 * 100_000
+                            + b as u32 * 20_000
+                            + cc as u32 * 4_000
+                            + d as u32 * 800
+                            + e as u32 * 200;
                         let hkey: [u16; 6] = std::array::from_fn(|i| path.coords()[i].index());
                         cs6.place_path(&path, val);
                         hm.insert(hkey, val);
@@ -1290,8 +1308,7 @@ fn bench_cs6_md_axis_projection(c: &mut Criterion) {
             let count = cs6
                 .iter_tree()
                 .filter(|(path, _)| {
-                    path.coords()[2].to_axes().0 == 2
-                        && path.coords()[4].to_axes().1 == 3
+                    path.coords()[2].to_axes().0 == 2 && path.coords()[4].to_axes().1 == 3
                 })
                 .count();
             black_box(count);
@@ -1337,8 +1354,8 @@ fn bench_cs19_sparse_100(c: &mut Criterion) {
                 // First 18 coords are mostly fixed, only 19th varies
                 let mut coords = [mk(0u16); 19];
                 coords[0] = mk(a * 5586);
-                coords[1] = mk(1117 + b* 2234);
-                coords[18] = mk(4468 + z as u16 * 279);
+                coords[1] = mk(1117 + b * 2234);
+                coords[18] = mk(4468 + z * 279);
 
                 let path = tagma_core::CoordPath::new(coords);
                 let val = a as u32 * 50 + b as u32 * 25 + z as u32;
@@ -1355,12 +1372,16 @@ fn bench_cs19_sparse_100(c: &mut Criterion) {
 
     group.bench_function("CoordSpace19/get", |b| {
         b.iter(|| {
-            for (path, _) in &paths { black_box(cs19.at_path(path)); }
+            for (path, _) in &paths {
+                black_box(cs19.at_path(path));
+            }
         })
     });
     group.bench_function("HashMap/get", |b| {
         b.iter(|| {
-            for (_, hk) in &paths { black_box(hm.get(hk)); }
+            for (_, hk) in &paths {
+                black_box(hm.get(hk));
+            }
         })
     });
 
@@ -1380,8 +1401,8 @@ fn bench_cs19_nonexistent_prefix(c: &mut Criterion) {
             for z in 0u16..25 {
                 let mut coords = [mk(0u16); 19];
                 coords[0] = mk(a * 5586);
-                coords[1] = mk(1117 + b* 2234);
-                coords[18] = mk(4468 + z as u16 * 279);
+                coords[1] = mk(1117 + b * 2234);
+                coords[18] = mk(4468 + z * 279);
                 let path = tagma_core::CoordPath::new(coords);
                 let val = a as u32 * 50 + b as u32 * 25 + z as u32;
                 let hkey: [u16; 19] = std::array::from_fn(|i| path.coords()[i].index());
@@ -1397,15 +1418,11 @@ fn bench_cs19_nonexistent_prefix(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Edge/cs19_nonexistent_prefix");
     group.bench_function("CoordSpace19", |b| {
-        b.iter(|| {
-            black_box(cs19.at_path(&missing_prefix))
-        })
+        b.iter(|| black_box(cs19.at_path(&missing_prefix)))
     });
     group.bench_function("HashMap", |b| {
         let hk: [u16; 19] = std::array::from_fn(|i| missing_prefix.coords()[i].index());
-        b.iter(|| {
-            black_box(hm.get(&hk))
-        })
+        b.iter(|| black_box(hm.get(&hk)))
     });
     group.finish();
 }
