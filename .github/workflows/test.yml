@@ -11,12 +11,6 @@ on:
       - "!**/*.qmd"
   pull_request:
     branches: ["main"]
-    paths:
-      - "sw/rust/**"
-      - "run.sh"
-      - ".github/workflows/*.yml"
-      - "!sw/rust/**/*.md"
-      - "!**/*.qmd"
   workflow_dispatch:
 
 permissions:

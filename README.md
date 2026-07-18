@@ -1,8 +1,8 @@
 # synTagma
 
-synTagma is a spatial coordinate space computing system built on Tagma, a 16-bit coordinate primitive embedded in the Unicode Hangul syllable block (U+AC00--U+D7AF). Every valid 16-bit value decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
 
-Tagma is a computing primitive where the address is the coordinate — not a flat pointer, but a point in an N-dimensional geometric space. This is made possible by a 16-bit Unicode block allocated to a 3-axis writing system, which provides a collision-free, hash-less, structurally addressable coordinate space. Every valid 16-bit value in the Hangul syllable block (U+AC00--U+D7AF) decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
+
+synTagma is a spatial coordinate space computing system built on Tagma, a 16-bit coordinate primitive embedded in the Unicode Hangul syllable block (U+AC00--U+D7AF). Every valid 16-bit value decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
 
 ## Layers
 
@@ -36,7 +36,7 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | CoordSpace\<V\> | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
 | base11172 | Self-validating serialization: arbitrary bytes to Hangul syllable strings | `base11172/src/lib.rs` |
 
-Test coverage: 163 unit/integration tests + 15 doc-tests, all passing. Zero clippy warnings. CI runs `cargo fmt --check`, `cargo clippy`, `cargo build --release`, `cargo test --release`, `cargo build --no-default-features` (no_alloc verification).
+Test coverage: 170 unit/integration tests + 15 doc-tests, all passing. Zero clippy warnings. CI runs `cargo fmt --check`, `cargo clippy`, `cargo build --release`, `cargo test --release`, `cargo build --no-default-features` (no_alloc verification).
 
 ### Requires alloc (default feature)
 
@@ -119,8 +119,8 @@ The three-axis composition formula admits unbounded recursive embedding: each ax
 
 | Metric | SHA-256 | Tagma (1-syll) | Tagma (6-syll) | Tagma (19-syll) |
 |--------|---------|---------------|---------------|----------------|
-| Latency | 227 ns/op | 2 ns/op | 11 ns/op | 35 ns/op |
-| Speedup | baseline | 115x | 21x | 6.5x |
+| Latency | 227 ns/op | 0.38 ns/op | 5.58 ns/op | 23.5 ns/op |
+| Speedup | baseline | 597x | 41x | 9.7x |
 | Address space | 2^256 | 1.1e4 | 1.9e24 | 2^256 |
 
 ## Benchmark: Spatial query vs HashMap (Apple M1)
@@ -132,10 +132,12 @@ Same algorithm (iterate + decompose + filter on axis), different memory layout. 
 | Insert 11,172 | 26.5 µs | 377 µs | 14x |
 | Get 11,172 | 6.49 µs | 101 µs | 16x |
 | Remove 11,172 | 15.0 µs | 268 µs | 18x |
-| Axis filter (medial=10) | 58.2 Melem/s | 24.2 Melem/s | 2.4x |
-| Range filter (initial 3--7) | 312 Melem/s | 139 Melem/s | 2.3x |
+| Axis filter (medial=10) | 58.8 Melem/s | 24.2 Melem/s | 2.4x |
 | CoordSet compound (initial=3 AND medial=5) | 94.4 ns | 13.0 µs | 138x |
-| Get single (random coord) | 0.81 ns | 8.9 ns | 11x |
+| Get single (random coord) | 0.82 ns | 8.79 ns | 10.7x |
+| **Sparse get 10M (CS2)** | **44.9 ms** | **1.05 s** | **23.4x** |
+| **Nonexistent prefix 10M (CS2)** | **1.60 ns** | **23.1 ms** | **14.4Mx** |
+| **Nonexistent prefix 100 (CS19)** | **1.27 ns** | **18.5 ns** | **14.6x** |
 
 ## Documentation
 
