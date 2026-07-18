@@ -54,11 +54,16 @@ case "${1:-}" in
         auto_fix
         build_and_test
         ;;
+    --bench|bench)
+        build_and_test
+        echo "--- running core benchmarks (inserts, lookup, n_scaling) ---"
+        (cd sw/rust && cargo bench -- "inserts|lookup|n_scaling|spatial|edge" 2>&1 | tail -20)
+        ;;
     --doc|doc)
         build_docs
         ;;
     --help|-h)
-        echo "Usage: ./run.sh [--check|--fix|--doc|--help]"
+        echo "Usage: ./run.sh [--check|--fix|--bench|--doc|--help]"
         exit 0
         ;;
     *)
