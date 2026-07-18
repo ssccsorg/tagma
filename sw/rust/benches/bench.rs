@@ -704,12 +704,12 @@ fn bench_cs2_bulk_100k(c: &mut Criterion) {
 // checks, and negative lookup in cache systems.
 // ===========================================================================
 
-// Edge/cs2_sparse_5M: 5,000,000 entries at depth 2, 5000 prefixes × 1000 suffixes.
-fn bench_cs2_sparse_5M(c: &mut Criterion) {
+// Edge/cs2_sparse_10M: 10,000,000 entries at depth 2, 10000 prefixes × 1000 suffixes.
+fn bench_cs2_sparse_10M(c: &mut Criterion) {
     let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
-    let mut paths = Vec::with_capacity(5_000_000);
-    for p in 0u16..5000 {
+    let mut paths = Vec::with_capacity(10_000_000);
+    for p in 0u16..10000 {
         for s in 0u16..1000 {
             let path = tagma_core::CoordPath::new([
                 tagma_core::Coord::new((p * 22) % 11172).unwrap(),
@@ -721,8 +721,8 @@ fn bench_cs2_sparse_5M(c: &mut Criterion) {
         }
     }
 
-    let mut group = c.benchmark_group("Edge/cs2_sparse_5M");
-    group.throughput(criterion::Throughput::Elements(5_000_000));
+    let mut group = c.benchmark_group("Edge/cs2_sparse_10M");
+    group.throughput(criterion::Throughput::Elements(10_000_000));
 
     group.bench_function("CoordSpace/get", |b| {
         b.iter(|| {
@@ -754,7 +754,7 @@ fn bench_cs2_sparse_5M(c: &mut Criterion) {
 fn bench_cs2_md_axis_projection(c: &mut Criterion) {
     let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
-    for p in 0u16..5000 {
+    for p in 0u16..10000 {
         for s in 0u16..1000 {
             let path = tagma_core::CoordPath::new([
                 tagma_core::Coord::new(p).unwrap(),
@@ -766,11 +766,11 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
     }
 
     let mut group = c.benchmark_group("Edge/cs2_md_axis");
-    group.throughput(criterion::Throughput::Elements(5_000_000));
+    group.throughput(criterion::Throughput::Elements(10_000_000));
 
     // Projection: prefix.initial == 3 AND suffix.medial == 7
-    // ~5000/19 = 263 prefixes with initial==3, each with 1000/21 ≈ 48 suffixes
-    // with medial==7 → ~12,600 matching entries
+    // ~10000/19 = 526 prefixes with initial==3, each with 1000/21 ≈ 48 suffixes
+    // with medial==7 → ~25,200 matching entries
     group.bench_function("CoordSpace2", |b| {
         b.iter(|| {
             let count = cs2
@@ -800,9 +800,9 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
     group.finish();
 }
 
-// Edge/cs2_nonexistent_prefix: query a prefix that has no entries (5M entries stored).
+// Edge/cs2_nonexistent_prefix: query a prefix that has no entries (10M entries stored).
 // CoordSpace2 navigates to the prefix branch, finds None, returns immediately.
-// HashMap scans all 5M entries, finds none, returns empty.
+// HashMap scans all 10M entries, finds none, returns empty.
 // WHY THIS MATTERS: In distributed systems, content-addressed networks, and
 // sparse data structures, "negative" existence checks are as frequent as
 // positive lookups. Tagma answers them in 1.6 ns regardless of data volume.
@@ -810,7 +810,7 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
 fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
     let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
-    for p in 0u16..5000 {
+    for p in 0u16..10000 {
         for s in 0u16..1000 {
             let path = tagma_core::CoordPath::new([
                 tagma_core::Coord::new(p).unwrap(),
@@ -824,14 +824,14 @@ fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
     let mut group = c.benchmark_group("Edge/cs2_nonexistent_prefix");
     group.throughput(criterion::Throughput::Elements(5_000_000));
     group.bench_function("CoordSpace2", |b| {
-        let missing = vec![tagma_core::Coord::new(9999).unwrap()];
+        let missing = vec![tagma_core::Coord::new(11111).unwrap()];
         b.iter(|| {
             black_box(cs2.iter_prefix(&missing).map(|it| it.count()).unwrap_or(0))
         })
     });
     group.bench_function("HashMap", |b| {
         b.iter(|| {
-            black_box(hm.iter().filter(|(&(p, _), _)| p == 9999).count())
+            black_box(hm.iter().filter(|(&(p, _), _)| p == 11111).count())
         })
     });
     group.finish();
@@ -1116,7 +1116,7 @@ criterion_group!(
 criterion_group!(
     name = edge;
     config = Criterion::default();
-    targets = bench_cs2_sparse_5M, bench_cs2_md_axis_projection, bench_cs2_nonexistent_prefix,
+    targets = bench_cs2_sparse_10M, bench_cs2_md_axis_projection, bench_cs2_nonexistent_prefix,
               bench_cs6_sparse_1k, bench_cs6_nonexistent_prefix, bench_cs6_md_axis_projection
 );
 criterion_group!(
