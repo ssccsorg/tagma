@@ -1,7 +1,6 @@
 use crate::coord::Coord;
 use crate::coord_path::CoordPath;
 use alloc::boxed::Box;
-#[allow(unused_imports)]
 use alloc::vec;
 use alloc::vec::Vec;
 
