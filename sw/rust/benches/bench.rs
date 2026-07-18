@@ -835,9 +835,7 @@ fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
         let missing = vec![tagma_core::Coord::new(11111).unwrap()];
         b.iter(|| black_box(cs2.iter_prefix(&missing).map(|it| it.count()).unwrap_or(0)))
     });
-    group.bench_function("HashMap", |b| {
-        b.iter(|| black_box(hm.get(&(11111, 0))))
-    });
+    group.bench_function("HashMap", |b| b.iter(|| black_box(hm.get(&(11111, 0)))));
     group.finish();
 }
 
