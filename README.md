@@ -135,9 +135,9 @@ Same algorithm (iterate + decompose + filter on axis), different memory layout. 
 | Bulk 11,172 | Remove | 15.0 µs | 268 µs | 18x |
 | Spatial query | Axis filter (medial=10) | 58.8 Melem/s | 24.2 Melem/s | 2.4x |
 | Spatial query | CoordSet compound (initial=3 AND medial=5) | 94.4 ns | 13.0 µs | 138x |
-| Edge 10M (CS2) | Sparse get (10M entries) | 44.9 ms | 1.05 s | 23.4x |
-| Edge 10M (CS2) | Nonexistent prefix (10M stored) | 1.60 ns | 23.1 ms | 14.4Mx |
-| Edge 100 (CS19) | Nonexistent prefix (100 stored) | 1.27 ns | 18.5 ns | 14.6x |
+| Edge (CS2) | Sparse get 10M | 44.9 ms | 1.05 s | 23.4x |
+| Edge (CS2) | Nonexistent prefix | 1.60 ns | 23.1 ms | 14.4Mx |
+| Edge (CS19) | Nonexistent prefix | 1.27 ns | 18.5 ns | 14.6x |
 
 ## Documentation
 
