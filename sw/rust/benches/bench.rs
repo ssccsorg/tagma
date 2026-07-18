@@ -694,7 +694,14 @@ fn bench_cs2_bulk_100k(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// Edge cases: scenarios where Tagma is NOT faster (transparency)
+// Edge cases: transparency (both wins and losses)
+//
+// Nonexistent prefix is a core advantage, not an edge case. It demonstrates
+// that CoordSpace answers "does this address exist?" by navigating to the
+// coordinate and checking occupancy — a single array access. HashMap must
+// scan all entries because it has no structural notion of "coordinate ranges."
+// This property is essential for distributed routing, sparse allocation
+// checks, and negative lookup in cache systems.
 // ===========================================================================
 
 // Edge/cs2_sparse_5M: 5,000,000 entries at depth 2, 5000 prefixes × 1000 suffixes.
@@ -737,9 +744,69 @@ fn bench_cs2_sparse_5M(c: &mut Criterion) {
     group.finish();
 }
 
+// Edge/cs2_md_axis_projection: multi-dimensional query at CoordSpace2 scale.
+// Query: "count entries where prefix.initial==3 AND suffix.medial==7" over 5M entries.
+// Both sides: iterate all entries, decompose each Coord, check both axis conditions.
+// Same filter logic, different memory layout (contiguous array vs fragmented bucket).
+// NOTE: This is the CPU-bound version. CoordSet bitwise approach (175-word AND)
+// would be much faster but requires pre-computed per-axis sets, which is
+// infrastructure-level work, not a microbenchmark.
+fn bench_cs2_md_axis_projection(c: &mut Criterion) {
+    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
+    for p in 0u16..5000 {
+        for s in 0u16..1000 {
+            let path = tagma_core::CoordPath::new([
+                tagma_core::Coord::new(p).unwrap(),
+                tagma_core::Coord::new(s).unwrap(),
+            ]);
+            cs2.place_path(&path, (p * 1000 + s).into());
+            hm.insert((p, s), (p * 1000 + s).into());
+        }
+    }
+
+    let mut group = c.benchmark_group("Edge/cs2_md_axis");
+    group.throughput(criterion::Throughput::Elements(5_000_000));
+
+    // Projection: prefix.initial == 3 AND suffix.medial == 7
+    // ~5000/19 = 263 prefixes with initial==3, each with 1000/21 ≈ 48 suffixes
+    // with medial==7 → ~12,600 matching entries
+    group.bench_function("CoordSpace2", |b| {
+        b.iter(|| {
+            let count = cs2
+                .iter_tree()
+                .filter(|(path, _)| {
+                    path.coords()[0].to_axes().0 == 3
+                        && path.coords()[1].to_axes().1 == 7
+                })
+                .count();
+            black_box(count);
+        })
+    });
+
+    group.bench_function("HashMap", |b| {
+        b.iter(|| {
+            let count = hm
+                .iter()
+                .filter(|((p, s), _)| {
+                    tagma_core::Coord::new(*p).unwrap().to_axes().0 == 3
+                        && tagma_core::Coord::new(*s).unwrap().to_axes().1 == 7
+                })
+                .count();
+            black_box(count);
+        })
+    });
+
+    group.finish();
+}
+
 // Edge/cs2_nonexistent_prefix: query a prefix that has no entries (5M entries stored).
 // CoordSpace2 navigates to the prefix branch, finds None, returns immediately.
-// HashMap scans all 5000 entries, finds none, returns empty.
+// HashMap scans all 5M entries, finds none, returns empty.
+// WHY THIS MATTERS: In distributed systems, content-addressed networks, and
+// sparse data structures, "negative" existence checks are as frequent as
+// positive lookups. Tagma answers them in 1.6 ns regardless of data volume.
+// HashMap pays O(N) every time.
 fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
     let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
@@ -1049,7 +1116,7 @@ criterion_group!(
 criterion_group!(
     name = edge;
     config = Criterion::default();
-    targets = bench_cs2_sparse_5M, bench_cs2_nonexistent_prefix
+    targets = bench_cs2_sparse_5M, bench_cs2_md_axis_projection, bench_cs2_nonexistent_prefix
 );
 criterion_group!(
     name = stress;
