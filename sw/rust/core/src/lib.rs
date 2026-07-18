@@ -17,6 +17,10 @@ pub mod coord_space_n;
 #[cfg(feature = "alloc")]
 pub mod dyn_coord_space;
 
+// CoordSetN: sparse N-dimensional set (N>1).
+#[cfg(feature = "alloc")]
+pub mod coord_set_n;
+
 pub use coord::Coord;
 pub use coord_path::CoordPath;
 pub use coord_set::CoordSet;
@@ -42,6 +46,9 @@ pub use coord_space_n::CoordSpaceN;
 pub use dyn_coord_space::DynCoordSpace;
 #[cfg(feature = "alloc")]
 pub use dyn_coord_space::DynIter;
+
+#[cfg(feature = "alloc")]
+pub use coord_set_n::CoordSetN;
 
 // Internal types (used by CoordSpace1):
 pub use coord_space::FlatDrain;
