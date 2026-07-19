@@ -23,8 +23,8 @@
 //   CoordSpaceN2 N=2  tree  0.94 ns  (sparse, per-entry heap alloc)
 //   CoordSpaceN3 N=3  tree  2.69 ns
 //   CoordSpaceN6 N=6  tree  5.91 ns
-//   CoordSpaceN12 N=12 tree  15.5 ns
-//   CoordSpaceN19 N=19 tree  40.8 ns
+//   CoordSpaceN12 N=12 tree  23.3 ns
+//   CoordSpaceN19 N=19 tree  58.6 ns
 //
 // Naming convention:
 //   No suffix (CoordSpace)       = dense array, true Tagma
@@ -979,8 +979,8 @@ fn bench_coordset_spatial_query(c: &mut Criterion) {
 //   N=3   CoordSpaceN3    2.69 ns   space 10^12
 //   N=3   CoordSpaceM3    0.40 ns   space 10^12 (mmap dense, 6.7x faster)
 //   N=6   CoordSpaceN6    5.91 ns   space 10^24
-//   N=12  CoordSpaceN12   15.5  ns   space 10^67
-//   N=19  CoordSpaceN19   40.8  ns   space 10^77 (SHA-256 scale)
+//   N=12  CoordSpaceN12   23.3  ns   space 10^67
+//   N=19  CoordSpaceN19   58.6  ns   space 10^77 (SHA-256 scale)
 fn bench_n_scaling_get(c: &mut Criterion) {
     let path6 = tagma_core::CoordPath::<6>::new(core::array::from_fn(|i| {
         tagma_core::Coord::new(i as u16).unwrap()
@@ -1071,12 +1071,12 @@ fn bench_n_scaling_get(c: &mut Criterion) {
 // ===========================================================================
 
 // Dense vs tree comparison at N=2 (Apple M1, CoordSpace2 vs CoordSpaceN2):
-//   insert/1000   CoordSpace2   122 µs   CoordSpaceN2   817 µs    6.7x faster
-//   get/1000      Coordpace2    275 ns   CoordSpaceN2  1.06 µs    3.8x faster
-//   single get    CoordSpace2  0.39 ns   CoordSpaceN2  0.87 ns    2.3x faster
+//   insert/1000   CoordSpace2   155 µs   CoordSpaceN2   841 µs    5.4x faster
+//   get/1000      CoordSpace2  0.39 µs   CoordSpaceN2  1.15 µs    2.9x faster
+//   single get    CoordSpace2  0.39 ns   CoordSpaceN2  0.90 ns    2.3x faster
 
-// CoordSpaceN2/insert/1000          817 µs
-// CoordSpace2/insert/1000           122 µs  (dense array)
+// CoordSpaceN2/insert/1000          841 µs
+// CoordSpace2/insert/1000           155 µs  (dense array)
 fn bench_cm2_insert_1000(c: &mut Criterion) {
     let mut group = c.benchmark_group("N=2/insert/1000");
     group.bench_function("CoordSpaceN2", |b| {
