@@ -52,8 +52,7 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
     /// Returns the allocation size in bytes.
     fn alloc_size() -> usize {
         Self::SLOT_COUNT
-            .checked_mul(core::mem::size_of::<Option<V>>())
-            .unwrap_or(usize::MAX)
+            .saturating_mul(core::mem::size_of::<Option<V>>())
     }
 
     /// Creates an empty mmap-backed space.
@@ -156,18 +155,36 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
 
 impl<const N: usize, V: Clone> Clone for CoordSpaceM<N, V> {
     fn clone(&self) -> Self {
-        let new = Self::new();
         let size = Self::alloc_size();
-        if size > 0 && size < usize::MAX {
-            unsafe {
-                libc::memcpy(
-                    new.ptr.as_ptr() as *mut libc::c_void,
-                    self.ptr.as_ptr() as *const libc::c_void,
-                    size,
-                );
-            }
+        if size == 0 || size >= usize::MAX >> 1 {
+            // Cannot clone an mmap region that exceeds reasonable bounds.
+            // N=12 and N=19 saturate to usize::MAX; cloning them would
+            // try to memcpy the entire virtual address space. For those
+            // depths, cloning is not supported.
+            panic!("CoordSpaceM: clone not supported for N={} (size={})", N, size);
         }
-        CoordSpaceM { ptr: new.ptr, len: self.len }
+        // Allocate a new mmap via raw mmap (not Self::new, because we
+        // need the pointer without wrapping it in CoordSpaceM yet).
+        let ptr = unsafe {
+            libc::mmap(
+                ptr::null_mut(),
+                size,
+                libc::PROT_READ | libc::PROT_WRITE,
+                libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_NORESERVE,
+                -1,
+                0,
+            )
+        };
+        if ptr == libc::MAP_FAILED {
+            panic!("CoordSpaceM: mmap failed during clone (N={}, size={})", N, size);
+        }
+        unsafe {
+            libc::memcpy(ptr, self.ptr.as_ptr() as *const libc::c_void, size);
+        }
+        CoordSpaceM {
+            ptr: NonNull::new(ptr as *mut Option<V>).unwrap(),
+            len: self.len,
+        }
     }
 }
 
@@ -184,7 +201,23 @@ impl<const N: usize, V> Drop for CoordSpaceM<N, V> {
 
 impl<const N: usize, V: PartialEq> PartialEq for CoordSpaceM<N, V> {
     fn eq(&self, other: &Self) -> bool {
-        self.len == other.len
+        if self.len != other.len {
+            return false;
+        }
+        if self.len == 0 {
+            return true;
+        }
+        // Compare occupied slots by walking the slot array.
+        // This is correct but O(N) in slot count. For CoordSpaceM,
+        // equality checks are typically used in tests with few entries.
+        let size = Self::alloc_size();
+        if size >= usize::MAX >> 1 {
+            return self.len == other.len;
+        }
+        let n = size / core::mem::size_of::<Option<V>>();
+        let a = unsafe { core::slice::from_raw_parts(self.ptr.as_ptr(), n) };
+        let b = unsafe { core::slice::from_raw_parts(other.ptr.as_ptr(), n) };
+        a == b
     }
 }
 impl<const N: usize, V: PartialEq> Eq for CoordSpaceM<N, V> {}

@@ -14,7 +14,6 @@ use core::slice;
 /// For N=2:  124,813,584
 /// For N=3:  1,394,417,360,448  (mmap required; beyond single heap alloc)
 /// For N=4+: overflow; not representable in usize on 64-bit.
-/// Slot count for a dense CoordSpace at depth N.
 const fn coord_slots(n: usize) -> usize {
     match n {
         1 => 11172,
@@ -41,8 +40,7 @@ const fn coord_slots(n: usize) -> usize {
 /// (same invariant as `CoordSpace`).
 macro_rules! define_dense_coord_space {
     ($name:ident, $n:expr) => {
-        // const _: () = {
-            const SLOT_COUNT: usize = coord_slots($n);
+        const SLOT_COUNT: usize = coord_slots($n);
 
             #[doc = concat!(
                 "Dense, zeroed, heap-allocated CoordSpace for N=", stringify!($n), ".\n\n",
@@ -168,7 +166,6 @@ macro_rules! define_dense_coord_space {
                     space
                 }
             }
-        // };
     };
 }
 

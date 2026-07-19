@@ -48,4 +48,9 @@ name = "coord_space_dense"
 path = "tests/coord_space_dense.rs"
 required-features = ["alloc"]
 
+[[test]]
+name = "coord_space_m"
+path = "tests/coord_space_m.rs"
+required-features = ["mmap"]
+
 [dev-dependencies]

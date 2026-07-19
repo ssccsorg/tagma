@@ -1170,7 +1170,7 @@ criterion_group!(
     targets = bench_n_scaling_get
 );
 criterion_group!(
-    name = tree;
+    name = n2_comparison;
     config = Criterion::default();
     targets = bench_cm2_insert_1000, bench_cm2_get_1000
 );
@@ -1206,7 +1206,7 @@ criterion_group!(
 );
 
 criterion_main!(
-    inserts, lookup, mutate, iterate, micro, tree, stress, spatial, n_scaling, large, edge, deep,
+    inserts, lookup, mutate, iterate, micro, n2_comparison, stress, spatial, n_scaling, large, edge, deep,
     set
 );
 
