@@ -5,7 +5,7 @@
 //                        ┌─────────────────────────────────────────────┐
 //                        │              CoordSpace                    │
 //                        │  ┌──────────┬───────────┬────────┬──────┐  │
-//                        │  │ N=1 heap │ N=2 heap  │ N≥3    │ any N│  │
+//                        │  │ N=1      │ N=2 heap  │ N≥3    │ any N│
 //                        │  │          │           │ mmap   │ tree │  │
 //                        │  │ CoordSp   │ CoordSp2  │ CoordM │ CoordN│ │
 //                        │  │ 22 KB     │ 119 MB    │1.27 TB+│ entry│  │
@@ -17,7 +17,7 @@
 //                        └─────────────────────────────────────────────┘
 //
 // Single-syllable get latency (Apple M1):
-//   CoordSpace   N=1  heap  0.39 ns  22 KB (inline array, zero alloc)
+//   CoordSpace   N=1  inline  0.39 ns  22 KB (array on stack, no alloc)
 //   CoordSpace2  N=2  heap  0.39 ns  119 MB (single alloc_zeroed)
 //   CoordSpaceM3 N=3  mmap  0.40 ns  1.27 TB (MAP_NORESERVE, lazy page)
 //   CoordSpaceN2 N=2  tree  0.94 ns  (sparse, per-entry heap alloc)
@@ -973,7 +973,7 @@ fn bench_coordset_spatial_query(c: &mut Criterion) {
 }
 
 // N_scaling/get  (single lookup, Apple M1)
-//   N=1   CoordSpace      0.39 ns   space 10^4  (inline array, no alloc)
+//   N=1   CoordSpace      0.39 ns   space 10^4  (inline stack array, no alloc)
 //   N=2   CoordSpace2     0.39 ns   space 10^8  (dense heap, 2.4x faster)
 //   N=2   CoordSpaceN2    0.94 ns   space 10^8  (tree)
 //   N=3   CoordSpaceN3    2.69 ns   space 10^12
