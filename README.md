@@ -43,10 +43,13 @@ Test coverage: 170 unit/integration tests + 15 doc-tests, all passing. Zero clip
 | Type | Description | File |
 |------|-------------|------|
 | CoordSpaceN\<N, V\> | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/coord_space_n.rs` |
-| CoordSpace2N\<V\> | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/coord_space_n.rs` |
-| CoordSpace6N\<V\> | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/coord_space_n.rs` |
-| CoordSpace12N\<V\> | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/coord_space_n.rs` |
-| CoordSpace19N\<V\> | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN2\<V\> | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN6\<V\> | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN12\<V\> | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN19\<V\> | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/coord_space_n.rs` |
+| CoordSpace2\<V\> | N=2 dense heap, 124M slots, single `alloc_zeroed`, true Tagma identity | `core/src/coord_space_dense.rs` |
+| CoordSpaceM\<N, V\> | N≥3 mmap-backed dense (feature: `mmap`). Virtual address reservation with `MAP_NORESERVE` | `core/src/coord_space_m.rs` |
+| CoordSpaceM3\<V\> | N=3 mmap dense. Type alias for `CoordSpaceM<3, V>` | `core/src/coord_space_m.rs` |
 | DynCoordSpace\<V\> | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord_space.rs` |
 
 ## Quick start
@@ -90,14 +93,16 @@ assert!(set.contains(c));
 
 ## Feature matrix
 
-| Feature | `no_alloc` | `alloc` (default) |
-|---------|-----------|-------------------|
-| Coord | ✅ | ✅ |
-| CoordPath\<N\> | ✅ | ✅ |
-| CoordSet | ✅ | ✅ |
-| CoordSpace (inline array) | ✅ | ✅ |
-| CoordSpaceN (heap tree, N>1) | ❌ | ✅ |
-| DynCoordSpace (runtime trie) | ❌ | ✅ |
+| Feature | `no_alloc` | `alloc` (default) | `mmap` |
+|---------|-----------|-------------------|--------|
+| Coord | ✅ | ✅ | ✅ |
+| CoordPath\<N\> | ✅ | ✅ | ✅ |
+| CoordSet | ✅ | ✅ | ✅ |
+| CoordSpace (inline array) | ✅ | ✅ | ✅ |
+| CoordSpaceN (heap tree, N>1) | ❌ | ✅ | ❌ |
+| CoordSpace2 (dense heap, N=2) | ❌ | ✅ | ❌ |
+| CoordSpaceM (mmap dense, N≥3) | ❌ | ❌ | ✅ |
+| DynCoordSpace (runtime trie) | ❌ | ✅ | ❌ |
 
 ## How Tagma works
 
@@ -122,6 +127,8 @@ The three-axis composition formula admits unbounded recursive embedding: each ax
 | Latency | 227 ns/op | 0.38 ns/op | 5.57 ns/op | 54.9 ns/op |
 | Speedup | baseline | 597x | 41x | 4.1x |
 | Address space | 2^256 | 1.1e4 | 1.9e24 | 2^256 |
+
+CoordSpace2 (N=2 dense heap, 119 MB, `alloc_zeroed`) covers the full 124M 2-syllable space in a single pre-zeroed allocation — single load at 0.39 ns, no lazy branching.
 
 ## Benchmark: Spatial query vs HashMap (Apple M1)
 
