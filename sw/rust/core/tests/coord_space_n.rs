@@ -1,5 +1,5 @@
 use tagma_core::{
-    Coord, CoordPath, CoordSpace12, CoordSpace19, CoordSpace2, CoordSpace6, CoordSpaceN,
+    Coord, CoordPath, CoordSpaceN12, CoordSpaceN19, CoordSpaceN2, CoordSpaceN6, CoordSpaceN,
 };
 
 // ── CoordSpaceN<1, _> — flat map tests ──
@@ -257,15 +257,15 @@ fn tree6_missing_path() {
 #[test]
 fn type_aliases_exist() {
     let _m1: CoordSpaceN<1, u32> = CoordSpaceN::new();
-    let _m2: CoordSpace2<u32> = CoordSpaceN::new();
-    let _m6: CoordSpace6<u32> = CoordSpaceN::new();
-    let _m12: CoordSpace12<u32> = CoordSpaceN::new();
-    let _m19: CoordSpace19<u32> = CoordSpaceN::new();
+    let _m2: CoordSpaceN2<u32> = CoordSpaceN::new();
+    let _m6: CoordSpaceN6<u32> = CoordSpaceN::new();
+    let _m12: CoordSpaceN12<u32> = CoordSpaceN::new();
+    let _m19: CoordSpaceN19<u32> = CoordSpaceN::new();
 }
 
 #[test]
 fn coord_space12_basic() {
-    let mut space: CoordSpace12<String> = CoordSpaceN::new();
+    let mut space: CoordSpaceN12<String> = CoordSpaceN::new();
     let path = CoordPath::new(core::array::from_fn(|i| Coord::new(i as u16).unwrap()));
     space.place_path(&path, "hello".to_string());
     assert_eq!(space.at_path(&path).map(|s| s.as_str()), Some("hello"));
@@ -392,7 +392,7 @@ fn coord_space1_is_coord_space_1() {
 
 #[test]
 fn coord_space6_uuid_scale() {
-    let mut space: CoordSpace6<u32> = CoordSpaceN::new();
+    let mut space: CoordSpaceN6<u32> = CoordSpaceN::new();
     let path = CoordPath::new([
         Coord::new(0).unwrap(),
         Coord::new(0).unwrap(),

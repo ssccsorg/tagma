@@ -1,15 +1,15 @@
 use tagma_core::{
-    Coord, CoordPath, CoordSpace, CoordSpace12, CoordSpace19, CoordSpace2, CoordSpace3,
-    CoordSpace6, CoordSpaceN,
+    Coord, CoordPath, CoordSpace, CoordSpaceN12, CoordSpaceN19, CoordSpaceN2, CoordSpaceN3,
+    CoordSpaceN6, CoordSpaceN,
 };
 
-// ── CoordSpace2 — cross-product FIH-like scenario ──
+// ── CoordSpaceN2 — cross-product FIH-like scenario ──
 
 #[test]
 fn cm2_fih_cube() {
-    // Simulate Fact(11,172) × Intent(11,172) × Hint(11,172) = use CoordSpace2
+    // Simulate Fact(11,172) × Intent(11,172) × Hint(11,172) = use CoordSpaceN2
     // as cross-product: Fact coord maps to Intent→Hint sub-map
-    let mut map = CoordSpace2::new();
+    let mut map = CoordSpaceN2::new();
     // Insert 100 FIH tuples
     for f in 0u16..10 {
         for i in 0u16..10 {
@@ -31,7 +31,7 @@ fn cm2_fih_cube() {
 #[test]
 fn cm2_sparse_coverage() {
     // Sparse population over large logical space
-    let mut map = CoordSpace2::new();
+    let mut map = CoordSpaceN2::new();
     for i in 0u16..1000 {
         let c0 = Coord::new(i * 11 % 11172).unwrap();
         let c1 = Coord::new(i * 7 % 11172).unwrap();
@@ -42,7 +42,7 @@ fn cm2_sparse_coverage() {
 
 #[test]
 fn cm2_clone_independent() {
-    let mut a = CoordSpace2::new();
+    let mut a = CoordSpaceN2::new();
     a.place_path(
         &CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]),
         1,
@@ -56,11 +56,11 @@ fn cm2_clone_independent() {
     assert_eq!(b.len(), 2);
 }
 
-// ── CoordSpace3 — three-axis real-world pattern ──
+// ── CoordSpaceN3 — three-axis real-world pattern ──
 
 #[test]
 fn cm3_3d_grid() {
-    let mut map = CoordSpace3::new();
+    let mut map = CoordSpaceN3::new();
     // 10×10×10 coordinate cube
     for x in 0u16..10 {
         for y in 0u16..10 {
@@ -84,11 +84,11 @@ fn cm3_3d_grid() {
     assert_eq!(r, Some(&555));
 }
 
-// ── CoordSpace6 — UUID-scale ──
+// ── CoordSpaceN6 — UUID-scale ──
 
 #[test]
 fn cm6_basic() {
-    let mut map = CoordSpace6::new();
+    let mut map = CoordSpaceN6::new();
     let coords: [Coord; 6] = core::array::from_fn(|i| Coord::new(i as u16).unwrap());
     let path = CoordPath::new(coords);
     map.place_path(&path, 42);
@@ -98,7 +98,7 @@ fn cm6_basic() {
 
 #[test]
 fn cm6_missing_path() {
-    let map: CoordSpace6<u32> = CoordSpace6::new();
+    let map: CoordSpaceN6<u32> = CoordSpaceN6::new();
     let path = CoordPath::new(core::array::from_fn(|_| Coord::new(0).unwrap()));
     assert_eq!(map.at_path(&path), None);
 }
@@ -106,7 +106,7 @@ fn cm6_missing_path() {
 #[test]
 fn cm6_fan_out() {
     // Single prefix fans out to multiple suffixes
-    let mut map = CoordSpace6::new();
+    let mut map = CoordSpaceN6::new();
     let prefix = Coord::new(42).unwrap();
     for i in 0u16..100 {
         let mut coords = [Coord::new(0).unwrap(); 6];
@@ -119,7 +119,7 @@ fn cm6_fan_out() {
 
 #[test]
 fn cm6_iterate() {
-    let mut map = CoordSpace6::new();
+    let mut map = CoordSpaceN6::new();
     for i in 0u16..10 {
         let mut coords = [Coord::new(0).unwrap(); 6];
         coords[0] = Coord::new(i).unwrap();
@@ -129,11 +129,11 @@ fn cm6_iterate() {
     assert_eq!(count, 10);
 }
 
-// ── CoordSpace19 — SHA-256-scale tree ──
+// ── CoordSpaceN19 — SHA-256-scale tree ──
 
 #[test]
 fn cm19_insert_and_get() {
-    let mut map = CoordSpace19::new();
+    let mut map = CoordSpaceN19::new();
     let coords: [Coord; 19] = core::array::from_fn(|i| Coord::new(i as u16).unwrap());
     let path = CoordPath::new(coords);
     map.place_path(&path, 42);
@@ -143,7 +143,7 @@ fn cm19_insert_and_get() {
 
 #[test]
 fn cm19_multiple_paths() {
-    let mut map = CoordSpace19::new();
+    let mut map = CoordSpaceN19::new();
     let make_path = |offset: u16| -> CoordPath<19> {
         let mut coords = [Coord::new(0).unwrap(); 19];
         for i in 0..19u16 {
@@ -191,16 +191,16 @@ fn api_parity_with_hashmap() {
 fn all_series_use_same_pattern() {
     let _m: CoordSpace<u32> = CoordSpace::new();
     let _mn: CoordSpaceN<2, u32> = CoordSpaceN::new();
-    let _m2: CoordSpace2<u32> = CoordSpace2::new();
-    let _m3: CoordSpace3<u32> = CoordSpace3::new();
-    let _m6: CoordSpace6<u32> = CoordSpace6::new();
-    let _m12: CoordSpace12<u32> = CoordSpace12::new();
-    let _m19: CoordSpace19<u32> = CoordSpace19::new();
+    let _m2: CoordSpaceN2<u32> = CoordSpaceN2::new();
+    let _m3: CoordSpaceN3<u32> = CoordSpaceN3::new();
+    let _m6: CoordSpaceN6<u32> = CoordSpaceN6::new();
+    let _m12: CoordSpaceN12<u32> = CoordSpaceN12::new();
+    let _m19: CoordSpaceN19<u32> = CoordSpaceN19::new();
 }
 
 #[test]
 fn cm12_insert_and_get() {
-    let mut map = CoordSpace12::new();
+    let mut map = CoordSpaceN12::new();
     let coords: [Coord; 12] = core::array::from_fn(|i| Coord::new(i as u16).unwrap());
     let path = CoordPath::new(coords);
     map.place_path(&path, 42);
@@ -262,9 +262,9 @@ fn dyn_coord_stress_1000() {
 
 #[test]
 fn space3_axis_projection() {
-    // CoordSpace3: FIH-like space (Fact × Intent × Hint).
+    // CoordSpaceN3: FIH-like space (Fact × Intent × Hint).
     // Insert a cross-product and verify axis projection queries.
-    let mut space = CoordSpace3::new();
+    let mut space = CoordSpaceN3::new();
     // Fact: initial=0..5, Intent: initial=0..5, Hint: initial=0..5
     // Use only the 'initial' axis of each Coord for simplicity:
     // Coord(fact, 0, 0) × Coord(intent, 0, 0) × Coord(hint, 0, 0)
@@ -309,7 +309,7 @@ fn space3_axis_projection() {
 fn space19_deep_path_resolution() {
     // Verify that a 19-deep CoordPath resolves correctly at every level.
     // This tests the tree traversal logic across all intermediate nodes.
-    let mut space = CoordSpace19::new();
+    let mut space = CoordSpaceN19::new();
     // Build a path where each coordinate is distinct: (0,1,2,...,18)
     let coords: [Coord; 19] = core::array::from_fn(|i| {
         Coord::from_axes((i % 19) as u8, (i * 3 % 21) as u8, (i * 7 % 28) as u8).unwrap()
@@ -345,7 +345,7 @@ fn space19_deep_path_resolution() {
 fn space19_sparse_19_paths() {
     // Insert 19 independent paths into the SHA-256-scale space.
     // Each path differs at every syllable position.
-    let mut space = CoordSpace19::new();
+    let mut space = CoordSpaceN19::new();
     for seed in 0..19u16 {
         let coords: [Coord; 19] = core::array::from_fn(|i| {
             let v = (i as u16 * 587 + seed * 331) % 11172;
