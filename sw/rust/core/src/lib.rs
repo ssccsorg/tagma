@@ -21,6 +21,10 @@ pub mod dyn_coord_space;
 #[cfg(feature = "alloc")]
 pub mod coord_set_n;
 
+// CoordSpaceDense: dense zeroed array family (true Tagma for any N).
+#[cfg(feature = "alloc")]
+pub mod coord_space_dense;
+
 pub use coord::Coord;
 pub use coord_path::CoordPath;
 pub use coord_set::CoordSet;
@@ -49,6 +53,9 @@ pub use dyn_coord_space::DynIter;
 
 #[cfg(feature = "alloc")]
 pub use coord_set_n::CoordSetN;
+
+#[cfg(feature = "alloc")]
+pub use coord_space_dense::CoordSpace2;
 
 // Internal types (used by CoordSpace):
 pub use coord_space::FlatDrain;
