@@ -141,24 +141,32 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
     }
 
     /// Removes all values. Retains the mmap allocation.
+    ///
+    /// On Linux, uses `madvise(MADV_DONTNEED)` to discard pages
+    /// immediately. On other platforms, re-mmaps over the region with
+    /// `MAP_FIXED` to zero it.
     pub fn clear(&mut self) {
         let ptr = self.ptr.as_ptr() as *mut libc::c_void;
         let size = Self::alloc_size();
         if size > 0 && size < usize::MAX {
             unsafe {
-                // Re-mmap over the existing region to zero it atomically.
-                let result = libc::mmap(
-                    ptr,
-                    size,
-                    libc::PROT_READ | libc::PROT_WRITE,
-                    libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED,
-                    -1,
-                    0,
-                );
-                assert!(
-                    result != libc::MAP_FAILED,
-                    "CoordSpaceM: MAP_FIXED remap failed on clear"
-                );
+                #[cfg(target_os = "linux")]
+                libc::madvise(ptr, size, libc::MADV_DONTNEED);
+                #[cfg(not(target_os = "linux"))]
+                {
+                    let ret = libc::mmap(
+                        ptr,
+                        size,
+                        libc::PROT_READ | libc::PROT_WRITE,
+                        libc::MAP_PRIVATE | libc::MAP_ANONYMOUS | libc::MAP_FIXED,
+                        -1,
+                        0,
+                    );
+                    assert!(
+                        ret != libc::MAP_FAILED,
+                        "CoordSpaceM: MAP_FIXED remap failed on clear"
+                    );
+                }
             }
         }
         self.len = 0;
