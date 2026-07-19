@@ -14,6 +14,13 @@ default = ["alloc"]
 # CoordSpace and related types require this feature.
 alloc = []
 
+# Enables CoordSpaceM (mmap-backed dense array for N>=3).
+# Implies alloc. Dependencia libc proporciona mmap en Unix.
+mmap = ["alloc", "libc"]
+
+[dependencies]
+libc = { version = "0.2", optional = true }
+
 # Integration tests require alloc (use CoordSpaceN, DynCoordSpace, etc.).
 # `cargo test --no-default-features` automatically skips this binary.
 [[test]]

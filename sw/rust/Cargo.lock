@@ -528,6 +528,9 @@ dependencies = [
 [[package]]
 name = "tagma-core"
 version = "0.1.0"
+dependencies = [
+ "libc",
+]
 
 [[package]]
 name = "tinytemplate"
