@@ -450,9 +450,3 @@ impl<V: PartialEq> PartialEq for CoordSpace<V> {
 impl<V: PartialEq> Eq for CoordSpace<V> {}
 
 // ── Type alias ─────────────────────────────────────────
-
-/// Default single-syllable address table. No allocator required.
-pub type CoordSpaceN<V> = CoordSpace<V>;
-
-/// 1-syllable: 11,172 identifiers. No allocator required.
-pub type CoordSpace1<V> = CoordSpace<V>;

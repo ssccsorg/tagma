@@ -31,17 +31,17 @@ pub use coord_set::CoordSet;
 pub use coord_space::CoordSpace;
 
 #[cfg(feature = "alloc")]
-pub use coord_space_n::CoordSpace12;
-#[cfg(feature = "alloc")]
-pub use coord_space_n::CoordSpace19;
-#[cfg(feature = "alloc")]
-pub use coord_space_n::CoordSpace2;
-#[cfg(feature = "alloc")]
-pub use coord_space_n::CoordSpace3;
-#[cfg(feature = "alloc")]
-pub use coord_space_n::CoordSpace6;
-#[cfg(feature = "alloc")]
 pub use coord_space_n::CoordSpaceN;
+#[cfg(feature = "alloc")]
+pub use coord_space_n::CoordSpaceN12;
+#[cfg(feature = "alloc")]
+pub use coord_space_n::CoordSpaceN19;
+#[cfg(feature = "alloc")]
+pub use coord_space_n::CoordSpaceN2;
+#[cfg(feature = "alloc")]
+pub use coord_space_n::CoordSpaceN3;
+#[cfg(feature = "alloc")]
+pub use coord_space_n::CoordSpaceN6;
 #[cfg(feature = "alloc")]
 pub use dyn_coord_space::DynCoordSpace;
 #[cfg(feature = "alloc")]
@@ -50,7 +50,7 @@ pub use dyn_coord_space::DynIter;
 #[cfg(feature = "alloc")]
 pub use coord_set_n::CoordSetN;
 
-// Internal types (used by CoordSpace1):
+// Internal types (used by CoordSpace):
 pub use coord_space::FlatDrain;
 pub use coord_space::FlatEntry;
 pub use coord_space::FlatIter;

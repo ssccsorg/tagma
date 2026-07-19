@@ -849,20 +849,20 @@ impl<V> core::ops::IndexMut<Coord> for CoordSpaceN<1, V> {
 // ---------------------------------------------------------------------------
 
 /// 1-syllable:  11,172 identifiers (heap-allocated flat array).
-/// For no_alloc, use `CoordSpace1`.
-pub type CoordSpace1<V> = CoordSpaceN<1, V>;
+/// For no_alloc (dense zeroed array), use `CoordSpace`.
+pub type CoordSpaceN1<V> = CoordSpaceN<1, V>;
 
 /// 2-syllable:  1.25 × 10⁸ identifiers — small KV.
-pub type CoordSpace2<V> = CoordSpaceN<2, V>;
+pub type CoordSpaceN2<V> = CoordSpaceN<2, V>;
 
 /// 3-syllable:  1.39 × 10¹² identifiers — medium KV.
-pub type CoordSpace3<V> = CoordSpaceN<3, V>;
+pub type CoordSpaceN3<V> = CoordSpaceN<3, V>;
 
 /// 6-syllable:  1.94 × 10²⁴ identifiers — UUID-scale.
-pub type CoordSpace6<V> = CoordSpaceN<6, V>;
+pub type CoordSpaceN6<V> = CoordSpaceN<6, V>;
 
 /// 12-syllable: 2.41 × 10⁶⁷ identifiers — between UUID and SHA-256.
-pub type CoordSpace12<V> = CoordSpaceN<12, V>;
+pub type CoordSpaceN12<V> = CoordSpaceN<12, V>;
 
 /// 19-syllable: 1.94 × 10⁷⁷ identifiers — SHA-256-scale (2²⁵⁶).
-pub type CoordSpace19<V> = CoordSpaceN<19, V>;
+pub type CoordSpaceN19<V> = CoordSpaceN<19, V>;

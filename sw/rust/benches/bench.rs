@@ -582,14 +582,14 @@ fn bench_spatial_axis_filter_range(c: &mut Criterion) {
 }
 
 // Spatial/cs2_prefix_42 (100k entries, 1000 prefixes)
-//   CoordSpace2  4.2 µs     240 Kelem/s   4.5x (with iter_prefix)
+//   CoordSpaceN2  4.2 µs     240 Kelem/s   4.5x (with iter_prefix)
 //   HashMap     188  µs     5.4 Melem/s
 fn bench_spatial_cs2_prefix_scan(c: &mut Criterion) {
-    // CoordSpace2: 10000 entries with shared prefixes vs HashMap<(Coord,Coord),V>.
+    // CoordSpaceN2: 10000 entries with shared prefixes vs HashMap<(Coord,Coord),V>.
     // Query: find all entries matching a specific prefix (first coord).
-    // CoordSpace2 can restrict iteration to the sub-tree at that prefix;
+    // CoordSpaceN2 can restrict iteration to the sub-tree at that prefix;
     // HashMap must scan every entry.
-    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut cs2 = tagma_core::CoordSpaceN2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
     // 1000 prefixes × 100 suffixes = 100,000 entries
     for p in 0u16..1000 {
@@ -607,7 +607,7 @@ fn bench_spatial_cs2_prefix_scan(c: &mut Criterion) {
     // 100 entries share prefix=42
     group.throughput(criterion::Throughput::Elements(100));
 
-    group.bench_function("CoordSpace2", |b| {
+    group.bench_function("CoordSpaceN2", |b| {
         let prefix_path = vec![tagma_core::Coord::new(42).unwrap()];
         b.iter(|| {
             let count = cs2
@@ -629,16 +629,16 @@ fn bench_spatial_cs2_prefix_scan(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// CoordSpace2 bulk 100k entries
+// CoordSpaceN2 bulk 100k entries
 // ===========================================================================
 
-// CoordSpace2/bulk_100k (1000 prefixes, 100 suffixes each)
+// CoordSpaceN2/bulk_100k (1000 prefixes, 100 suffixes each)
 //   CoordSpace/insert   ~1.5 ms
 //   HashMap/insert      ~2.5 ms
 //   CoordSpace/get      ~0.6 ms
 //   HashMap/get         ~1.2 ms
 fn bench_cs2_bulk_100k(c: &mut Criterion) {
-    let cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let cs2 = tagma_core::CoordSpaceN2::<u32>::new();
     let hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
     let mut paths = Vec::with_capacity(100_000);
     for p in 0u16..1000 {
@@ -651,12 +651,12 @@ fn bench_cs2_bulk_100k(c: &mut Criterion) {
         }
     }
 
-    let mut group = c.benchmark_group("CoordSpace2/bulk_100k");
+    let mut group = c.benchmark_group("CoordSpaceN2/bulk_100k");
     group.throughput(criterion::Throughput::Elements(100_000));
 
     group.bench_function("CoordSpace/insert", |b| {
         b.iter(|| {
-            let mut cs = tagma_core::CoordSpace2::<u32>::new();
+            let mut cs = tagma_core::CoordSpaceN2::<u32>::new();
             for (path, p, s) in &paths {
                 black_box(cs.place_path(path, (p * 1000 + s).into()));
             }
@@ -708,7 +708,7 @@ fn bench_cs2_bulk_100k(c: &mut Criterion) {
 // Edge/cs2_sparse_10M: 10,000,000 entries at depth 2, 10000 prefixes × 1000 suffixes.
 #[allow(non_snake_case)]
 fn bench_cs2_sparse_10M(c: &mut Criterion) {
-    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut cs2 = tagma_core::CoordSpaceN2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
     let mut paths = Vec::with_capacity(10_000_000);
     for p in 0u16..10000 {
@@ -751,7 +751,7 @@ fn bench_cs2_sparse_10M(c: &mut Criterion) {
     group.finish();
 }
 
-// Edge/cs2_md_axis_projection: multi-dimensional query at CoordSpace2 scale.
+// Edge/cs2_md_axis_projection: multi-dimensional query at CoordSpaceN2 scale.
 // Query: "count entries where prefix.initial==3 AND suffix.medial==7" over 5M entries.
 // Both sides: iterate all entries, decompose each Coord, check both axis conditions.
 // Same filter logic, different memory layout (contiguous array vs fragmented bucket).
@@ -759,7 +759,7 @@ fn bench_cs2_sparse_10M(c: &mut Criterion) {
 // would be much faster but requires pre-computed per-axis sets, which is
 // infrastructure-level work, not a microbenchmark.
 fn bench_cs2_md_axis_projection(c: &mut Criterion) {
-    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut cs2 = tagma_core::CoordSpaceN2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
     for p in 0u16..10000 {
         for s in 0u16..1000 {
@@ -778,7 +778,7 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
     // Projection: prefix.initial == 3 AND suffix.medial == 7
     // ~10000/19 = 526 prefixes with initial==3, each with 1000/21 ≈ 48 suffixes
     // with medial==7 → ~25,200 matching entries
-    group.bench_function("CoordSpace2", |b| {
+    group.bench_function("CoordSpaceN2", |b| {
         b.iter(|| {
             let count = cs2
                 .iter_tree()
@@ -807,7 +807,7 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
 }
 
 // Edge/cs2_nonexistent_prefix: query a nonexistent prefix (10M entries stored).
-// CoordSpace2 navigates to the branch at that prefix, finds Nothing, returns immediately.
+// CoordSpaceN2 navigates to the branch at that prefix, finds Nothing, returns immediately.
 // HashMap has no structural notion of "prefix" — it must scan all 10M entries to
 // determine that no entry has first coord == 11111.
 // WHY THIS MATTERS: In distributed systems, content-addressed networks, and
@@ -815,7 +815,7 @@ fn bench_cs2_md_axis_projection(c: &mut Criterion) {
 // positive lookups. Tagma answers them in 1.6 ns regardless of data volume
 // or depth. HashMap pays O(N) because it cannot answer structural queries.
 fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
-    let mut cs2 = tagma_core::CoordSpace2::<u32>::new();
+    let mut cs2 = tagma_core::CoordSpaceN2::<u32>::new();
     let mut hm: std::collections::HashMap<(u16, u16), u32> = std::collections::HashMap::new();
     for p in 0u16..10000 {
         for s in 0u16..1000 {
@@ -830,7 +830,7 @@ fn bench_cs2_nonexistent_prefix(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Edge/cs2_nonexistent_prefix");
     group.throughput(criterion::Throughput::Elements(5_000_000));
-    group.bench_function("CoordSpace2", |b| {
+    group.bench_function("CoordSpaceN2", |b| {
         let missing = vec![tagma_core::Coord::new(11111).unwrap()];
         b.iter(|| black_box(cs2.iter_prefix(&missing).map(|it| it.count()).unwrap_or(0)))
     });
@@ -940,11 +940,11 @@ fn bench_coordset_spatial_query(c: &mut Criterion) {
 
 // N_scaling/get  (single lookup, Apple M1)
 //   N=1   CoordSpace    0.38 ns   space 10^4
-//   N=2   CoordSpace2   0.87 ns   space 10^8
-//   N=3   CoordSpace3   2.66 ns   space 10^12
-//   N=6   CoordSpace6   5.60 ns   space 10^24
-//   N=12  CoordSpace12  13.2  ns   space 10^67
-//   N=19  CoordSpace19  53.2  ns   space 10^77 (SHA-256 scale)
+//   N=2   CoordSpaceN2   0.87 ns   space 10^8
+//   N=3   CoordSpaceN3   2.66 ns   space 10^12
+//   N=6   CoordSpaceN6   5.60 ns   space 10^24
+//   N=12  CoordSpaceN12  13.2  ns   space 10^67
+//   N=19  CoordSpaceN19  53.2  ns   space 10^77 (SHA-256 scale)
 fn bench_n_scaling_get(c: &mut Criterion) {
     let path6 = tagma_core::CoordPath::<6>::new(core::array::from_fn(|i| {
         tagma_core::Coord::new(i as u16).unwrap()
@@ -975,40 +975,40 @@ fn bench_n_scaling_get(c: &mut Criterion) {
         group.finish();
     }
     {
-        let mut cs = tagma_core::CoordSpace2::<u64>::new();
+        let mut cs = tagma_core::CoordSpaceN2::<u64>::new();
         cs.place_path(&path2, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=2");
-        group.bench_function("CoordSpace2", |b| b.iter(|| black_box(cs.at_path(&path2))));
+        group.bench_function("CoordSpaceN2", |b| b.iter(|| black_box(cs.at_path(&path2))));
         group.finish();
     }
     {
-        let mut cs = tagma_core::CoordSpace3::<u64>::new();
+        let mut cs = tagma_core::CoordSpaceN3::<u64>::new();
         cs.place_path(&path3, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=3");
-        group.bench_function("CoordSpace3", |b| b.iter(|| black_box(cs.at_path(&path3))));
+        group.bench_function("CoordSpaceN3", |b| b.iter(|| black_box(cs.at_path(&path3))));
         group.finish();
     }
     {
-        let mut cs = tagma_core::CoordSpace6::<u64>::new();
+        let mut cs = tagma_core::CoordSpaceN6::<u64>::new();
         cs.place_path(&path6, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=6");
-        group.bench_function("CoordSpace6", |b| b.iter(|| black_box(cs.at_path(&path6))));
+        group.bench_function("CoordSpaceN6", |b| b.iter(|| black_box(cs.at_path(&path6))));
         group.finish();
     }
     {
-        let mut cs = tagma_core::CoordSpace12::<u64>::new();
+        let mut cs = tagma_core::CoordSpaceN12::<u64>::new();
         cs.place_path(&path12, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=12");
-        group.bench_function("CoordSpace12", |b| {
+        group.bench_function("CoordSpaceN12", |b| {
             b.iter(|| black_box(cs.at_path(&path12)))
         });
         group.finish();
     }
     {
-        let mut cs = tagma_core::CoordSpace19::<u64>::new();
+        let mut cs = tagma_core::CoordSpaceN19::<u64>::new();
         cs.place_path(&path19, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=19");
-        group.bench_function("CoordSpace19", |b| {
+        group.bench_function("CoordSpaceN19", |b| {
             b.iter(|| black_box(cs.at_path(&path19)))
         });
         group.finish();
@@ -1016,14 +1016,14 @@ fn bench_n_scaling_get(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// CoordSpace2 (N=2) benchmarks — cross-product FIH-like scenario
+// CoordSpaceN2 (N=2) benchmarks — cross-product FIH-like scenario
 // ===========================================================================
 
-// CoordSpace2/insert/1000          803 µs
+// CoordSpaceN2/insert/1000          803 µs
 fn bench_cm2_insert_1000(c: &mut Criterion) {
-    c.bench_function("CoordSpace2/insert/1000", |b| {
+    c.bench_function("CoordSpaceN2/insert/1000", |b| {
         b.iter(|| {
-            let mut map = tagma_core::CoordSpace2::new();
+            let mut map = tagma_core::CoordSpaceN2::new();
             for i in 0u16..100 {
                 for j in 0u16..10 {
                     let path = tagma_core::CoordPath::new([
@@ -1038,9 +1038,9 @@ fn bench_cm2_insert_1000(c: &mut Criterion) {
     });
 }
 
-// CoordSpace2/get/1000             4.92 µs
+// CoordSpaceN2/get/1000             4.92 µs
 fn bench_cm2_get_1000(c: &mut Criterion) {
-    let mut map = tagma_core::CoordSpace2::new();
+    let mut map = tagma_core::CoordSpaceN2::new();
     for i in 0u16..100 {
         for j in 0u16..10 {
             let path = tagma_core::CoordPath::new([
@@ -1050,7 +1050,7 @@ fn bench_cm2_get_1000(c: &mut Criterion) {
             map.place_path(&path, (i * 100 + j) as u32);
         }
     }
-    c.bench_function("CoordSpace2/get/1000", |b| {
+    c.bench_function("CoordSpaceN2/get/1000", |b| {
         b.iter(|| {
             for i in 0u16..100 {
                 for j in 0u16..10 {
@@ -1159,7 +1159,7 @@ criterion_group!(
 );
 
 // ===========================================================================
-// CoordSpace6 (N=6, UUID-scale) benchmarks — 1,000 entries at depth 6
+// CoordSpaceN6 (N=6, UUID-scale) benchmarks — 1,000 entries at depth 6
 //
 // Path distribution: 2 × 5 × 5 × 5 × 4 × 1 = 1,000 entries
 // Memory: ~2 + 10 + 50 + 250 + 1000 + 1000 nodes → ~135MB total
@@ -1170,7 +1170,7 @@ criterion_group!(
 
 // Edge/cs6_sparse_1k: 1,000 entries at depth 6, get + iter + axis projection.
 fn bench_cs6_sparse_1k(c: &mut Criterion) {
-    let mut cs6 = tagma_core::CoordSpace6::<u32>::new();
+    let mut cs6 = tagma_core::CoordSpaceN6::<u32>::new();
     let mut hm: std::collections::HashMap<[u16; 6], u32> = std::collections::HashMap::new();
     let mut paths = Vec::with_capacity(1000);
     let mk = |v: u16| tagma_core::Coord::new(v).unwrap();
@@ -1206,7 +1206,7 @@ fn bench_cs6_sparse_1k(c: &mut Criterion) {
     let mut group = c.benchmark_group("Edge/cs6_sparse_1k");
     group.throughput(criterion::Throughput::Elements(1000));
 
-    group.bench_function("CoordSpace6/get", |b| {
+    group.bench_function("CoordSpaceN6/get", |b| {
         b.iter(|| {
             for (path, _) in &paths {
                 black_box(cs6.at_path(path));
@@ -1220,7 +1220,7 @@ fn bench_cs6_sparse_1k(c: &mut Criterion) {
             }
         })
     });
-    group.bench_function("CoordSpace6/iter", |b| {
+    group.bench_function("CoordSpaceN6/iter", |b| {
         b.iter(|| black_box(cs6.iter_tree().count()))
     });
     group.bench_function("HashMap/iter", |b| b.iter(|| black_box(hm.len())));
@@ -1229,10 +1229,10 @@ fn bench_cs6_sparse_1k(c: &mut Criterion) {
 }
 
 // Edge/cs6_nonexistent_prefix: query a nonexistent prefix against 1,000 stored entries.
-// CoordSpace6 navigates depth-5 branch, finds None → immediate return.
+// CoordSpaceN6 navigates depth-5 branch, finds None → immediate return.
 // HashMap scans all 1,000 entries, finds none → O(N).
 fn bench_cs6_nonexistent_prefix(c: &mut Criterion) {
-    let mut cs6 = tagma_core::CoordSpace6::<u32>::new();
+    let mut cs6 = tagma_core::CoordSpaceN6::<u32>::new();
     let mut hm: std::collections::HashMap<[u16; 6], u32> = std::collections::HashMap::new();
     let mk = |v: u16| tagma_core::Coord::new(v).unwrap();
 
@@ -1266,7 +1266,7 @@ fn bench_cs6_nonexistent_prefix(c: &mut Criterion) {
     let missing_prefix = tagma_core::CoordPath::new([mk(9999), mk(0), mk(0), mk(0), mk(0), mk(0)]);
 
     let mut group = c.benchmark_group("Edge/cs6_nonexistent_prefix");
-    group.bench_function("CoordSpace6", |b| {
+    group.bench_function("CoordSpaceN6", |b| {
         b.iter(|| black_box(cs6.at_path(&missing_prefix)))
     });
     group.bench_function("HashMap", |b| {
@@ -1278,10 +1278,10 @@ fn bench_cs6_nonexistent_prefix(c: &mut Criterion) {
 
 // Edge/cs6_md_axis_projection: multi-dimensional axis filter at depth 6.
 // Query: "count entries where coord[2].initial == 2 AND coord[4].medial == 3"
-// over 1,000 stored entries at CoordSpace6.
+// over 1,000 stored entries at CoordSpaceN6.
 // Both sides decompose each Coord into axes and filter.
 fn bench_cs6_md_axis_projection(c: &mut Criterion) {
-    let mut cs6 = tagma_core::CoordSpace6::<u32>::new();
+    let mut cs6 = tagma_core::CoordSpaceN6::<u32>::new();
     let mut hm: std::collections::HashMap<[u16; 6], u32> = std::collections::HashMap::new();
     let mk = |v: u16| tagma_core::Coord::new(v).unwrap();
 
@@ -1316,7 +1316,7 @@ fn bench_cs6_md_axis_projection(c: &mut Criterion) {
     group.throughput(criterion::Throughput::Elements(1000));
 
     // Filter: coord[2].initial == 2 AND coord[4].medial == 3
-    group.bench_function("CoordSpace6", |b| {
+    group.bench_function("CoordSpaceN6", |b| {
         b.iter(|| {
             let count = cs6
                 .iter_tree()
@@ -1345,7 +1345,7 @@ fn bench_cs6_md_axis_projection(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// CoordSpace19 (N=19, SHA-256-scale) benchmarks — 100 entries at depth 19
+// CoordSpaceN19 (N=19, SHA-256-scale) benchmarks — 100 entries at depth 19
 //
 // Path distribution: 2 × 2 × 1 × ... × 25 = 100 entries
 //   All entries share first 18 coords (2 unique at depth 1-2, 1 each at 3-18).
@@ -1355,7 +1355,7 @@ fn bench_cs6_md_axis_projection(c: &mut Criterion) {
 
 // Edge/cs19_sparse_100: 100 entries at depth 19, get + iter.
 fn bench_cs19_sparse_100(c: &mut Criterion) {
-    let mut cs19 = tagma_core::CoordSpace19::<u32>::new();
+    let mut cs19 = tagma_core::CoordSpaceN19::<u32>::new();
     let mut hm: std::collections::HashMap<[u16; 19], u32> = std::collections::HashMap::new();
     let mut paths = Vec::with_capacity(100);
     let mk = |v: u16| tagma_core::Coord::new(v).unwrap();
@@ -1383,7 +1383,7 @@ fn bench_cs19_sparse_100(c: &mut Criterion) {
     let mut group = c.benchmark_group("Edge/cs19_sparse_100");
     group.throughput(criterion::Throughput::Elements(100));
 
-    group.bench_function("CoordSpace19/get", |b| {
+    group.bench_function("CoordSpaceN19/get", |b| {
         b.iter(|| {
             for (path, _) in &paths {
                 black_box(cs19.at_path(path));
@@ -1402,10 +1402,10 @@ fn bench_cs19_sparse_100(c: &mut Criterion) {
 }
 
 // Edge/cs19_nonexistent_prefix: query a nonexistent prefix against 100 stored entries at depth 19.
-// CoordSpace19 navigates depth-18 branch, finds None → immediate.
+// CoordSpaceN19 navigates depth-18 branch, finds None → immediate.
 // HashMap scans all 100 entries.
 fn bench_cs19_nonexistent_prefix(c: &mut Criterion) {
-    let mut cs19 = tagma_core::CoordSpace19::<u32>::new();
+    let mut cs19 = tagma_core::CoordSpaceN19::<u32>::new();
     let mut hm: std::collections::HashMap<[u16; 19], u32> = std::collections::HashMap::new();
     let mk = |v: u16| tagma_core::Coord::new(v).unwrap();
 
@@ -1430,7 +1430,7 @@ fn bench_cs19_nonexistent_prefix(c: &mut Criterion) {
     let missing_prefix = tagma_core::CoordPath::new(missing_coords);
 
     let mut group = c.benchmark_group("Edge/cs19_nonexistent_prefix");
-    group.bench_function("CoordSpace19", |b| {
+    group.bench_function("CoordSpaceN19", |b| {
         b.iter(|| black_box(cs19.at_path(&missing_prefix)))
     });
     group.bench_function("HashMap", |b| {

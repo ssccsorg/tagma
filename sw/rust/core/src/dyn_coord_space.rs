@@ -11,7 +11,7 @@ use alloc::vec::Vec;
 /// Each level is a fixed 11,172-slot array indexed directly by `Coord` —
 /// no hashing, no collisions, regardless of depth.
 ///
-/// Unlike [`CoordSpace`] (no_alloc, N=1) and [`CoordSpace6`] (compile-time N=6),
+/// Unlike [`CoordSpace`] (no_alloc, N=1) and [`CoordSpaceN6`] (compile-time N=6),
 /// the depth is determined at runtime by the length of the path slice.
 /// Memory is allocated lazily: only paths that are actually written to
 /// consume nodes.
