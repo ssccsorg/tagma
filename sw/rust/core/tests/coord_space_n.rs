@@ -1,5 +1,5 @@
 use tagma_core::{
-    Coord, CoordPath, CoordSpaceN12, CoordSpaceN19, CoordSpaceN2, CoordSpaceN6, CoordSpaceN,
+    Coord, CoordPath, CoordSpaceN, CoordSpaceN12, CoordSpaceN19, CoordSpaceN2, CoordSpaceN6,
 };
 
 // ── CoordSpaceN<1, _> — flat map tests ──

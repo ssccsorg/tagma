@@ -450,5 +450,3 @@ impl<V: PartialEq> PartialEq for CoordSpace<V> {
 impl<V: PartialEq> Eq for CoordSpace<V> {}
 
 // ── Type alias ─────────────────────────────────────────
-
-

@@ -31,6 +31,8 @@ pub use coord_set::CoordSet;
 pub use coord_space::CoordSpace;
 
 #[cfg(feature = "alloc")]
+pub use coord_space_n::CoordSpaceN;
+#[cfg(feature = "alloc")]
 pub use coord_space_n::CoordSpaceN12;
 #[cfg(feature = "alloc")]
 pub use coord_space_n::CoordSpaceN19;
@@ -40,8 +42,6 @@ pub use coord_space_n::CoordSpaceN2;
 pub use coord_space_n::CoordSpaceN3;
 #[cfg(feature = "alloc")]
 pub use coord_space_n::CoordSpaceN6;
-#[cfg(feature = "alloc")]
-pub use coord_space_n::CoordSpaceN;
 #[cfg(feature = "alloc")]
 pub use dyn_coord_space::DynCoordSpace;
 #[cfg(feature = "alloc")]

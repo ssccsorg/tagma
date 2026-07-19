@@ -1,6 +1,6 @@
 use tagma_core::{
-    Coord, CoordPath, CoordSpace, CoordSpaceN12, CoordSpaceN19, CoordSpaceN2, CoordSpaceN3,
-    CoordSpaceN6, CoordSpaceN,
+    Coord, CoordPath, CoordSpace, CoordSpaceN, CoordSpaceN12, CoordSpaceN19, CoordSpaceN2,
+    CoordSpaceN3, CoordSpaceN6,
 };
 
 // ── CoordSpaceN2 — cross-product FIH-like scenario ──
