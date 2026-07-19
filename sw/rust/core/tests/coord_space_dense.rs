@@ -50,7 +50,10 @@ fn clear() {
     s.clear();
     assert!(s.is_empty());
     assert_eq!(
-        s.at_path(&CoordPath::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()])),
+        s.at_path(&CoordPath::new([
+            Coord::new(0).unwrap(),
+            Coord::new(0).unwrap()
+        ])),
         None
     );
 }

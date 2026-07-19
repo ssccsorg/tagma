@@ -7,6 +7,7 @@ set -euo pipefail
 #   ./run.sh                 # Full pipeline: check → build → test
 #   ./run.sh --check         # fmt → clippy → build → test (strict)
 #   ./run.sh --fix           # auto-fix → build → test
+#   ./run.sh --bench         # build + test + core benchmarks
 #   ./run.sh --doc           # build documentation
 #   ./run.sh --help
 #
@@ -18,9 +19,18 @@ export RUSTFLAGS="-D warnings"
 
 check_checks() {
     (cd sw/rust && cargo fmt --check)
+    # default feature set (alloc): tree, dense, set types
+    echo "--- clippy (default features) ---"
     (cd sw/rust && cargo clippy --all-targets)
+    # mmap feature: CoordSpaceM (N>=3 mmap-backed dense)
+    echo "--- clippy (mmap feature) ---"
+    (cd sw/rust && cargo clippy --all-targets --features mmap)
+    echo "--- build + test (default features) ---"
     (cd sw/rust && cargo build --release)
     (cd sw/rust && cargo test --release)
+    echo "--- build + test (mmap feature) ---"
+    (cd sw/rust && cargo build --release --features mmap)
+    (cd sw/rust && cargo test --release --features mmap)
     # no_alloc: verify Coord, CoordPath, CoordSet, CoordSpace compile
     # without heap allocator (core types only).
     echo "--- no_alloc build + test ---"
@@ -56,8 +66,8 @@ case "${1:-}" in
         ;;
     --bench|bench)
         build_and_test
-        echo "--- running core benchmarks (inserts, lookup, n_scaling) ---"
-        (cd sw/rust && cargo bench -- "inserts|lookup|n_scaling|spatial|edge" 2>&1 | tail -20)
+        echo "--- running core benchmarks ---"
+        (cd sw/rust && cargo bench --features mmap -- "inserts|lookup|n_scaling|n2_comparison|spatial|edge" 2>&1 | tail -20)
         ;;
     --doc|doc)
         build_docs

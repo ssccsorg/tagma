@@ -13,8 +13,8 @@ use core::ptr::{self, NonNull};
 const fn coord_slots(n: usize) -> usize {
     let sq = 11172usize.wrapping_mul(11172); // 124,813,584
     match n {
-        3 => sq.wrapping_mul(11172),  // = 11172^3, fits in 64-bit
-        _ => 0,  // unsupported depth; new() will panic
+        3 => sq.wrapping_mul(11172), // = 11172^3, fits in 64-bit
+        _ => 0,                      // unsupported depth; new() will panic
     }
 }
 
@@ -45,8 +45,7 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
 
     /// Returns the allocation size in bytes.
     fn alloc_size() -> usize {
-        Self::SLOT_COUNT
-            .saturating_mul(core::mem::size_of::<Option<V>>())
+        Self::SLOT_COUNT.saturating_mul(core::mem::size_of::<Option<V>>())
     }
 
     /// Creates an empty mmap-backed space.
@@ -71,10 +70,7 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
             )
         };
         if ptr == libc::MAP_FAILED {
-            panic!(
-                "CoordSpaceM: mmap(N={}) failed for {} bytes",
-                N, size,
-            );
+            panic!("CoordSpaceM: mmap(N={}) failed for {} bytes", N, size,);
         }
         CoordSpaceM {
             ptr: NonNull::new(ptr as *mut Option<V>).unwrap(),
@@ -98,7 +94,12 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
     #[inline]
     pub fn at_path(&self, path: &CoordPath<N>) -> Option<&V> {
         let idx = linear_index::<N>(path);
-        debug_assert!(idx < Self::SLOT_COUNT, "CoordSpaceM at_path: index {} out of bounds (max {})", idx, Self::SLOT_COUNT - 1);
+        debug_assert!(
+            idx < Self::SLOT_COUNT,
+            "CoordSpaceM at_path: index {} out of bounds (max {})",
+            idx,
+            Self::SLOT_COUNT - 1
+        );
         unsafe { (*self.ptr.as_ptr().add(idx)).as_ref() }
     }
 
@@ -106,7 +107,12 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
     #[inline]
     pub fn place_path(&mut self, path: &CoordPath<N>, value: V) -> Option<V> {
         let idx = linear_index::<N>(path);
-        debug_assert!(idx < Self::SLOT_COUNT, "CoordSpaceM place_path: index {} out of bounds (max {})", idx, Self::SLOT_COUNT - 1);
+        debug_assert!(
+            idx < Self::SLOT_COUNT,
+            "CoordSpaceM place_path: index {} out of bounds (max {})",
+            idx,
+            Self::SLOT_COUNT - 1
+        );
         let slot = unsafe { &mut *self.ptr.as_ptr().add(idx) };
         let prev = slot.take();
         *slot = Some(value);
@@ -120,7 +126,12 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
     #[inline]
     pub fn vacate_path(&mut self, path: &CoordPath<N>) -> Option<V> {
         let idx = linear_index::<N>(path);
-        debug_assert!(idx < Self::SLOT_COUNT, "CoordSpaceM vacate_path: index {} out of bounds (max {})", idx, Self::SLOT_COUNT - 1);
+        debug_assert!(
+            idx < Self::SLOT_COUNT,
+            "CoordSpaceM vacate_path: index {} out of bounds (max {})",
+            idx,
+            Self::SLOT_COUNT - 1
+        );
         let slot = unsafe { &mut *self.ptr.as_ptr().add(idx) };
         let prev = slot.take();
         if prev.is_some() {
@@ -144,7 +155,10 @@ impl<const N: usize, V> CoordSpaceM<N, V> {
                     -1,
                     0,
                 );
-                assert!(result != libc::MAP_FAILED, "CoordSpaceM: MAP_FIXED remap failed on clear");
+                assert!(
+                    result != libc::MAP_FAILED,
+                    "CoordSpaceM: MAP_FIXED remap failed on clear"
+                );
             }
         }
         self.len = 0;
@@ -159,7 +173,10 @@ impl<const N: usize, V: Clone> Clone for CoordSpaceM<N, V> {
             // N=12 and N=19 saturate to usize::MAX; cloning them would
             // try to memcpy the entire virtual address space. For those
             // depths, cloning is not supported.
-            panic!("CoordSpaceM: clone not supported for N={} (size={})", N, size);
+            panic!(
+                "CoordSpaceM: clone not supported for N={} (size={})",
+                N, size
+            );
         }
         // Allocate a new mmap via raw mmap (not Self::new, because we
         // need the pointer without wrapping it in CoordSpaceM yet).
@@ -174,7 +191,10 @@ impl<const N: usize, V: Clone> Clone for CoordSpaceM<N, V> {
             )
         };
         if ptr == libc::MAP_FAILED {
-            panic!("CoordSpaceM: mmap failed during clone (N={}, size={})", N, size);
+            panic!(
+                "CoordSpaceM: mmap failed during clone (N={}, size={})",
+                N, size
+            );
         }
         unsafe {
             libc::memcpy(ptr, self.ptr.as_ptr() as *const libc::c_void, size);

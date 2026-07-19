@@ -1249,7 +1249,18 @@ criterion_group!(
 );
 
 criterion_main!(
-    inserts, lookup, mutate, iterate, micro, n2_comparison, stress, spatial, n_scaling, large, edge, deep,
+    inserts,
+    lookup,
+    mutate,
+    iterate,
+    micro,
+    n2_comparison,
+    stress,
+    spatial,
+    n_scaling,
+    large,
+    edge,
+    deep,
     set
 );
 

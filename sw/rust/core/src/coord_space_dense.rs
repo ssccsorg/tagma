@@ -188,9 +188,10 @@ pub(crate) fn linear_index<const N: usize>(path: &CoordPath<N>) -> usize {
     let mut idx = 0usize;
     let mut i = 0;
     while i < N {
-        idx = idx.wrapping_mul(11172).wrapping_add(path.coords()[i].index() as usize);
+        idx = idx
+            .wrapping_mul(11172)
+            .wrapping_add(path.coords()[i].index() as usize);
         i += 1;
     }
     idx
 }
-
