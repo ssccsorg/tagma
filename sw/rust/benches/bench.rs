@@ -939,12 +939,13 @@ fn bench_coordset_spatial_query(c: &mut Criterion) {
 }
 
 // N_scaling/get  (single lookup, Apple M1)
-//   N=1   CoordSpace    0.38 ns   space 10^4
-//   N=2   CoordSpaceN2   0.87 ns   space 10^8
-//   N=3   CoordSpaceN3   2.66 ns   space 10^12
-//   N=6   CoordSpaceN6   5.60 ns   space 10^24
-//   N=12  CoordSpaceN12  13.2  ns   space 10^67
-//   N=19  CoordSpaceN19  53.2  ns   space 10^77 (SHA-256 scale)
+//   N=1   CoordSpace      0.38 ns   space 10^4
+//   N=2   CoordSpace2     0.39 ns   space 10^8 (dense array, 2.3x faster than tree)
+//   N=2   CoordSpaceN2    0.87 ns   space 10^8 (tree)
+//   N=3   CoordSpaceN3    2.66 ns   space 10^12
+//   N=6   CoordSpaceN6    5.68 ns   space 10^24
+//   N=12  CoordSpaceN12   20.1  ns   space 10^67
+//   N=19  CoordSpaceN19   50.8  ns   space 10^77 (SHA-256 scale)
 fn bench_n_scaling_get(c: &mut Criterion) {
     let path6 = tagma_core::CoordPath::<6>::new(core::array::from_fn(|i| {
         tagma_core::Coord::new(i as u16).unwrap()
@@ -979,6 +980,13 @@ fn bench_n_scaling_get(c: &mut Criterion) {
         cs.place_path(&path2, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=2");
         group.bench_function("CoordSpaceN2", |b| b.iter(|| black_box(cs.at_path(&path2))));
+        group.finish();
+    }
+    {
+        let mut cs = tagma_core::CoordSpace2::<u64>::new();
+        cs.place_path(&path2, 42);
+        let mut group = c.benchmark_group("N_scaling/get/N=2");
+        group.bench_function("CoordSpace2", |b| b.iter(|| black_box(cs.at_path(&path2))));
         group.finish();
     }
     {
@@ -1019,9 +1027,16 @@ fn bench_n_scaling_get(c: &mut Criterion) {
 // CoordSpaceN2 (N=2) benchmarks — cross-product FIH-like scenario
 // ===========================================================================
 
-// CoordSpaceN2/insert/1000          803 µs
+// Dense vs tree comparison at N=2 (Apple M1, CoordSpace2 vs CoordSpaceN2):
+//   insert/1000   CoordSpace2   122 µs   CoordSpaceN2   817 µs    6.7x faster
+//   get/1000      Coordpace2    275 ns   CoordSpaceN2  1.06 µs    3.8x faster
+//   single get    CoordSpace2  0.39 ns   CoordSpaceN2  0.87 ns    2.3x faster
+
+// CoordSpaceN2/insert/1000          817 µs
+// CoordSpace2/insert/1000           122 µs  (dense array)
 fn bench_cm2_insert_1000(c: &mut Criterion) {
-    c.bench_function("CoordSpaceN2/insert/1000", |b| {
+    let mut group = c.benchmark_group("N=2/insert/1000");
+    group.bench_function("CoordSpaceN2", |b| {
         b.iter(|| {
             let mut map = tagma_core::CoordSpaceN2::new();
             for i in 0u16..100 {
@@ -1036,21 +1051,55 @@ fn bench_cm2_insert_1000(c: &mut Criterion) {
             black_box(map);
         })
     });
+    group.bench_function("CoordSpace2", |b| {
+        b.iter(|| {
+            let mut map = tagma_core::CoordSpace2::new();
+            for i in 0u16..100 {
+                for j in 0u16..10 {
+                    let path = tagma_core::CoordPath::new([
+                        tagma_core::Coord::new(i).unwrap(),
+                        tagma_core::Coord::new(j).unwrap(),
+                    ]);
+                    black_box(map.place_path(&path, (i * 100 + j) as u32));
+                }
+            }
+            black_box(map);
+        })
+    });
+    group.finish();
 }
 
 // CoordSpaceN2/get/1000             4.92 µs
+// CoordSpace2/get/1000                 ?  µs  (dense array)
 fn bench_cm2_get_1000(c: &mut Criterion) {
-    let mut map = tagma_core::CoordSpaceN2::new();
-    for i in 0u16..100 {
-        for j in 0u16..10 {
-            let path = tagma_core::CoordPath::new([
-                tagma_core::Coord::new(i).unwrap(),
-                tagma_core::Coord::new(j).unwrap(),
-            ]);
-            map.place_path(&path, (i * 100 + j) as u32);
+    let map_n2 = {
+        let mut map = tagma_core::CoordSpaceN2::new();
+        for i in 0u16..100 {
+            for j in 0u16..10 {
+                let path = tagma_core::CoordPath::new([
+                    tagma_core::Coord::new(i).unwrap(),
+                    tagma_core::Coord::new(j).unwrap(),
+                ]);
+                map.place_path(&path, (i * 100 + j) as u32);
+            }
         }
-    }
-    c.bench_function("CoordSpaceN2/get/1000", |b| {
+        map
+    };
+    let map_dense = {
+        let mut map = tagma_core::CoordSpace2::new();
+        for i in 0u16..100 {
+            for j in 0u16..10 {
+                let path = tagma_core::CoordPath::new([
+                    tagma_core::Coord::new(i).unwrap(),
+                    tagma_core::Coord::new(j).unwrap(),
+                ]);
+                map.place_path(&path, (i * 100 + j) as u32);
+            }
+        }
+        map
+    };
+    let mut group = c.benchmark_group("N=2/get/1000");
+    group.bench_function("CoordSpaceN2", |b| {
         b.iter(|| {
             for i in 0u16..100 {
                 for j in 0u16..10 {
@@ -1058,11 +1107,25 @@ fn bench_cm2_get_1000(c: &mut Criterion) {
                         tagma_core::Coord::new(i).unwrap(),
                         tagma_core::Coord::new(j).unwrap(),
                     ]);
-                    black_box(black_box(&map).at_path(&path));
+                    black_box(map_n2.at_path(&path));
                 }
             }
         })
     });
+    group.bench_function("CoordSpace2", |b| {
+        b.iter(|| {
+            for i in 0u16..100 {
+                for j in 0u16..10 {
+                    let path = tagma_core::CoordPath::new([
+                        tagma_core::Coord::new(i).unwrap(),
+                        tagma_core::Coord::new(j).unwrap(),
+                    ]);
+                    black_box(map_dense.at_path(&path));
+                }
+            }
+        })
+    });
+    group.finish();
 }
 
 // ===========================================================================
