@@ -1,3 +1,37 @@
+// ===========================================================================
+// Tagma-core CoordSpace family — implementation summary
+// ===========================================================================
+//
+//                        ┌─────────────────────────────────────────────┐
+//                        │              CoordSpace                    │
+//                        │  ┌──────────┬───────────┬────────┬──────┐  │
+//                        │  │ N=1 heap │ N=2 heap  │ N≥3    │ any N│  │
+//                        │  │          │           │ mmap   │ tree │  │
+//                        │  │ CoordSp   │ CoordSp2  │ CoordM │ CoordN│ │
+//                        │  │ 22 KB     │ 119 MB    │1.27 TB+│ entry│  │
+//                        │  │ load      │ load      │ page   │ Box+ │  │
+//                        │  │ 0.39 ns   │ 0.39 ns   │0.40 ns │0.94- │  │
+//                        │  │ ✅완전    │ ✅완전    │✅완전  │⚠️폴백│  │
+//                        │  └──────────┴───────────┴────────┴──────┘  │
+//                        │   true Tagma   │      software fallback     │
+//                        └─────────────────────────────────────────────┘
+//
+// Single-syllable get latency (Apple M1):
+//   CoordSpace   N=1  heap  0.39 ns  22 KB (inline array, zero alloc)
+//   CoordSpace2  N=2  heap  0.39 ns  119 MB (single alloc_zeroed)
+//   CoordSpaceM3 N=3  mmap  0.40 ns  1.27 TB (MAP_NORESERVE, lazy page)
+//   CoordSpaceN2 N=2  tree  0.94 ns  (sparse, per-entry heap alloc)
+//   CoordSpaceN3 N=3  tree  2.69 ns
+//   CoordSpaceN6 N=6  tree  5.91 ns
+//   CoordSpaceN12 N=12 tree  15.5 ns
+//   CoordSpaceN19 N=19 tree  40.8 ns
+//
+// Naming convention:
+//   No suffix (CoordSpace)       = dense array, true Tagma
+//   N suffix  (CoordSpaceN<N>)   = sparse tree, software fallback
+//   M suffix  (CoordSpaceM<N>)   = mmap-backed dense, N>=3
+// ===========================================================================
+
 use criterion::{black_box, criterion_group, criterion_main, Criterion};
 
 // ---------------------------------------------------------------------------
@@ -939,13 +973,14 @@ fn bench_coordset_spatial_query(c: &mut Criterion) {
 }
 
 // N_scaling/get  (single lookup, Apple M1)
-//   N=1   CoordSpace      0.38 ns   space 10^4
-//   N=2   CoordSpace2     0.39 ns   space 10^8 (dense array, 2.3x faster than tree)
-//   N=2   CoordSpaceN2    0.87 ns   space 10^8 (tree)
-//   N=3   CoordSpaceN3    2.66 ns   space 10^12
-//   N=6   CoordSpaceN6    5.68 ns   space 10^24
-//   N=12  CoordSpaceN12   20.1  ns   space 10^67
-//   N=19  CoordSpaceN19   50.8  ns   space 10^77 (SHA-256 scale)
+//   N=1   CoordSpace      0.39 ns   space 10^4  (inline array, no alloc)
+//   N=2   CoordSpace2     0.39 ns   space 10^8  (dense heap, 2.4x faster)
+//   N=2   CoordSpaceN2    0.94 ns   space 10^8  (tree)
+//   N=3   CoordSpaceN3    2.69 ns   space 10^12
+//   N=3   CoordSpaceM3    0.40 ns   space 10^12 (mmap dense, 6.7x faster)
+//   N=6   CoordSpaceN6    5.91 ns   space 10^24
+//   N=12  CoordSpaceN12   15.5  ns   space 10^67
+//   N=19  CoordSpaceN19   40.8  ns   space 10^77 (SHA-256 scale)
 fn bench_n_scaling_get(c: &mut Criterion) {
     let path6 = tagma_core::CoordPath::<6>::new(core::array::from_fn(|i| {
         tagma_core::Coord::new(i as u16).unwrap()
@@ -994,6 +1029,14 @@ fn bench_n_scaling_get(c: &mut Criterion) {
         cs.place_path(&path3, 42);
         let mut group = c.benchmark_group("N_scaling/get/N=3");
         group.bench_function("CoordSpaceN3", |b| b.iter(|| black_box(cs.at_path(&path3))));
+        group.finish();
+    }
+    #[cfg(feature = "mmap")]
+    {
+        let mut cs = tagma_core::CoordSpaceM3::<u64>::new();
+        cs.place_path(&path3, 42);
+        let mut group = c.benchmark_group("N_scaling/get/N=3");
+        group.bench_function("CoordSpaceM3", |b| b.iter(|| black_box(cs.at_path(&path3))));
         group.finish();
     }
     {
