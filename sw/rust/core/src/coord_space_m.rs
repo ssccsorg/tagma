@@ -230,33 +230,31 @@ impl<const N: usize, V> Default for CoordSpaceM<N, V> {
 }
 
 // ---------------------------------------------------------------------------
-// Type aliases
+// Type alias
 // ---------------------------------------------------------------------------
 
 /// 3-syllable: mmap-backed dense, true Tagma at N=3 scale.
+///
+/// This is the only supported depth for `CoordSpaceM`. At N>=6 the slot
+/// count $11172^N$ exceeds `usize` on 64-bit platforms, making dense
+/// linear addressing impossible. Use `CoordSpaceN[N]` (sparse tree) for
+/// depths >= 4.
 pub type CoordSpaceM3<V> = CoordSpaceM<3, V>;
 
-/// 6-syllable: mmap-backed dense, UUID-scale.
-pub type CoordSpaceM6<V> = CoordSpaceM<6, V>;
-
-/// 12-syllable: mmap-backed dense.
-pub type CoordSpaceM12<V> = CoordSpaceM<12, V>;
-
-/// 19-syllable: SHA-256-scale — mmap-backed dense.
-pub type CoordSpaceM19<V> = CoordSpaceM<19, V>;
+// The following depths are intentionally omitted:
+//   CoordSpaceM6  — 11172^6 overflows usize (1.94e24 > u64::MAX)
+//   CoordSpaceM12 — 11172^12 overflows usize
+//   CoordSpaceM19 — 11172^19 overflows usize
+// For these depths, the CoordSpace family provides tree-based fallbacks
+// (CoordSpaceN6, CoordSpaceN12, CoordSpaceN19) via the alloc feature.
 
 // ---------------------------------------------------------------------------
 // Helper
 // ---------------------------------------------------------------------------
 
 /// Linear index into the flat mmap array for a CoordPath of depth N.
+/// Delegates to the shared implementation in coord_space_dense.
 #[inline]
 fn linear_index<const N: usize>(path: &CoordPath<N>) -> usize {
-    let mut idx = 0usize;
-    let mut i = 0;
-    while i < N {
-        idx = idx.wrapping_mul(11172).wrapping_add(path.coords()[i].index() as usize);
-        i += 1;
-    }
-    idx
+    crate::coord_space_dense::linear_index::<N>(path)
 }

@@ -64,13 +64,7 @@ pub use coord_space_dense::CoordSpace2;
 #[cfg(feature = "mmap")]
 pub use coord_space_m::CoordSpaceM;
 #[cfg(feature = "mmap")]
-pub use coord_space_m::CoordSpaceM12;
-#[cfg(feature = "mmap")]
-pub use coord_space_m::CoordSpaceM19;
-#[cfg(feature = "mmap")]
 pub use coord_space_m::CoordSpaceM3;
-#[cfg(feature = "mmap")]
-pub use coord_space_m::CoordSpaceM6;
 
 // Internal types (used by CoordSpace):
 pub use coord_space::FlatDrain;

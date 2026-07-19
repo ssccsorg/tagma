@@ -15,7 +15,7 @@ default = ["alloc"]
 alloc = []
 
 # Enables CoordSpaceM (mmap-backed dense array for N>=3).
-# Implies alloc. Dependencia libc proporciona mmap en Unix.
+# Implies alloc. libc provides mmap on Unix.
 mmap = ["alloc", "libc"]
 
 [dependencies]

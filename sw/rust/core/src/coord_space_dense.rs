@@ -42,130 +42,124 @@ macro_rules! define_dense_coord_space {
     ($name:ident, $n:expr) => {
         const SLOT_COUNT: usize = coord_slots($n);
 
-            #[doc = concat!(
-                "Dense, zeroed, heap-allocated CoordSpace for N=", stringify!($n), ".\n\n",
-                "All ", stringify!($n), " syllable(s): ", stringify!(SLOT_COUNT), " slots.\n",
-                "Backed by a single `alloc_zeroed` call — true Tagma, no hashing, no tree.\n\n",
-                "# Panics\n\n",
-                "Panics if `SLOT_COUNT * size_of::<Option<V>>()` overflows `usize`."
-            )]
-            pub struct $name<V> {
-                slots: Box<[Option<V>]>,
-                len: usize,
+        #[doc = concat!(
+            "Dense, zeroed, heap-allocated CoordSpace for N=", stringify!($n), ".\n\n",
+            "All ", stringify!($n), " syllable(s): ", stringify!(SLOT_COUNT), " slots.\n",
+            "Backed by a single `alloc_zeroed` call \u{2014} true Tagma, no hashing, no tree.\n\n",
+            "# Panics\n\n",
+            "Panics if `SLOT_COUNT * size_of::<Option<V>>()` overflows `usize`."
+        )]
+        pub struct $name<V> {
+            slots: Box<[Option<V>]>,
+            len: usize,
+        }
+
+        impl<V> $name<V> {
+            /// Creates an empty dense space with all slots zeroed (None).
+            ///
+            /// Allocation size: `SLOT_COUNT * size_of::<Option<V>>()` bytes.
+            /// Initialized via `alloc_zeroed` \u{2014} pages are lazily committed by the OS.
+            #[inline]
+            pub fn new() -> Self {
+                let slot_bytes = core::mem::size_of::<Option<V>>()
+                    .checked_mul(SLOT_COUNT)
+                    .expect("overflow in CoordSpace dense allocation size");
+                let layout = Layout::from_size_align(slot_bytes, core::mem::align_of::<Option<V>>())
+                    .expect("invalid Layout for CoordSpace dense array");
+                let ptr = unsafe { alloc_zeroed(layout) as *mut Option<V> };
+                assert!(!ptr.is_null(), "CoordSpace dense allocation failed");
+                let slots = unsafe { Box::from_raw(slice::from_raw_parts_mut(ptr, SLOT_COUNT)) };
+                $name { slots, len: 0 }
             }
 
-            impl<V> $name<V> {
-                /// Creates an empty dense space with all slots zeroed (None).
-                ///
-                /// Allocation size: `SLOT_COUNT * size_of::<Option<V>>()` bytes.
-                /// Initialized via `alloc_zeroed` — pages are lazily committed by the OS.
-                #[inline]
-                pub fn new() -> Self {
-                    let slot_bytes = core::mem::size_of::<Option<V>>()
-                        .checked_mul(SLOT_COUNT)
-                        .expect("overflow in CoordSpace dense allocation size");
-                    let layout = Layout::from_size_align(slot_bytes, core::mem::align_of::<Option<V>>())
-                        .expect("invalid Layout for CoordSpace dense array");
-                    let ptr = unsafe { alloc_zeroed(layout) as *mut Option<V> };
-                    assert!(!ptr.is_null(), "CoordSpace dense allocation failed");
-                    let slots = unsafe { Box::from_raw(slice::from_raw_parts_mut(ptr, SLOT_COUNT)) };
-                    $name { slots, len: 0 }
-                }
-
-                /// Returns the number of occupied slots.
-                #[inline]
-                pub fn len(&self) -> usize {
-                    self.len
-                }
-
-                /// Returns `true` if no slots are occupied.
-                #[inline]
-                pub fn is_empty(&self) -> bool {
-                    self.len == 0
-                }
-
-                /// Returns a reference to the value at `path`, or `None`.
-                pub fn at_path(&self, path: &CoordPath<$n>) -> Option<&V> {
-                    let idx = linear_index::<$n>(path);
-                    // SAFETY: linear_index returns a value < SLOT_COUNT for valid CoordPaths.
-                    unsafe { (*self.slots.as_ptr().add(idx)).as_ref() }
-                }
-
-                /// Places `value` at `path`. Returns the previous value if any.
-                pub fn place_path(&mut self, path: &CoordPath<$n>, value: V) -> Option<V> {
-                    let idx = linear_index::<$n>(path);
-                    let slot = unsafe { &mut *self.slots.as_mut_ptr().add(idx) };
-                    let prev = slot.take();
-                    *slot = Some(value);
-                    if prev.is_none() {
-                        self.len += 1;
-                    }
-                    prev
-                }
-
-                /// Removes the value at `path`. Returns it if present.
-                pub fn vacate_path(&mut self, path: &CoordPath<$n>) -> Option<V> {
-                    let idx = linear_index::<$n>(path);
-                    let slot = unsafe { &mut *self.slots.as_mut_ptr().add(idx) };
-                    let prev = slot.take();
-                    if prev.is_some() {
-                        self.len -= 1;
-                    }
-                    prev
-                }
-
-                /// Removes all values. Retains the allocation.
-                pub fn clear(&mut self) {
-                    // Zero the entire allocation (faster than iterating).
-                    let ptr = self.slots.as_mut_ptr() as *mut u8;
-                    let bytes = SLOT_COUNT * core::mem::size_of::<Option<V>>();
-                    unsafe { ptr::write_bytes(ptr, 0, bytes) };
-                    self.len = 0;
-                }
+            #[inline]
+            pub fn len(&self) -> usize {
+                self.len
             }
 
-            impl<V> Default for $name<V> {
-                #[inline]
-                fn default() -> Self {
-                    Self::new()
-                }
+            #[inline]
+            pub fn is_empty(&self) -> bool {
+                self.len == 0
             }
 
-            impl<V: core::fmt::Debug> core::fmt::Debug for $name<V> {
-                fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-                    f.debug_struct(stringify!($name))
-                        .field("N", &($n))
-                        .field("len", &self.len)
-                        .field("capacity", &SLOT_COUNT)
-                        .finish()
-                }
+            pub fn at_path(&self, path: &CoordPath<$n>) -> Option<&V> {
+                let idx = linear_index::<$n>(path);
+                // SAFETY: linear_index returns a value < SLOT_COUNT for valid CoordPaths.
+                unsafe { (*self.slots.as_ptr().add(idx)).as_ref() }
             }
 
-            impl<V: PartialEq> PartialEq for $name<V> {
-                fn eq(&self, other: &Self) -> bool {
-                    self.slots == other.slots
+            pub fn place_path(&mut self, path: &CoordPath<$n>, value: V) -> Option<V> {
+                let idx = linear_index::<$n>(path);
+                let slot = unsafe { &mut *self.slots.as_mut_ptr().add(idx) };
+                let prev = slot.take();
+                *slot = Some(value);
+                if prev.is_none() {
+                    self.len += 1;
                 }
-            }
-            impl<V: PartialEq> Eq for $name<V> {}
-
-            impl<V: Clone> Clone for $name<V> {
-                fn clone(&self) -> Self {
-                    $name {
-                        slots: self.slots.clone(),
-                        len: self.len,
-                    }
-                }
+                prev
             }
 
-            impl<V> FromIterator<(CoordPath<$n>, V)> for $name<V> {
-                fn from_iter<I: IntoIterator<Item = (CoordPath<$n>, V)>>(iter: I) -> Self {
-                    let mut space = Self::new();
-                    for (path, value) in iter {
-                        space.place_path(&path, value);
-                    }
-                    space
+            pub fn vacate_path(&mut self, path: &CoordPath<$n>) -> Option<V> {
+                let idx = linear_index::<$n>(path);
+                let slot = unsafe { &mut *self.slots.as_mut_ptr().add(idx) };
+                let prev = slot.take();
+                if prev.is_some() {
+                    self.len -= 1;
+                }
+                prev
+            }
+
+            pub fn clear(&mut self) {
+                let ptr = self.slots.as_mut_ptr() as *mut u8;
+                let bytes = (SLOT_COUNT as u64)
+                    .saturating_mul(core::mem::size_of::<Option<V>>() as u64);
+                unsafe { ptr::write_bytes(ptr, 0, bytes as usize) };
+                self.len = 0;
+            }
+        }
+
+        impl<V> Default for $name<V> {
+            #[inline]
+            fn default() -> Self {
+                Self::new()
+            }
+        }
+
+        impl<V: core::fmt::Debug> core::fmt::Debug for $name<V> {
+            fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                f.debug_struct(stringify!($name))
+                    .field("N", &($n))
+                    .field("len", &self.len)
+                    .field("capacity", &SLOT_COUNT)
+                    .finish()
+            }
+        }
+
+        impl<V: PartialEq> PartialEq for $name<V> {
+            fn eq(&self, other: &Self) -> bool {
+                self.slots == other.slots
+            }
+        }
+        impl<V: PartialEq> Eq for $name<V> {}
+
+        impl<V: Clone> Clone for $name<V> {
+            fn clone(&self) -> Self {
+                $name {
+                    slots: self.slots.clone(),
+                    len: self.len,
                 }
             }
+        }
+
+        impl<V> FromIterator<(CoordPath<$n>, V)> for $name<V> {
+            fn from_iter<I: IntoIterator<Item = (CoordPath<$n>, V)>>(iter: I) -> Self {
+                let mut space = Self::new();
+                for (path, value) in iter {
+                    space.place_path(&path, value);
+                }
+                space
+            }
+        }
     };
 }
 
