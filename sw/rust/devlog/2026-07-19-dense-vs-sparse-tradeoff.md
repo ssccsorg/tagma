@@ -11,14 +11,14 @@ Contiguous memory cost for the full address space:
 
 | N | Address space $11{,}172^N$ | Contiguous memory ($\text{Option<()>}$) | Feasible? |
 |---|---------------------------|----------------------------------------|-----------|
-| 1 | $1.12 \times 10^4$ | 22 KB | Yes |
-| 2 | $1.25 \times 10^8$ | 1.3 GB | Marginal |
-| 3 | $1.39 \times 10^{12}$ | 15 TB | No |
-| 6 | $1.94 \times 10^{24}$ | $2.1 \times 10^{19}$ TB | No |
+| 1 | $1.12 \times 10^4$ | 11 KB | Yes |
+| 2 | $1.25 \times 10^8$ | 119 MB | Marginal |
+| 3 | $1.39 \times 10^{12}$ | 1.27 TB | No |
+| 6 | $1.94 \times 10^{24}$ | $1.94 \times 10^{12}$ TB | No |
 | 19 | $\approx 2^{256}$ | Unmeasurable | No |
 
-At N=2 the full space is physically allocable (1.3 GB) but wasteful for sparse workloads.
-At N=3 it is no longer possible with current hardware.
+At N=2 the full space is physically allocable (119 MB, V=()) but wasteful for sparse workloads.
+At N=3 (1.27 TB) it is no longer possible with current single-node hardware.
 
 This is not a Tagma limitation. It is a physics limitation: $11{,}172^N$ grows as
 $O(10^{4N})$ while physical memory grows as $O(2^{\text{address bits}})$. No addressing
@@ -167,7 +167,7 @@ The `N` suffix is structural, not cosmetic. It says "this type allocates on the 
 and accesses cost N dereferences." The concrete aliases carry the suffix consistently:
 `CoordSpaceN2`, `CoordSpaceN6`, `CoordSpaceN19`.
 
-Before the convention was established, the aliases were `CoordSpace2N`, `CoordSpace6N`,
+Before the convention was established, the aliases were `CoordSpaceN2`, `CoordSpaceN6`,
 etc., which was misleading: they looked like `CoordSpace` variants with different
 depths, but they had fundamentally different implementation characteristics (heap
 allocation, tree traversal). The rename was applied retroactively in PR #27.
