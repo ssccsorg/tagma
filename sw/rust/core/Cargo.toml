@@ -36,4 +36,9 @@ name = "dyn_coord_space"
 path = "tests/dyn_coord_space.rs"
 required-features = ["alloc"]
 
+[[test]]
+name = "coord_space_dense"
+path = "tests/coord_space_dense.rs"
+required-features = ["alloc"]
+
 [dev-dependencies]
