@@ -36,8 +36,8 @@ fn path_to_key_bytes<const N: usize>(path: &tagma_core::CoordPath<N>) -> [u8; N]
 ///
 /// | Trait | Methods |
 /// |-------|---------|
-/// | [`CoordKV`] | `insert` / `get` / `remove` via `&str` |
-/// | [`CoordKVKey<N>`] | `insert_by_coordkey` / `get_by_coordkey` / `remove_by_coordkey` via `CoordKey<N>` |
+/// | [`CoordKV`] | `insert`, `get`, `remove`, `contains_key` via `&str` |
+/// | [`CoordKVKey<N>`] | `insert_by_coordkey`, `get_by_coordkey`, `remove_by_coordkey`, `contains_key_by_coordkey` via `CoordKey<N>` |
 ///
 /// # Example
 ///

@@ -28,8 +28,8 @@ fn box_to_vec_owned(v: Box<[u8]>) -> Vec<u8> {
 ///
 /// | Trait | Methods |
 /// |-------|---------|
-/// | [`CoordKV`] | `insert` / `get` / `remove` via `&str` |
-/// | [`CoordKVKey<2>`] | `insert_by_coordkey` / `get_by_coordkey` / `remove_by_coordkey` via `CoordKey<2>` |
+/// | [`CoordKV`] | `insert`, `get`, `remove`, `contains_key` via `&str` |
+/// | [`CoordKVKey<2>`] | `insert_by_coordkey`, `get_by_coordkey`, `remove_by_coordkey`, `contains_key_by_coordkey` via `CoordKey<2>` |
 ///
 /// # Example
 ///
