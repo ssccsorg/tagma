@@ -15,7 +15,7 @@ This is a hard constraint: the conversion must be at least as fast as SipHash-2-
 (the standard Rust HashMap hasher), and ideally faster. If not, every Tagma KV
 operation carries a baseline penalty that has nothing to do with storage or indexing.
 
-## The benchmark (Apple M1)
+## The benchmark (ARMv8.4-A Firestorm)
 
 ```
 Benchmark: single get, 1000 iterations per sample

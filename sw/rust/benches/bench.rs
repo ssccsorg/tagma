@@ -2,7 +2,7 @@
 // Tagma-core CoordSpace family — implementation summary
 // ===========================================================================
 //
-//                    CoordSpace family (Apple M1, V=u64):
+//                    CoordSpace family (ARMv8.4-A Firestorm, V=u64):
 //
 //  ┌─────────────────────────────────────────────────────────────────────┐
 //  │                     CoordSpace                                     │
@@ -18,7 +18,7 @@
 //  │       true Tagma (dense)    │        software fallback (sparse)      │
 //  └─────────────────────────────────────────────────────────────────────┘
 //
-// Single-syllable get latency (Apple M1, measured):
+// Single-syllable get latency (ARMv8.4-A Firestorm, measured):
 //   CoordSpace   N=1  inline  0.38 ns   22 KB  (array, no alloc)
 //   CoordSpace2  N=2  heap    0.39 ns  119 MB  (single alloc_zeroed)
 //   CoordSpaceM3 N=3  mmap    0.40 ns  1.27 TB (MAP_NORESERVE, lazy page)
@@ -983,7 +983,7 @@ fn bench_coordset_spatial_query(c: &mut Criterion) {
     group.finish();
 }
 
-// N_scaling/get  (single lookup, Apple M1)
+// N_scaling/get  (single lookup, ARMv8.4-A Firestorm)
 //   N=1   CoordSpace      0.39 ns   space 10^4  (inline stack array, no alloc)
 //   N=2   CoordSpace2     0.39 ns   space 10^8  (dense heap, 2.4x faster)
 //   N=2   CoordSpaceN2    0.94 ns   space 10^8  (tree)
@@ -1081,7 +1081,7 @@ fn bench_n_scaling_get(c: &mut Criterion) {
 // CoordSpaceN2 (N=2) benchmarks — cross-product FIH-like scenario
 // ===========================================================================
 
-// Dense vs tree comparison at N=2 (Apple M1, CoordSpace2 vs CoordSpaceN2):
+// Dense vs tree comparison at N=2 (ARMv8.4-A Firestorm, CoordSpace2 vs CoordSpaceN2):
 //   insert/1000   CoordSpace2   155 µs   CoordSpaceN2   841 µs    5.4x faster
 //   get/1000      CoordSpace2  0.39 µs   CoordSpaceN2  1.15 µs    2.9x faster
 //   single get    CoordSpace2  0.39 ns   CoordSpaceN2  0.90 ns    2.3x faster

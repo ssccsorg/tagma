@@ -151,7 +151,7 @@ fn kvn_contains_key() {
 #[test]
 fn kv2_contains_key_by_coordkey() {
     let mut kv = CoordKV2::new();
-    let key = CoordKey::new([b'h', b'i']);
+    let key = CoordKey::new(*b"hi");
     assert!(!kv.contains_key_by_coordkey(&key));
     kv.insert_by_coordkey(&key, b"world".to_vec());
     assert!(kv.contains_key_by_coordkey(&key));
@@ -191,8 +191,8 @@ fn kvn_iter_yields_inserted() {
     let mut entries: Vec<_> = kv.iter().collect();
     entries.sort_by_key(|(k, _)| *k);
     assert_eq!(entries.len(), 2);
-    assert_eq!(entries[0], ([b'a', b'a'], &b"1"[..]));
-    assert_eq!(entries[1], ([b'b', b'b'], &b"2"[..]));
+    assert_eq!(entries[0], (*b"aa", &b"1"[..]));
+    assert_eq!(entries[1], (*b"bb", &b"2"[..]));
 }
 
 // ── CoordKV2 (fixed 2-byte, str API) ─────────────────────────────────────
@@ -269,7 +269,7 @@ fn kv2_clear() {
 #[test]
 fn kv2_by_coordkey() {
     let mut kv = CoordKV2::new();
-    let key = CoordKey::new([b'h', b'i']);
+    let key = CoordKey::new(*b"hi");
     kv.insert_by_coordkey(&key, b"world".to_vec());
     assert_eq!(kv.get_by_coordkey(&key), Some(b"world".to_vec()));
     assert_eq!(kv.len(), 1);
@@ -278,7 +278,7 @@ fn kv2_by_coordkey() {
 #[test]
 fn kv2_by_coordkey_remove() {
     let mut kv = CoordKV2::new();
-    let key = CoordKey::new([b'k', b'y']);
+    let key = CoordKey::new(*b"ky");
     kv.insert_by_coordkey(&key, b"val".to_vec());
     assert_eq!(kv.remove_by_coordkey(&key), Some(b"val".to_vec()));
     assert!(kv.is_empty());
@@ -313,7 +313,7 @@ fn kvn_wrong_length() {
 #[test]
 fn kvn_by_coordkey() {
     let mut kv = CoordKVN::<3>::new();
-    let key = CoordKey::new([b'f', b'o', b'o']);
+    let key = CoordKey::new(*b"foo");
     kv.insert_by_coordkey(&key, b"bar".to_vec());
     assert_eq!(kv.get_by_coordkey(&key), Some(b"bar".to_vec()));
 }

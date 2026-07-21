@@ -318,7 +318,7 @@ pub type DefaultDynamic = ByteWise;
 /// - SipHash-2-4 must process every byte
 ///
 /// Tagma KV converts `&str` to `Coord` faster than SipHash hashes it (22.5 ns vs
-/// 23.8 ns on Apple M1 for 2-byte keys).  If the hardest case is already faster,
+/// 23.8 ns on ARMv8.4-A Firestorm for 2-byte keys).  If the hardest case is already faster,
 /// then **every more constrained key type** — fixed integers, UUIDs, byte arrays,
 /// enums, timestamps — is trivially faster by an even larger margin.  The
 /// variable-length string boundary is the only real challenge, and it is solved.
@@ -342,7 +342,7 @@ pub type DefaultDynamic = ByteWise;
 /// use tagma_core::CoordSpace2;
 /// use tagma_kv::coord_gen::CoordKey;
 ///
-/// let key = CoordKey::new([b'h', b'i']);
+/// let key = CoordKey::new(*b"hi");
 /// let path = key.to_coord_path();
 ///
 /// let mut store: CoordSpace2<u32> = CoordSpace2::new();
@@ -506,7 +506,7 @@ mod tests {
 
     #[test]
     fn fixed_key_new() {
-        let key = CoordKey::new([b'h', b'e', b'l', b'l', b'o']);
+        let key = CoordKey::new(*b"hello");
         assert_eq!(key.len(), 5);
         assert!(!key.is_empty());
         assert_eq!(key.as_bytes(), b"hello");
@@ -514,7 +514,7 @@ mod tests {
 
     #[test]
     fn fixed_key_to_coord_path() {
-        let key = CoordKey::new([b'a', b'b']);
+        let key = CoordKey::new(*b"ab");
         let path = key.to_coord_path();
         assert_eq!(path.len(), 2);
         assert_eq!(path.coords()[0], Coord::new(b'a' as u16).unwrap());
@@ -598,9 +598,9 @@ mod tests {
     #[test]
     fn fixed_key_eq_hash() {
         use std::collections::HashSet;
-        let a = CoordKey::new([b'a', b'b']);
-        let b = CoordKey::new([b'a', b'b']);
-        let c = CoordKey::new([b'a', b'c']);
+        let a = CoordKey::new(*b"ab");
+        let b = CoordKey::new(*b"ab");
+        let c = CoordKey::new(*b"ac");
         assert_eq!(a, b);
         assert_ne!(a, c);
 

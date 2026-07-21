@@ -9,10 +9,12 @@ Tagma is a primitive where the address is the coordinate — not a flat pointer,
 ```
 synTagma (system)
   └─ Coordination layer (protocol, topology, distributed resolver)
+  └─ tagma-kv (KV bridge: hashless string-key store, HashMap API)
   └─ Tagma core primitive (Coord, CoordPath, CoordSet, CoordSpace)
 ```
 
 - Tagma — the core primitive: a 16-bit structural coordinate with closed-form composition, zero collisions, and single-cycle combinational decoding. The atomic identity primitive.
+- tagma-kv — the bridge layer: accepts `&str` keys at HashMap-competitive speed, stores entries in Tagma coordinate space, exposes standard `insert`/`get`/`remove` API plus `CoordKey`-based access. Zero extra cost for spatial indexing.
 - synTagma coordination layer — recursive coordinate space expansion, physical topology mapping, distributed routing, and consistency protocol. Defined in the [synTagma](https://docs.ssccs.org/projects/syntagma/tagma/syn.html).
 
 ## Tagma primitive: Feature levels
@@ -120,7 +122,7 @@ N-syllable sequences (CoordPath) extend the address space to $11172^N$ identifie
 
 The three-axis composition formula admits unbounded recursive embedding: each axis of a synTagma coordinate can itself be a full CoordPath, enabling physical topology mapping across distributed nodes without modifying the core arithmetic.
 
-## Benchmark: Tagma identity generation (Apple M1)
+## Benchmark: Tagma identity generation (ARMv8.4-A Firestorm)
 
 | Metric | SHA-256 | Tagma (1-syll) | Tagma (6-syll) | Tagma (19-syll) |
 |--------|---------|---------------|---------------|----------------|
@@ -130,7 +132,7 @@ The three-axis composition formula admits unbounded recursive embedding: each ax
 
 CoordSpace2 (N=2 dense heap, 119 MB, `alloc_zeroed`) covers the full 124M 2-syllable space in a single pre-zeroed allocation — single load at 0.39 ns, no lazy branching.
 
-## Benchmark: Spatial query vs HashMap (Apple M1)
+## Benchmark: Spatial query vs HashMap (ARMv8.4-A Firestorm)
 
 Same algorithm (iterate + decompose + filter on axis), different memory layout. CoordSpace stores values in contiguous `[Option<V>; 11172]` — no hash, no collision, no fragmentation. HashMap scatters across buckets.
 
