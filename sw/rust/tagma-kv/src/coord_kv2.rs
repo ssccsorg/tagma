@@ -71,10 +71,10 @@ impl CoordKV for CoordKV2 {
         self.len = 0;
     }
 
-    fn insert(&mut self, key: &str, value: Vec<u8>) {
+    fn insert(&mut self, key: &str, value: Vec<u8>) -> Option<Vec<u8>> {
         // Panics if key.len() != 2 (via CoordKey::from)
         let ck: CoordKey<2> = key.into();
-        self.insert_by_coordkey(&ck, value);
+        self.insert_by_coordkey(&ck, value)
     }
 
     fn get(&self, key: &str) -> Option<Vec<u8>> {
@@ -95,11 +95,13 @@ impl CoordKV for CoordKV2 {
 }
 
 impl CoordKVKey<2> for CoordKV2 {
-    fn insert_by_coordkey(&mut self, key: &CoordKey<2>, value: Vec<u8>) {
+    fn insert_by_coordkey(&mut self, key: &CoordKey<2>, value: Vec<u8>) -> Option<Vec<u8>> {
         let path = key.to_coord_path();
-        if self.space.place_path(&path, vec_to_box(value)).is_none() {
+        let prev = self.space.place_path(&path, vec_to_box(value));
+        if prev.is_none() {
             self.len += 1;
         }
+        prev.map(box_to_vec_owned)
     }
 
     fn get_by_coordkey(&self, key: &CoordKey<2>) -> Option<Vec<u8>> {

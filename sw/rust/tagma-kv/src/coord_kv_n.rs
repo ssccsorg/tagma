@@ -70,10 +70,10 @@ impl<const N: usize> CoordKV for CoordKVN<N> {
         self.len = 0;
     }
 
-    fn insert(&mut self, key: &str, value: Vec<u8>) {
+    fn insert(&mut self, key: &str, value: Vec<u8>) -> Option<Vec<u8>> {
         // Panics if key.len() != N (via CoordKey::from)
         let ck: CoordKey<N> = key.into();
-        self.insert_by_coordkey(&ck, value);
+        self.insert_by_coordkey(&ck, value)
     }
 
     fn get(&self, key: &str) -> Option<Vec<u8>> {
@@ -94,11 +94,13 @@ impl<const N: usize> CoordKV for CoordKVN<N> {
 }
 
 impl<const N: usize> CoordKVKey<N> for CoordKVN<N> {
-    fn insert_by_coordkey(&mut self, key: &CoordKey<N>, value: Vec<u8>) {
+    fn insert_by_coordkey(&mut self, key: &CoordKey<N>, value: Vec<u8>) -> Option<Vec<u8>> {
         let path = key.to_coord_path();
-        if self.space.place_path(&path, vec_to_box(value)).is_none() {
+        let prev = self.space.place_path(&path, vec_to_box(value));
+        if prev.is_none() {
             self.len += 1;
         }
+        prev.map(box_to_vec_owned)
     }
 
     fn get_by_coordkey(&self, key: &CoordKey<N>) -> Option<Vec<u8>> {

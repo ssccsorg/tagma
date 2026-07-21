@@ -69,14 +69,16 @@ impl CoordKV for DynCoordKV {
         self.len = 0;
     }
 
-    fn insert(&mut self, key: &str, value: Vec<u8>) {
+    fn insert(&mut self, key: &str, value: Vec<u8>) -> Option<Vec<u8>> {
         if key.is_empty() {
-            return;
+            return None;
         }
         let path = string_to_coord_path(key).unwrap();
-        if self.space.place(&path, vec_to_box(value)).is_none() {
+        let prev = self.space.place(&path, vec_to_box(value));
+        if prev.is_none() {
             self.len += 1;
         }
+        prev.map(box_to_vec_owned)
     }
 
     fn get(&self, key: &str) -> Option<Vec<u8>> {

@@ -1570,6 +1570,158 @@ fn bench_kv_batch_get_all(c: &mut Criterion) {
     group.finish();
 }
 
+// ===========================================================================
+// Wrapper-type benchmarks: DynCoordKV vs CoordKV2 vs CoordKVN vs HashMap
+// through the CoordKV trait API (insert/get via &str)
+// ===========================================================================
+
+use tagma_kv::{CoordKV, CoordKV2, DynCoordKV};
+use tagma_kv::coord_kv_n::CoordKVN;
+
+// ── Single insert ────────────────────────────────────────────────────────
+
+fn kv_2byte_keys(count: usize) -> Vec<String> {
+    (0..count)
+        .map(|i| format!("{:02}", i % 100)) // "00" .. "99" (2 bytes each)
+        .collect()
+}
+
+fn bench_kv_wrapper_single_insert(c: &mut Criterion) {
+    let mut group = c.benchmark_group("tagma-kv-wrapper/insert/single");
+
+    group.bench_function("DynCoordKV", |b| {
+        let mut kv = DynCoordKV::new();
+        b.iter(|| {
+            black_box(kv.insert("k000", kv_value()));
+        })
+    });
+
+    group.bench_function("CoordKV2", |b| {
+        let mut kv = CoordKV2::new();
+        b.iter(|| {
+            black_box(kv.insert("k0", kv_value()));
+        })
+    });
+
+    group.bench_function("CoordKVN<2>", |b| {
+        let mut kv = CoordKVN::<2>::new();
+        b.iter(|| {
+            black_box(kv.insert("k0", kv_value()));
+        })
+    });
+
+    group.bench_function("HashMap<String>", |b| {
+        let mut map: std::collections::HashMap<String, Vec<u8>> =
+            std::collections::HashMap::new();
+        b.iter(|| {
+            black_box(map.insert("k0".to_string(), kv_value()));
+        })
+    });
+
+    group.finish();
+}
+
+// ── Single get ───────────────────────────────────────────────────────────
+
+fn bench_kv_wrapper_single_get(c: &mut Criterion) {
+    let mut group = c.benchmark_group("tagma-kv-wrapper/get/single");
+
+    group.bench_function("DynCoordKV", |b| {
+        let mut kv = DynCoordKV::new();
+        kv.insert("k000", kv_value());
+        b.iter(|| {
+            black_box(kv.get("k000"));
+        })
+    });
+
+    group.bench_function("CoordKV2", |b| {
+        let mut kv = CoordKV2::new();
+        kv.insert("k0", kv_value());
+        b.iter(|| {
+            black_box(kv.get("k0"));
+        })
+    });
+
+    group.bench_function("CoordKVN<2>", |b| {
+        let mut kv = CoordKVN::<2>::new();
+        kv.insert("k0", kv_value());
+        b.iter(|| {
+            black_box(kv.get("k0"));
+        })
+    });
+
+    group.bench_function("HashMap<String>", |b| {
+        let mut map: std::collections::HashMap<String, Vec<u8>> =
+            std::collections::HashMap::new();
+        map.insert("k0".to_string(), kv_value());
+        b.iter(|| {
+            black_box(map.get("k0"));
+        })
+    });
+
+    group.finish();
+}
+
+// ── Batch get: 1,000 short keys, all five stores ───────────────────────
+
+fn bench_kv_wrapper_batch_get(c: &mut Criterion) {
+    let short_keys = kv_short_keys(1000);
+    let byte2_keys = kv_2byte_keys(100);
+    let val = kv_value();
+    let mut group = c.benchmark_group("tagma-kv-wrapper/batch-get/1k");
+
+    group.bench_function("DynCoordKV", |b| {
+        let mut kv = DynCoordKV::new();
+        for k in &short_keys {
+            kv.insert(k, val.clone());
+        }
+        b.iter(|| {
+            for k in &short_keys {
+                black_box(kv.get(k));
+            }
+        })
+    });
+
+    group.bench_function("CoordKV2", |b| {
+        let mut kv = CoordKV2::new();
+        for k in &byte2_keys {
+            kv.insert(k, val.clone());
+        }
+        b.iter(|| {
+            for k in &byte2_keys {
+                black_box(kv.get(k));
+            }
+        })
+    });
+
+    group.bench_function("CoordKVN<2>", |b| {
+        let mut kv = CoordKVN::<2>::new();
+        for k in &byte2_keys {
+            kv.insert(k, val.clone());
+        }
+        b.iter(|| {
+            for k in &byte2_keys {
+                black_box(kv.get(k));
+            }
+        })
+    });
+
+    group.bench_function("HashMap<String>", |b| {
+        let mut map: std::collections::HashMap<String, Vec<u8>> =
+            std::collections::HashMap::new();
+        for k in &short_keys {
+            map.insert(k.clone(), val.clone());
+        }
+        b.iter(|| {
+            for k in &short_keys {
+                black_box(map.get(k));
+            }
+        })
+    });
+
+    group.finish();
+}
+
 criterion_group!(
     name = kv;
     config = Criterion::default().sample_size(10);
@@ -1578,6 +1730,8 @@ criterion_group!(
               bench_kv_batch_insert_static_short, bench_kv_batch_insert_dyn_short, bench_kv_batch_insert_hashmap_short,
               bench_kv_batch_insert_static_medium, bench_kv_batch_insert_dyn_medium, bench_kv_batch_insert_hashmap_medium,
               bench_kv_batch_get_all,
+              bench_kv_wrapper_single_insert, bench_kv_wrapper_single_get,
+              bench_kv_wrapper_batch_get,
 );
 
 criterion_main!(

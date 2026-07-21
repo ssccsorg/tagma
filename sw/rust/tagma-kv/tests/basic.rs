@@ -88,6 +88,75 @@ fn dyn_roundtrip_large_key() {
     assert_eq!(kv.get(key), Some(val));
 }
 
+// ── HashMap-compatible insert return ──────────────────────────────────────
+
+#[test]
+fn dyn_insert_returns_previous() {
+    let mut kv = DynCoordKV::new();
+    assert_eq!(kv.insert("key", b"v1".to_vec()), None);
+    assert_eq!(kv.insert("key", b"v2".to_vec()), Some(b"v1".to_vec()));
+    assert_eq!(kv.len(), 1);
+}
+
+#[test]
+fn kv2_insert_returns_previous() {
+    let mut kv = CoordKV2::new();
+    assert_eq!(kv.insert("ky", b"v1".to_vec()), None);
+    assert_eq!(kv.insert("ky", b"v2".to_vec()), Some(b"v1".to_vec()));
+    assert_eq!(kv.len(), 1);
+}
+
+#[test]
+fn kvn_insert_returns_previous() {
+    let mut kv = CoordKVN::<3>::new();
+    assert_eq!(kv.insert("foo", b"v1".to_vec()), None);
+    assert_eq!(kv.insert("foo", b"v2".to_vec()), Some(b"v1".to_vec()));
+    assert_eq!(kv.len(), 1);
+}
+
+// ── contains_key ─────────────────────────────────────────────────────────
+
+#[test]
+fn dyn_contains_key() {
+    let mut kv = DynCoordKV::new();
+    assert!(!kv.contains_key("hello"));
+    kv.insert("hello", b"world".to_vec());
+    assert!(kv.contains_key("hello"));
+}
+
+#[test]
+fn kv2_contains_key() {
+    let mut kv = CoordKV2::new();
+    assert!(!kv.contains_key("hi"));
+    kv.insert("hi", b"world".to_vec());
+    assert!(kv.contains_key("hi"));
+}
+
+#[test]
+fn kv2_contains_key_wrong_length() {
+    let kv = CoordKV2::new();
+    assert!(!kv.contains_key("hello"));
+}
+
+#[test]
+fn kvn_contains_key() {
+    let mut kv = CoordKVN::<3>::new();
+    assert!(!kv.contains_key("foo"));
+    kv.insert("foo", b"bar".to_vec());
+    assert!(kv.contains_key("foo"));
+}
+
+// ── contains_key_by_coordkey ─────────────────────────────────────────────
+
+#[test]
+fn kv2_contains_key_by_coordkey() {
+    let mut kv = CoordKV2::new();
+    let key = CoordKey::new([b'h', b'i']);
+    assert!(!kv.contains_key_by_coordkey(&key));
+    kv.insert_by_coordkey(&key, b"world".to_vec());
+    assert!(kv.contains_key_by_coordkey(&key));
+}
+
 // ── CoordKV2 (fixed 2-byte, str API) ─────────────────────────────────────
 
 #[test]
