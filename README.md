@@ -104,6 +104,34 @@ set.insert(c);
 assert!(set.contains(c));
 ```
 
+### tagma-kv usage
+
+```rust
+use tagma_kv::{CoordKV, CoordKV2, CoordKVKey, DynCoordKV};
+use tagma_kv::coord_gen::CoordKey;
+
+// Dynamic KV: any non-empty string key
+let mut kv = DynCoordKV::new();
+kv.insert("hello", b"world".to_vec());
+assert_eq!(kv.get("hello"), Some(b"world".to_vec()));
+
+// Fixed 2-byte dense KV: 119 MB, O(1), collision-free
+let mut kv = CoordKV2::new();
+kv.insert("hi", b"value".to_vec());
+assert_eq!(kv.get("hi"), Some(b"value".to_vec()));
+
+// Same store, CoordKey-based access
+let key = CoordKey::new(*b"hi");
+assert_eq!(kv.get_by_coordkey(&key), Some(b"value".to_vec()));
+
+// Compile-time key length enforcement
+const KEY: CoordKey<2> = CoordKey::from_str_const("hi");
+
+// Contains key, remove, all HashMap-compatible
+assert!(kv.contains_key("hi"));
+kv.remove("hi");
+```
+
 ## Feature matrix
 
 | Feature | `no_alloc` | `alloc` (default) | `mmap` |
@@ -116,6 +144,7 @@ assert!(set.contains(c));
 | CoordSpace2 (dense heap, N=2) | ❌ | ✅ | ❌ |
 | CoordSpaceM (mmap dense, N≥3) | ❌ | ❌ | ✅ |
 | DynCoordSpace (runtime trie) | ❌ | ✅ | ❌ |
+| tagma-kv (string-key KV, HashMap API) | ❌ | ✅ | ❌ |
 
 ## How Tagma works
 
@@ -160,6 +189,21 @@ Same algorithm (iterate + decompose + filter on axis), different memory layout. 
 
 *Nonexistent prefix (structural vs iter scan): HashMap has no prefix index and must scan all 10M entries to determine that no entry has first coord == 11111. CoordSpace navigates to the branch at that prefix and returns None immediately. The gap (14.0Mx) reflects the difference between structural addressing and content scanning, not between two equivalent hash lookups.*
 
+## Benchmark: tagma-kv vs HashMap (Apple M1)
+
+tagma-kv is a hashless KV store: it converts `&str` to Coord sequences instead of hashing them. The critical question is whether this conversion is faster than SipHash-2-4.
+
+| Variant | Insert (single) | Get (single) | Batch get (1k, per key) | vs HashMap get |
+|---------|----------------|--------------|------------------------|----------------|
+| `CoordKV2` (fixed 2B) | 18.7 ns | 22.0 ns | 22.5 ns | **1.1x faster** |
+| `HashMap<String>` | 44.8 ns | 23.8 ns | 23.5 ns | baseline |
+| `DynCoordKV` (dynamic) | 49.3 ns | 42.4 ns | 44.4 ns | 1.9x slower |
+| Raw CoordSpace2 (no conv) | 16.8 ns | 1.07 ns | 0.85 ns | 28x faster |
+
+CoordKV2 converts `&str` to Coord faster than SipHash hashes it. The 21 ns conversion accounts for nearly all of the 22 ns get latency; the actual slot load is 1.07 ns (the pure Tagma promise). DynCoordKV is slower for single ops due to per-byte Vec allocation, but only by the allocation cost.
+
+Once data is in Tagma coordinate space, all spatial capabilities (prefix scan, axis filter, range query) are available at zero additional cost.
+
 ## Documentation
 
 - [synTagma project page](https://docs.ssccs.org/projects/syntagma/) — Project overview, paradigm shift, papers
@@ -167,7 +211,8 @@ Same algorithm (iterate + decompose + filter on axis), different memory layout. 
 - [synTagma coordination layer](https://docs.ssccs.org/projects/syntagma/tagma/syn.html) — Recursive topology mapping, transport, distributed resolver, consistency
 - [Tagma-ID](https://docs.ssccs.org/projects/syntagma/tagma/id.html) — Content-addressable identity without hash functions
 - [Specification](spec/coord-space.md) — Language-independent Tagma coordinate space definition
-- Rustdoc — `cargo doc --no-deps -p tagma-core` for API reference
+- [Rustdoc (tagma-core)](https://docs.ssccs.org/projects/syntagma/tagma/core/) — Coord, CoordPath, CoordSpace, CoordSpaceN, DynCoordSpace
+- [Rustdoc (tagma-kv)](https://docs.ssccs.org/projects/syntagma/tagma/kv/) — CoordKV, CoordKV2, DynCoordKV, CoordKey
 
 ## License
 
