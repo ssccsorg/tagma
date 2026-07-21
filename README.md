@@ -54,6 +54,17 @@ Test coverage: 170 unit/integration tests + 15 doc-tests, all passing. Zero clip
 | CoordSpaceM3\<V\> | N=3 mmap dense. Type alias for `CoordSpaceM<3, V>` | `core/src/coord_space_m.rs` |
 | DynCoordSpace\<V\> | Variable-depth trie, `&[Coord]` runtime path. Mixed-depth slot (Both) preserves shallow values | `core/src/dyn_coord_space.rs` |
 
+### tagma-kv: hashless string-key store (requires alloc)
+
+| Type | Description | File |
+|------|-------------|------|
+| CoordKey\<N\> | Fixed N-byte key, type-level length enforcement. Injective to CoordPath | `tagma-kv/src/coord_gen.rs` |
+| DynCoordKV | Dynamic KV, ByteWise strategy, all-length strings | `tagma-kv/src/dyn_coord_kv.rs` |
+| CoordKV2 | Fixed 2-byte dense KV, CoordSpace2 (119 MB), O(1) lookup | `tagma-kv/src/coord_kv2.rs` |
+| CoordKVN\<N\> | Fixed N-byte tree KV, CoordSpaceN, sparse | `tagma-kv/src/coord_kv_n.rs` |
+| CoordKV trait | HashMap-compatible: `insert`, `get`, `remove`, `contains_key` via `&str` | `tagma-kv/src/coord_kv.rs` |
+| CoordKVKey\<N\> trait | `_by_coordkey` methods for CoordKey-based access | `tagma-kv/src/coord_kv.rs` |
+
 ## Quick start
 
 ```sh
