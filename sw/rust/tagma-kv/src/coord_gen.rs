@@ -1,4 +1,4 @@
-use tagma_core::Coord;
+use tagma_core::{Coord, CoordPath};
 
 // ---------------------------------------------------------------------------
 // Error type
@@ -259,15 +259,15 @@ impl<const N: usize> CoordGen for ByteFold<N> {
 pub type DefaultDynamic = ByteWise;
 
 // ---------------------------------------------------------------------------
-// FixedKey — type-level key capacity restriction
+// CoordKey — type-level key capacity restriction
 // ---------------------------------------------------------------------------
 
 /// A fixed-size byte-array key that maps injectively to a [`CoordPath`]
 /// of the same length `N`.
 ///
 /// Unlike [`Prefix<N>`] (which truncates or zero-pads arbitrary strings),
-/// `FixedKey<N>` **enforces exact key length at the type level** via const
-/// generics.  This makes it impossible to construct a `FixedKey<N>` whose
+/// `CoordKey<N>` **enforces exact key length at the type level** via const
+/// generics.  This makes it impossible to construct a `CoordKey<N>` whose
 /// byte length differs from `N`.
 ///
 /// # Injectivity guarantee
@@ -279,7 +279,7 @@ pub type DefaultDynamic = ByteWise;
 /// ```
 ///
 /// Since the codomain is always vastly larger than the domain, each
-/// distinct `FixedKey<N>` maps to a distinct `CoordPath<N>`.  The mapping
+/// distinct `CoordKey<N>` maps to a distinct `CoordPath<N>`.  The mapping
 /// is **collision-free** — suitable for use with [`CoordSpace2`] (N=2) or
 /// [`CoordSpaceN`] (any N) as a lossless static strategy.
 ///
@@ -287,9 +287,9 @@ pub type DefaultDynamic = ByteWise;
 ///
 /// ```
 /// use tagma_core::CoordSpace2;
-/// use tagma_kv::coord_gen::FixedKey;
+/// use tagma_kv::coord_gen::CoordKey;
 ///
-/// let key = FixedKey::new([b'h', b'i']);
+/// let key = CoordKey::new([b'h', b'i']);
 /// let path = key.to_coord_path();
 ///
 /// let mut store: CoordSpace2<u32> = CoordSpace2::new();
@@ -300,10 +300,10 @@ pub type DefaultDynamic = ByteWise;
 /// [`CoordSpace2`]: ../tagma_core/coord_space_dense/struct.CoordSpace2.html
 /// [`CoordSpaceN`]: ../tagma_core/coord_space_n/struct.CoordSpaceN.html
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct FixedKey<const N: usize>([u8; N]);
+pub struct CoordKey<const N: usize>([u8; N]);
 
-impl<const N: usize> FixedKey<N> {
-    /// Creates a `FixedKey` from a byte array of exactly `N` bytes.
+impl<const N: usize> CoordKey<N> {
+    /// Creates a `CoordKey` from a byte array of exactly `N` bytes.
     ///
     /// The length is verified at compile time by the type system.
     #[inline]
@@ -326,7 +326,7 @@ impl<const N: usize> FixedKey<N> {
     ///
     /// [`CoordPath<N>`]: ../tagma_core/coord_path/struct.CoordPath.html
     #[inline]
-    pub fn to_coord_path(&self) -> crate::CoordPath<N> {
+    pub fn to_coord_path(&self) -> CoordPath<N> {
         let mut coords = [Coord::new(0).unwrap(); N];
         for (i, &b) in self.0.iter().enumerate() {
             debug_assert!(
@@ -336,7 +336,7 @@ impl<const N: usize> FixedKey<N> {
             );
             coords[i] = Coord::new(b as u16).expect("byte < 11172");
         }
-        crate::CoordPath::new(coords)
+        CoordPath::new(coords)
     }
 
     /// Returns the number of bytes (always `N`).
@@ -352,21 +352,21 @@ impl<const N: usize> FixedKey<N> {
     }
 }
 
-impl<const N: usize> From<[u8; N]> for FixedKey<N> {
+impl<const N: usize> From<[u8; N]> for CoordKey<N> {
     #[inline]
     fn from(bytes: [u8; N]) -> Self {
         Self(bytes)
     }
 }
 
-impl<const N: usize> From<FixedKey<N>> for [u8; N] {
+impl<const N: usize> From<CoordKey<N>> for [u8; N] {
     #[inline]
-    fn from(key: FixedKey<N>) -> Self {
+    fn from(key: CoordKey<N>) -> Self {
         key.0
     }
 }
 
-impl<const N: usize> core::str::FromStr for FixedKey<N> {
+impl<const N: usize> core::str::FromStr for CoordKey<N> {
     type Err = GenError;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
@@ -383,13 +383,13 @@ impl<const N: usize> core::str::FromStr for FixedKey<N> {
     }
 }
 
-impl<const N: usize> From<&str> for FixedKey<N> {
-    /// Converts a `&str` to `FixedKey<N>`, **panicking** if the string
+impl<const N: usize> From<&str> for CoordKey<N> {
+    /// Converts a `&str` to `CoordKey<N>`, **panicking** if the string
     /// length does not match `N`.
     ///
     /// Use this when you know the string is exactly `N` bytes and want
     /// an infallible conversion.  For fallible conversion use
-    /// [`FixedKey::<N>::try_from`] or `.parse::<FixedKey<N>>()`.
+    /// [`CoordKey::<N>::try_from`] or `.parse::<CoordKey<N>>()`.
     ///
     /// # Panics
     ///
@@ -397,7 +397,7 @@ impl<const N: usize> From<&str> for FixedKey<N> {
     fn from(s: &str) -> Self {
         assert!(
             s.len() == N,
-            "FixedKey::from: expected string of exactly {} bytes, got {}",
+            "CoordKey::from: expected string of exactly {} bytes, got {}",
             N,
             s.len()
         );
@@ -407,8 +407,8 @@ impl<const N: usize> From<&str> for FixedKey<N> {
     }
 }
 
-impl<const N: usize> FixedKey<N> {
-    /// Converts a `&str` to `FixedKey<N>` in **const context**.
+impl<const N: usize> CoordKey<N> {
+    /// Converts a `&str` to `CoordKey<N>` in **const context**.
     ///
     /// At compile time (`const`, `static`), a length mismatch produces a
     /// compile error.  At runtime it panics.
@@ -416,19 +416,19 @@ impl<const N: usize> FixedKey<N> {
     /// # Example
     ///
     /// ```
-    /// use tagma_kv::coord_gen::FixedKey;
+    /// use tagma_kv::coord_gen::CoordKey;
     ///
-    /// const KEY: FixedKey<2> = FixedKey::from_str_const("hi");
+    /// const KEY: CoordKey<2> = CoordKey::from_str_const("hi");
     /// assert_eq!(KEY.as_bytes(), b"hi");
     /// ```
     ///
     /// ```compile_fail
-    /// use tagma_kv::coord_gen::FixedKey;
-    /// const BAD: FixedKey<2> = FixedKey::from_str_const("hello"); // compile error
+    /// use tagma_kv::coord_gen::CoordKey;
+    /// const BAD: CoordKey<2> = CoordKey::from_str_const("hello"); // compile error
     /// ```
     #[inline]
     pub const fn from_str_const(s: &str) -> Self {
-        assert!(s.len() == N, "FixedKey::from_str_const: length mismatch");
+        assert!(s.len() == N, "CoordKey::from_str_const: length mismatch");
         let bytes = s.as_bytes();
         let mut arr = [0u8; N];
         let mut i = 0;
@@ -449,19 +449,19 @@ impl<const N: usize> FixedKey<N> {
 mod tests {
     use super::*;
 
-    // ── FixedKey ──────────────────────────────────────────────────────────────
+    // ── CoordKey ──────────────────────────────────────────────────────────────
 
     #[test]
     fn fixed_key_new() {
-        let key = FixedKey::new([b'h', b'e', b'l', b'l', b'o']);
+        let key = CoordKey::new([b'h', b'e', b'l', b'l', b'o']);
         assert_eq!(key.len(), 5);
         assert!(!key.is_empty());
-        assert_eq!(key.as_bytes(), &[b'h', b'e', b'l', b'l', b'o']);
+        assert_eq!(key.as_bytes(), b"hello");
     }
 
     #[test]
     fn fixed_key_to_coord_path() {
-        let key = FixedKey::new([b'a', b'b']);
+        let key = CoordKey::new([b'a', b'b']);
         let path = key.to_coord_path();
         assert_eq!(path.len(), 2);
         assert_eq!(path.coords()[0], Coord::new(b'a' as u16).unwrap());
@@ -470,7 +470,7 @@ mod tests {
 
     #[test]
     fn fixed_key_from_array() {
-        let key = FixedKey::from([0x01u8, 0xFFu8]);
+        let key = CoordKey::from([0x01u8, 0xFFu8]);
         let path = key.to_coord_path();
         assert_eq!(path.coords()[0], Coord::new(0x01).unwrap());
         assert_eq!(path.coords()[1], Coord::new(0xFF).unwrap());
@@ -479,14 +479,14 @@ mod tests {
     #[test]
     fn fixed_key_from_str_exact() {
         use core::str::FromStr;
-        let key = FixedKey::<3>::from_str("abc").unwrap();
+        let key = CoordKey::<3>::from_str("abc").unwrap();
         assert_eq!(key.as_bytes(), b"abc");
     }
 
     #[test]
     fn fixed_key_from_str_wrong_length() {
         use core::str::FromStr;
-        let err = FixedKey::<3>::from_str("ab").unwrap_err();
+        let err = CoordKey::<3>::from_str("ab").unwrap_err();
         assert_eq!(
             err,
             GenError::KeyTooLong {
@@ -495,7 +495,7 @@ mod tests {
             }
         );
 
-        let err = FixedKey::<3>::from_str("abcd").unwrap_err();
+        let err = CoordKey::<3>::from_str("abcd").unwrap_err();
         assert_eq!(
             err,
             GenError::KeyTooLong {
@@ -507,43 +507,36 @@ mod tests {
 
     #[test]
     fn fixed_key_parse() {
-        let key: FixedKey<4> = "test".parse().unwrap();
+        let key: CoordKey<4> = "test".parse().unwrap();
         assert_eq!(key.as_bytes(), b"test");
     }
 
     #[test]
     fn fixed_key_from_str_infallible() {
-        let key: FixedKey<2> = "ok".into();
+        let key: CoordKey<2> = "ok".into();
         assert_eq!(key.as_bytes(), b"ok");
     }
 
     #[test]
     fn fixed_key_roundtrip_array() {
         let original = [0xABu8, 0xCDu8];
-        let key = FixedKey::new(original);
+        let key = CoordKey::new(original);
         let back: [u8; 2] = key.into();
         assert_eq!(original, back);
     }
 
     #[test]
     fn fixed_key_injective_across_two_byte_keys() {
-        // 모든 2바이트 조합은 unique한 CoordPath<2>를 생성해야 함.
-        // CoordPath가 Hash를 구현하지 않아 [u16; 2]로 변환해 확인.
+        // Every 2-byte combination must produce a unique CoordPath<2>.
+        // CoordPath does not implement Hash, so we convert to [u16; 2].
         use std::collections::HashSet;
         let mut seen = HashSet::new();
         for b0 in 0u8..=255 {
             for b1 in 0u8..=255 {
-                let key = FixedKey::new([b0, b1]);
+                let key = CoordKey::new([b0, b1]);
                 let path = key.to_coord_path();
-                let linear: [u16; 2] = [
-                    path.coords()[0].index(),
-                    path.coords()[1].index(),
-                ];
-                assert!(
-                    seen.insert(linear),
-                    "collision at bytes ({}, {})",
-                    b0, b1
-                );
+                let linear: [u16; 2] = [path.coords()[0].index(), path.coords()[1].index()];
+                assert!(seen.insert(linear), "collision at bytes ({}, {})", b0, b1);
             }
         }
         assert_eq!(seen.len(), 65536);
@@ -552,9 +545,9 @@ mod tests {
     #[test]
     fn fixed_key_eq_hash() {
         use std::collections::HashSet;
-        let a = FixedKey::new([b'a', b'b']);
-        let b = FixedKey::new([b'a', b'b']);
-        let c = FixedKey::new([b'a', b'c']);
+        let a = CoordKey::new([b'a', b'b']);
+        let b = CoordKey::new([b'a', b'b']);
+        let c = CoordKey::new([b'a', b'c']);
         assert_eq!(a, b);
         assert_ne!(a, c);
 
@@ -708,7 +701,10 @@ mod tests {
         // "c\x00a" -> bytes [99, 0, 97] -> acc[0] = 99^97 = 2, acc[1] = 0
         let a = ByteFold::<2>.generate("a\x00c").unwrap();
         let b = ByteFold::<2>.generate("c\x00a").unwrap();
-        assert_eq!(a, b, "commutative XOR within same accumulator produces collision");
+        assert_eq!(
+            a, b,
+            "commutative XOR within same accumulator produces collision"
+        );
         assert_eq!(a[0], Coord::new(2).unwrap());
         assert_eq!(a[1], Coord::new(0).unwrap());
     }
@@ -736,13 +732,12 @@ mod tests {
     }
 
     #[test]
-    fn prefix2_matches_string_to_short_path_first_two() {
-        // string_to_short_path packs 4 bytes into 2 Coords via u16 + mod 11172.
-        // Prefix<2> maps first 2 bytes directly.
-        // They differ in packing scheme — we just verify both succeed without panic.
-        let key = "abcd";
+    fn prefix2_matches_bytewise_first_two() {
+        // Prefix<2> takes the first 2 bytes; ByteWise produces 2 coords
+        // for a 2-byte key. Both should agree on those bytes.
+        let key = "ab";
         let from_prefix = Prefix::<2>.generate(key).unwrap();
-        let _from_short = crate::string_to_short_path(key).unwrap();
-        assert_eq!(from_prefix.len(), 2);
+        let from_bytewise = ByteWise.generate(key).unwrap();
+        assert_eq!(from_prefix, from_bytewise);
     }
 }

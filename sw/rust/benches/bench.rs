@@ -1310,7 +1310,7 @@ fn bench_kv_single_insert_static(c: &mut Criterion) {
     let key = "k000";
     let path = Prefix::<2>.generate(key).unwrap();
     let cp = CoordPath::new([path[0], path[1]]);
-    
+
     c.bench_function("tagma-kv/static/insert/single", |b| {
         let mut space: tagma_core::CoordSpace2<Box<[u8]>> = tagma_core::CoordSpace2::new();
         b.iter(|| {
@@ -1322,7 +1322,7 @@ fn bench_kv_single_insert_static(c: &mut Criterion) {
 fn bench_kv_single_insert_dyn(c: &mut Criterion) {
     let key = "k000";
     let path = ByteWise.generate(key).unwrap();
-    
+
     c.bench_function("tagma-kv/dynamic/insert/single", |b| {
         let mut space: tagma_core::DynCoordSpace<Box<[u8]>> = tagma_core::DynCoordSpace::new();
         b.iter(|| {
@@ -1333,7 +1333,7 @@ fn bench_kv_single_insert_dyn(c: &mut Criterion) {
 
 fn bench_kv_single_insert_hashmap(c: &mut Criterion) {
     let key = "k000";
-    
+
     c.bench_function("tagma-kv/hashmap/insert/single", |b| {
         let mut map: std::collections::HashMap<String, Box<[u8]>> =
             std::collections::HashMap::new();
@@ -1372,8 +1372,7 @@ fn bench_kv_single_get_dyn(c: &mut Criterion) {
 
 fn bench_kv_single_get_hashmap(c: &mut Criterion) {
     let key = "k000";
-    let mut map: std::collections::HashMap<String, Box<[u8]>> =
-        std::collections::HashMap::new();
+    let mut map: std::collections::HashMap<String, Box<[u8]>> = std::collections::HashMap::new();
     map.insert(key.to_string(), kv_boxed(&kv_value()));
 
     c.bench_function("tagma-kv/hashmap/get/single", |b| {

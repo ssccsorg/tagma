@@ -1,23 +1,27 @@
-use tagma_kv::CoordKV;
+use tagma_kv::coord_gen::CoordKey;
+use tagma_kv::coord_kv_n::CoordKVN;
+use tagma_kv::{CoordKV, CoordKV2, CoordKVKey, DynCoordKV};
+
+// ── DynCoordKV (dynamic) ─────────────────────────────────────────────────
 
 #[test]
-fn new_is_empty() {
-    let kv = CoordKV::new();
+fn dyn_new_is_empty() {
+    let kv = DynCoordKV::new();
     assert!(kv.is_empty());
     assert_eq!(kv.len(), 0);
 }
 
 #[test]
-fn insert_and_get() {
-    let mut kv = CoordKV::new();
+fn dyn_insert_and_get() {
+    let mut kv = DynCoordKV::new();
     kv.insert("hello", b"world".to_vec());
     assert_eq!(kv.get("hello"), Some(b"world".to_vec()));
     assert_eq!(kv.len(), 1);
 }
 
 #[test]
-fn insert_overwrite() {
-    let mut kv = CoordKV::new();
+fn dyn_insert_overwrite() {
+    let mut kv = DynCoordKV::new();
     kv.insert("key", b"v1".to_vec());
     kv.insert("key", b"v2".to_vec());
     assert_eq!(kv.get("key"), Some(b"v2".to_vec()));
@@ -25,16 +29,16 @@ fn insert_overwrite() {
 }
 
 #[test]
-fn remove() {
-    let mut kv = CoordKV::new();
+fn dyn_remove() {
+    let mut kv = DynCoordKV::new();
     kv.insert("key", b"value".to_vec());
     assert_eq!(kv.remove("key"), Some(b"value".to_vec()));
     assert!(kv.is_empty());
 }
 
 #[test]
-fn multiple_keys() {
-    let mut kv = CoordKV::new();
+fn dyn_multiple_keys() {
+    let mut kv = DynCoordKV::new();
     kv.insert("a", b"1".to_vec());
     kv.insert("b", b"2".to_vec());
     kv.insert("c", b"3".to_vec());
@@ -45,47 +49,28 @@ fn multiple_keys() {
 }
 
 #[test]
-fn nonexistent_key() {
-    let kv = CoordKV::new();
+fn dyn_nonexistent_key() {
+    let kv = DynCoordKV::new();
     assert_eq!(kv.get("nonexistent"), None);
 }
 
 #[test]
-fn empty_string_returns_none() {
-    let mut kv = CoordKV::new();
+fn dyn_empty_string_returns_none() {
+    let mut kv = DynCoordKV::new();
     kv.insert("", b"empty".to_vec());
     assert_eq!(kv.get(""), None);
 }
 
 #[test]
-fn unicode_key() {
-    let mut kv = CoordKV::new();
+fn dyn_unicode_key() {
+    let mut kv = DynCoordKV::new();
     kv.insert("\u{d55c}\u{ae00}", b"hangul".to_vec());
     assert_eq!(kv.get("\u{d55c}\u{ae00}"), Some(b"hangul".to_vec()));
 }
 
 #[test]
-fn short_insert_and_get() {
-    let mut kv = CoordKV::new();
-    kv.insert_short("abcd", b"short".to_vec()).unwrap();
-    assert_eq!(kv.get_short("abcd"), Some(b"short".to_vec()));
-}
-
-#[test]
-fn short_key_too_long() {
-    let mut kv = CoordKV::new();
-    assert!(kv.insert_short("abcde", b"too long".to_vec()).is_err());
-}
-
-#[test]
-fn short_get_too_long_returns_none() {
-    let kv = CoordKV::new();
-    assert_eq!(kv.get_short("abcde"), None);
-}
-
-#[test]
-fn clear() {
-    let mut kv = CoordKV::new();
+fn dyn_clear() {
+    let mut kv = DynCoordKV::new();
     kv.insert("a", b"1".to_vec());
     kv.insert("b", b"2".to_vec());
     assert_eq!(kv.len(), 2);
@@ -95,38 +80,153 @@ fn clear() {
 }
 
 #[test]
-fn roundtrip_large_key() {
-    let mut kv = CoordKV::new();
+fn dyn_roundtrip_large_key() {
+    let mut kv = DynCoordKV::new();
     let key = "this is a relatively long key that exceeds four bytes";
     let val = b"some value".to_vec();
     kv.insert(key, val.clone());
     assert_eq!(kv.get(key), Some(val));
 }
 
+// ── CoordKV2 (fixed 2-byte, str API) ─────────────────────────────────────
+
 #[test]
-fn short_and_long_dont_conflict() {
-    let mut kv = CoordKV::new();
-    kv.insert_short("abcd", b"short".to_vec()).unwrap();
-    assert_eq!(kv.get("abcd"), Some(b"short".to_vec()));
-    assert_eq!(kv.get_short("abcd"), Some(b"short".to_vec()));
+fn kv2_new_is_empty() {
+    let kv = CoordKV2::new();
+    assert!(kv.is_empty());
+    assert_eq!(kv.len(), 0);
 }
 
 #[test]
-fn short_path_modulo_collision_not_visible_to_get() {
-    // string_to_short_path uses % 11172, so two different 4-byte keys
-    // can collide on the same CoordPath<2>.  get() must NOT see this
-    // collision because it only uses the injective byte-wise path.
-    let mut kv = CoordKV::new();
-    kv.insert("aaaa", b"value_a".to_vec());
-    kv.insert("bbbb", b"value_b".to_vec());
-    // get() reads from the injective dyn path only
-    assert_eq!(kv.get("aaaa"), Some(b"value_a".to_vec()));
-    assert_eq!(kv.get("bbbb"), Some(b"value_b".to_vec()));
-    // Both keys are ≤4 bytes, so both also live in short_space.
-    // If their CoordPath<2> collides modulo 11172, the later insert
-    // overwrites the earlier — but get() is immune because it skips
-    // the short path.  We verify by checking the nonexistent key
-    // does not leak into get().
-    let missing = kv.get("cccc");
-    assert_eq!(missing, None, "get must not leak short-path collisions");
+fn kv2_insert_and_get() {
+    let mut kv = CoordKV2::new();
+    kv.insert("hi", b"world".to_vec());
+    assert_eq!(kv.get("hi"), Some(b"world".to_vec()));
+    assert_eq!(kv.len(), 1);
+}
+
+#[test]
+fn kv2_insert_overwrite() {
+    let mut kv = CoordKV2::new();
+    kv.insert("ky", b"v1".to_vec());
+    kv.insert("ky", b"v2".to_vec());
+    assert_eq!(kv.get("ky"), Some(b"v2".to_vec()));
+    assert_eq!(kv.len(), 1);
+}
+
+#[test]
+fn kv2_remove() {
+    let mut kv = CoordKV2::new();
+    kv.insert("ky", b"value".to_vec());
+    assert_eq!(kv.remove("ky"), Some(b"value".to_vec()));
+    assert!(kv.is_empty());
+}
+
+#[test]
+fn kv2_multiple_keys() {
+    let mut kv = CoordKV2::new();
+    kv.insert("aa", b"1".to_vec());
+    kv.insert("bb", b"2".to_vec());
+    kv.insert("cc", b"3".to_vec());
+    assert_eq!(kv.len(), 3);
+    assert_eq!(kv.get("aa"), Some(b"1".to_vec()));
+    assert_eq!(kv.get("bb"), Some(b"2".to_vec()));
+    assert_eq!(kv.get("cc"), Some(b"3".to_vec()));
+}
+
+#[test]
+fn kv2_nonexistent_key() {
+    let kv = CoordKV2::new();
+    assert_eq!(kv.get("no"), None);
+}
+
+#[test]
+fn kv2_wrong_length_returns_none() {
+    let kv = CoordKV2::new();
+    assert_eq!(kv.get("hello"), None);
+    assert_eq!(kv.get("x"), None);
+}
+
+#[test]
+fn kv2_clear() {
+    let mut kv = CoordKV2::new();
+    kv.insert("aa", b"1".to_vec());
+    kv.insert("bb", b"2".to_vec());
+    assert_eq!(kv.len(), 2);
+    kv.clear();
+    assert!(kv.is_empty());
+}
+
+// ── CoordKV2: CoordKey API (via CoordKVKey trait) ────────────────────────
+
+#[test]
+fn kv2_by_coordkey() {
+    let mut kv = CoordKV2::new();
+    let key = CoordKey::new([b'h', b'i']);
+    kv.insert_by_coordkey(&key, b"world".to_vec());
+    assert_eq!(kv.get_by_coordkey(&key), Some(b"world".to_vec()));
+    assert_eq!(kv.len(), 1);
+}
+
+#[test]
+fn kv2_by_coordkey_remove() {
+    let mut kv = CoordKV2::new();
+    let key = CoordKey::new([b'k', b'y']);
+    kv.insert_by_coordkey(&key, b"val".to_vec());
+    assert_eq!(kv.remove_by_coordkey(&key), Some(b"val".to_vec()));
+    assert!(kv.is_empty());
+}
+
+// ── CoordKVN (fixed N-byte, str API) ─────────────────────────────────────
+
+#[test]
+fn kvn_new_is_empty() {
+    let kv: CoordKVN<3> = CoordKVN::new();
+    assert!(kv.is_empty());
+    assert_eq!(kv.len(), 0);
+}
+
+#[test]
+fn kvn_insert_and_get() {
+    let mut kv = CoordKVN::<3>::new();
+    kv.insert("foo", b"bar".to_vec());
+    assert_eq!(kv.get("foo"), Some(b"bar".to_vec()));
+    assert_eq!(kv.len(), 1);
+}
+
+#[test]
+fn kvn_wrong_length() {
+    let kv: CoordKVN<3> = CoordKVN::new();
+    assert_eq!(kv.get("ab"), None);
+    assert_eq!(kv.get("abcd"), None);
+}
+
+// ── CoordKVN: CoordKey API (via CoordKVKey trait) ────────────────────────
+
+#[test]
+fn kvn_by_coordkey() {
+    let mut kv = CoordKVN::<3>::new();
+    let key = CoordKey::new([b'f', b'o', b'o']);
+    kv.insert_by_coordkey(&key, b"bar".to_vec());
+    assert_eq!(kv.get_by_coordkey(&key), Some(b"bar".to_vec()));
+}
+
+// ── Default ──────────────────────────────────────────────────────────────
+
+#[test]
+fn dyn_default_is_empty() {
+    let kv = DynCoordKV::default();
+    assert!(kv.is_empty());
+}
+
+#[test]
+fn kv2_default_is_empty() {
+    let kv = CoordKV2::default();
+    assert!(kv.is_empty());
+}
+
+#[test]
+fn kvn_default_is_empty() {
+    let kv: CoordKVN<2> = CoordKVN::default();
+    assert!(kv.is_empty());
 }
