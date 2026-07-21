@@ -189,7 +189,7 @@ Same algorithm (iterate + decompose + filter on axis), different memory layout. 
 
 *Nonexistent prefix (structural vs iter scan): HashMap has no prefix index and must scan all 10M entries to determine that no entry has first coord == 11111. CoordSpace navigates to the branch at that prefix and returns None immediately. The gap (14.0Mx) reflects the difference between structural addressing and content scanning, not between two equivalent hash lookups.*
 
-## Benchmark: tagma-kv vs HashMap (Apple M1)
+## Benchmark: tagma-kv vs HashMap (ARMv8.4-A Firestorm)
 
 tagma-kv is a hashless KV store: it converts `&str` to Coord sequences instead of hashing them. The critical question is whether this conversion is faster than SipHash-2-4.
 
