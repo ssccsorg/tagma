@@ -1159,7 +1159,7 @@ fn bench_kv_spatial_proximity(c: &mut Criterion) {
     use tagma_geo::spatial::SpatialOps;
     use tagma_kv::CoordKVKey;
     use tagma_kv::coord_gen::CoordKey;
-    use tagma_kv::spatial::SpatialKV;
+    use tagma_kv::spatial::CoordCubeKV;
     use tagma_kv::coord_kv_n::CoordKVN;
 
     let mut group = c.benchmark_group("Spatial/kvproximity");

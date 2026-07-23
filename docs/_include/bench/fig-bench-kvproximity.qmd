@@ -28,7 +28,7 @@ graph G {
   }
 
   subgraph cluster_amort {
-    label="SpatialKV throughput (D=2, R=1, r=1)";  fontsize=11  style=dashed
+    label="CoordCubeKV throughput (D=2, R=1, r=1)";  fontsize=11  style=dashed
     t_empty [label="Empty: 584 Melem/s"]
     t_sparse [label="Sparse: 188 Melem/s"]
     t_dense [label="Dense: 31.4 Melem/s"]

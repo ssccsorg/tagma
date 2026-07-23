@@ -6,7 +6,7 @@ use crate::coord_kv_n::CoordKVN;
 use crate::CoordKV2;
 
 // ---------------------------------------------------------------------------
-// Extension trait: SpatialKV
+// Extension trait: CoordCubeKV
 // ---------------------------------------------------------------------------
 
 /// Extension trait for spatial queries on [`CoordKV`](crate::CoordKV)-compatible
@@ -20,7 +20,7 @@ use crate::CoordKV2;
 ///
 /// You must specify the cube interpretation (`D`, `R`) at the call site.
 /// The constraint `D * R == N` is enforced at runtime.
-pub trait SpatialKV<const N: usize> {
+pub trait CoordCubeKV<const N: usize> {
     /// Returns all entries within L∞ (Chebyshev) distance `radius` of
     /// `center`, interpreted as a `CoordCube<D, R>`.
     ///
@@ -40,7 +40,7 @@ pub trait SpatialKV<const N: usize> {
 
 // ── Implementations ──────────────────────────────────────────────────────
 
-impl SpatialKV<2> for CoordKV2 {
+impl CoordCubeKV<2> for CoordKV2 {
     fn proximity<const D: usize, const R: usize>(
         &self,
         center: &CoordPath<2>,
@@ -67,7 +67,7 @@ impl SpatialKV<2> for CoordKV2 {
     }
 }
 
-impl<const N: usize> SpatialKV<N> for CoordKVN<N> {
+impl<const N: usize> CoordCubeKV<N> for CoordKVN<N> {
     fn proximity<const D: usize, const R: usize>(
         &self,
         center: &CoordPath<N>,

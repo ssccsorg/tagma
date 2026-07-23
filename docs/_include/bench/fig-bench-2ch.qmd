@@ -25,7 +25,7 @@ graph G {
   }
 
   subgraph cluster_combined {
-    label="Combined: SpatialKV";  fontsize=11 color="#8B008B" style=dashed
+    label="Combined: CoordCubeKV";  fontsize=11 color="#8B008B" style=dashed
     kv [label="KV proximity (D=2, R=1)\\nDense: 31 Melem/s\\nSparse: 188 Melem/s\\nEmpty: 584 Melem/s" fillcolor="#DDA0DD" style=filled]
     convert [label="CoordPath ←→ CoordCube\\nconversion: 960 ps"]
     kv -- convert [style=invis]
