@@ -1035,6 +1035,275 @@ fn bench_coordcube_bounding_box(c: &mut Criterion) {
     group.finish();
 }
 
+// ===========================================================================
+// CoordCube 2-channel benchmarks: dimensional scaling, distance metrics, KV queries
+// ===========================================================================
+
+// Spatial/cubecube/dim_scaling_D
+//   Proximity generation throughput vs number of dimensions (D), fixed R=1
+//   Measures how path length N affects mixed-radix iteration
+fn bench_coordcube_dim_scaling(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordCube, CoordPath};
+    use tagma_geo::spatial::SpatialOps;
+
+    let mut group = c.benchmark_group("Spatial/cubecube");
+
+    // D=1, R=1 → N=1
+    let c1 = CoordCube::<1, 1, 1>::from_path(CoordPath::new([Coord::new(5000).unwrap()]));
+    group.bench_function("dim1_proximity_r2", |b| {
+        b.iter(|| { let p: Vec<_> = c1.proximity(2).collect(); black_box(p.len()); })
+    });
+
+    // D=2, R=1 → N=2
+    let c2 = CoordCube::<2, 2, 1>::from_path(CoordPath::new([Coord::new(5000).unwrap(), Coord::new(5000).unwrap()]));
+    group.bench_function("dim2_proximity_r2", |b| {
+        b.iter(|| { let p: Vec<_> = c2.proximity(2).collect(); black_box(p.len()); })
+    });
+
+    // D=3, R=1 → N=3
+    let c3 = CoordCube::<3, 3, 1>::from_path(CoordPath::new([
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+    ]));
+    group.bench_function("dim3_proximity_r2", |b| {
+        b.iter(|| { let p: Vec<_> = c3.proximity(2).collect(); black_box(p.len()); })
+    });
+
+    // D=4, R=1 → N=4
+    let c4 = CoordCube::<4, 4, 1>::from_path(CoordPath::new([
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+    ]));
+    group.bench_function("dim4_proximity_r2", |b| {
+        b.iter(|| { let p: Vec<_> = c4.proximity(2).collect(); black_box(p.len()); })
+    });
+
+    // Resolution scaling: D=1, R=1 vs R=2 vs R=3
+    let cr1 = CoordCube::<1, 1, 1>::from_path(CoordPath::new([Coord::new(5000).unwrap()]));
+    group.bench_function("res1_proximity_r2", |b| {
+        b.iter(|| { let p: Vec<_> = cr1.proximity(2).collect(); black_box(p.len()); })
+    });
+
+    let cr2 = CoordCube::<2, 1, 2>::from_path(CoordPath::new([
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+    ]));
+    group.throughput(criterion::Throughput::Elements(25)); // 5^2
+    group.bench_function("res2_proximity_r2", |b| {
+        b.iter(|| { let p: Vec<_> = cr2.proximity(2).collect(); black_box(p.len()); })
+    });
+
+    let cr3 = CoordCube::<3, 1, 3>::from_path(CoordPath::new([
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+    ]));
+    group.throughput(criterion::Throughput::Elements(125)); // 5^3
+    group.bench_function("res3_proximity_r2", |b| {
+        b.iter(|| { let p: Vec<_> = cr3.proximity(2).collect(); black_box(p.len()); })
+    });
+
+    group.finish();
+}
+
+// Spatial/cubedist/metric
+//   Distance metric throughput for CoordCube
+fn bench_coordcube_distance_metrics(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordCube, CoordPath};
+    use tagma_geo::spatial::DistanceMetrics;
+
+    let c1 = CoordCube::<3, 3, 1>::from_path(CoordPath::new([
+        Coord::new(1000).unwrap(), Coord::new(2000).unwrap(), Coord::new(3000).unwrap(),
+    ]));
+    let c2 = CoordCube::<3, 3, 1>::from_path(CoordPath::new([
+        Coord::new(1500).unwrap(), Coord::new(2500).unwrap(), Coord::new(3500).unwrap(),
+    ]));
+
+    let mut group = c.benchmark_group("Spatial/cubedist");
+
+    group.bench_function("hamming", |bench| {
+        bench.iter(|| { black_box(c1.hamming_distance(&c2)); })
+    });
+
+    group.bench_function("euclidean", |bench| {
+        bench.iter(|| { black_box(c1.euclidean_distance_approx(&c2)); })
+    });
+
+    group.bench_function("manhattan", |bench| {
+        bench.iter(|| { black_box(c1.manhattan_distance(&c2)); })
+    });
+
+    // Multi-syllable (R=2) variants
+    let a_r2 = CoordCube::<4, 2, 2>::from_path(CoordPath::new([
+        Coord::new(1000).unwrap(), Coord::new(2000).unwrap(),
+        Coord::new(3000).unwrap(), Coord::new(4000).unwrap(),
+    ]));
+    let b_r2 = CoordCube::<4, 2, 2>::from_path(CoordPath::new([
+        Coord::new(1500).unwrap(), Coord::new(2500).unwrap(),
+        Coord::new(3500).unwrap(), Coord::new(4500).unwrap(),
+    ]));
+
+    group.bench_function("hamming_r2", |bench| {
+        bench.iter(|| { black_box(a_r2.hamming_distance(&b_r2)); })
+    });
+    group.bench_function("euclidean_r2", |bench| {
+        bench.iter(|| { black_box(a_r2.euclidean_distance_approx(&b_r2)); })
+    });
+    group.bench_function("manhattan_r2", |bench| {
+        bench.iter(|| { black_box(a_r2.manhattan_distance(&b_r2)); })
+    });
+
+    group.finish();
+}
+
+// Spatial/kvproximity/store_density
+//   End-to-end KV spatial query throughput with different store densities
+fn bench_kv_spatial_proximity(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordPath, CoordCube};
+    use tagma_geo::spatial::SpatialOps;
+    use tagma_kv::CoordKVKey;
+    use tagma_kv::coord_gen::CoordKey;
+    use tagma_kv::spatial::SpatialKV;
+    use tagma_kv::coord_kv_n::CoordKVN;
+
+    let mut group = c.benchmark_group("Spatial/kvproximity");
+
+    // Dense store: fill 100x100 region around center
+    let mut kv = CoordKVN::<2>::new();
+    let center = CoordPath::<2>::new([Coord::new(5000).unwrap(), Coord::new(5000).unwrap()]);
+    let fill_box = CoordCube::<2, 2, 1>::from_path(center);
+    let fill_ranges = [(4950u16, 5050u16), (4950u16, 5050u16)];
+    for path in fill_box.bounding_box(&fill_ranges) {
+        let key = CoordKey::from_coord_path(&path);
+        kv.insert_by_coordkey(&key, b"v".to_vec());
+    }
+
+    let query_center = CoordPath::<2>::new([Coord::new(5000).unwrap(), Coord::new(5000).unwrap()]);
+
+    group.throughput(criterion::Throughput::Elements(9));  // 3^2
+    group.bench_function("dense_r1_proximity", |b| {
+        b.iter(|| {
+            let r = kv.proximity::<2, 1>(&query_center, 1);
+            black_box(r.len());
+        })
+    });
+
+    group.throughput(criterion::Throughput::Elements(25));  // 5^2
+    group.bench_function("dense_r2_proximity", |b| {
+        b.iter(|| {
+            let r = kv.proximity::<2, 1>(&query_center, 2);
+            black_box(r.len());
+        })
+    });
+
+    // Sparse store: only a few scattered entries
+    let mut sparse_kv = CoordKVN::<2>::new();
+    for p in [4950u16, 5000u16, 5050u16] {
+        for q in [4950u16, 5000u16, 5050u16] {
+            let key = CoordKey::new([p as u8, q as u8]);
+            sparse_kv.insert_by_coordkey(&key, b"v".to_vec());
+        }
+    }
+
+    group.throughput(criterion::Throughput::Elements(9));
+    group.bench_function("sparse_r1_proximity", |b| {
+        b.iter(|| {
+            let r = sparse_kv.proximity::<2, 1>(&query_center, 1);
+            black_box(r.len());
+        })
+    });
+
+    // Empty store
+    let empty_kv: CoordKVN<2> = CoordKVN::new();
+    group.bench_function("empty_r1_proximity", |b| {
+        b.iter(|| {
+            let r = empty_kv.proximity::<2, 1>(&query_center, 1);
+            black_box(r.len());
+        })
+    });
+
+    group.finish();
+}
+
+// Spatial/cubebox/n_scaling
+//   Bounding box enumeration throughput vs N (number of syllables)
+fn bench_coordcube_box_n_scaling(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordCube, CoordPath};
+    use tagma_geo::spatial::SpatialOps;
+
+    let mid = 5000u16;
+    let mut group = c.benchmark_group("Spatial/cubebox");
+
+    // N=2, D=2, R=1: 2D box 10x10 = 100 paths
+    let c2 = CoordCube::<2, 2, 1>::from_path(CoordPath::new([Coord::new(mid).unwrap(), Coord::new(mid).unwrap()]));
+    group.throughput(criterion::Throughput::Elements(100));
+    group.bench_function("n2_box_10x10", |b| {
+        let r = [(0u16, 9u16), (0u16, 9u16)];
+        b.iter(|| { let p: Vec<_> = c2.bounding_box(&r).collect(); black_box(p.len()); })
+    });
+
+    // N=4, D=4, R=1: 4D box 4x4x4x4 = 256 paths
+    let c4 = CoordCube::<4, 4, 1>::from_path(CoordPath::new([
+        Coord::new(mid).unwrap(), Coord::new(mid).unwrap(),
+        Coord::new(mid).unwrap(), Coord::new(mid).unwrap(),
+    ]));
+    group.throughput(criterion::Throughput::Elements(256));
+    group.bench_function("n4_box_4x4x4x4", |b| {
+        let r = [(0u16, 3u16), (0u16, 3u16), (0u16, 3u16), (0u16, 3u16)];
+        b.iter(|| { let p: Vec<_> = c4.bounding_box(&r).collect(); black_box(p.len()); })
+    });
+
+    // N=6, D=6, R=1: 6D box 3^6 = 729 paths
+    let c6 = CoordCube::<6, 6, 1>::from_path(CoordPath::new([
+        Coord::new(mid).unwrap(), Coord::new(mid).unwrap(), Coord::new(mid).unwrap(),
+        Coord::new(mid).unwrap(), Coord::new(mid).unwrap(), Coord::new(mid).unwrap(),
+    ]));
+    group.throughput(criterion::Throughput::Elements(729));
+    group.bench_function("n6_box_3x3x3x3x3x3", |b| {
+        let r = [(0u16, 2u16); 6];
+        b.iter(|| { let p: Vec<_> = c6.bounding_box(&r).collect(); black_box(p.len()); })
+    });
+
+    group.finish();
+}
+
+// Spatial/cubeoverhead/axis_vs_raw
+//   Overhead of CoordCube axis extraction vs raw CoordPath access
+fn bench_coordcube_overhead(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordCube, CoordPath};
+
+    let path = CoordPath::<6>::new([
+        Coord::new(0).unwrap(), Coord::new(1).unwrap(),
+        Coord::new(2).unwrap(), Coord::new(3).unwrap(),
+        Coord::new(4).unwrap(), Coord::new(5).unwrap(),
+    ]);
+    let cube = CoordCube::<6, 3, 2>::from_path(path);
+
+    let mut group = c.benchmark_group("Spatial/cubeoverhead");
+
+    group.bench_function("raw_path_get_3x", |b| {
+        b.iter(|| {
+            let _a = CoordPath::new([
+                path.coords()[0], path.coords()[1],
+                path.coords()[2], path.coords()[3],
+                path.coords()[4], path.coords()[5],
+            ]);
+        })
+    });
+
+    group.bench_function("cube_axis_3x", |b| {
+        b.iter(|| {
+            let _a = cube.axis(0);
+            let _b = cube.axis(1);
+            let _c = cube.axis(2);
+        })
+    });
+
+    group.bench_function("cube_from_path", |b| {
+        b.iter(|| {
+            black_box(CoordCube::<6, 3, 2>::from_path(path));
+        })
+    });
+
+    group.finish();
+}
+
 // N_scaling/get  (single lookup, ARMv8.4-A Firestorm)
 //   N=1   CoordSpace      0.39 ns   space 10^4  (inline stack array, no alloc)
 //   N=2   CoordSpace2     0.39 ns   space 10^8  (dense heap, 2.4x faster)
@@ -1310,7 +1579,12 @@ criterion_group!(
               bench_spatial_cs2_prefix_scan,
               bench_coordset_spatial_query,
               bench_coordcube_proximity_radius,
-              bench_coordcube_bounding_box
+              bench_coordcube_bounding_box,
+              bench_coordcube_dim_scaling,
+              bench_coordcube_distance_metrics,
+              bench_kv_spatial_proximity,
+              bench_coordcube_box_n_scaling,
+              bench_coordcube_overhead
 );
 
 // ===========================================================================

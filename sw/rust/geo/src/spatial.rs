@@ -131,7 +131,7 @@ impl<const N: usize> Iterator for HammingFilter<N> {
     type Item = CoordPath<N>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some(candidate) = self.inner.next() {
+        for candidate in self.inner.by_ref() {
             let distance = candidate
                 .coords()
                 .iter()
