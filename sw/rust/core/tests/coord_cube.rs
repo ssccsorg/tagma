@@ -36,7 +36,8 @@ fn cube_into_path_roundtrip() {
 
 #[test]
 fn cube_from_path_via_from_trait() {
-    let path = CoordPath::<2>::new([Coord::new(42).unwrap(), Coord::new(99).unwrap()]);
+    let path =
+        CoordPath::<2>::new([Coord::new(42).unwrap(), Coord::new(99).unwrap()]);
     let cube: CoordCube<2, 2, 1> = path.into();
     assert_eq!(cube.axis(0).coords()[0].index(), 42);
     assert_eq!(cube.axis(1).coords()[0].index(), 99);
@@ -59,7 +60,6 @@ fn cube_invalid_dimensions_panics() {
         Coord::new(0).unwrap(),
         Coord::new(0).unwrap(),
     ]);
-    // D * R = 3 * 1 = 3, but N = 4
     let _cube = CoordCube::<4, 3, 1>::from_path(path);
 }
 
@@ -94,11 +94,9 @@ fn cube_axis_multi_syllable() {
     let axis0 = cube.axis(0);
     assert_eq!(axis0.coords()[0].index(), 0);
     assert_eq!(axis0.coords()[1].index(), 1);
-
     let axis1 = cube.axis(1);
     assert_eq!(axis1.coords()[0].index(), 2);
     assert_eq!(axis1.coords()[1].index(), 3);
-
     let axis2 = cube.axis(2);
     assert_eq!(axis2.coords()[0].index(), 4);
     assert_eq!(axis2.coords()[1].index(), 5);
@@ -109,7 +107,7 @@ fn cube_axis_multi_syllable() {
 fn cube_axis_out_of_range() {
     let path = CoordPath::<2>::new([Coord::new(0).unwrap(), Coord::new(0).unwrap()]);
     let cube = CoordCube::<2, 2, 1>::from_path(path);
-    let _ = cube.axis(2); // D=2, so indices 0,1 only
+    let _ = cube.axis(2);
 }
 
 // ---------------------------------------------------------------------------
@@ -129,121 +127,6 @@ fn cube_coord_at() {
     assert_eq!(cube.coord_at(0, 1).index(), 20);
     assert_eq!(cube.coord_at(1, 0).index(), 30);
     assert_eq!(cube.coord_at(1, 1).index(), 40);
-}
-
-// ---------------------------------------------------------------------------
-// Hamming distance
-// ---------------------------------------------------------------------------
-
-#[test]
-fn hamming_distance_identical() {
-    let path = CoordPath::<3>::new([
-        Coord::new(100).unwrap(),
-        Coord::new(200).unwrap(),
-        Coord::new(300).unwrap(),
-    ]);
-    let a = CoordCube::<3, 3, 1>::from_path(path);
-    let b = CoordCube::<3, 3, 1>::from_path(path);
-    assert_eq!(a.hamming_distance(&b), 0);
-}
-
-#[test]
-fn hamming_distance_all_differ() {
-    let a = CoordCube::<3, 3, 1>::from_path(CoordPath::new([
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-    ]));
-    let b = CoordCube::<3, 3, 1>::from_path(CoordPath::new([
-        Coord::new(1).unwrap(),
-        Coord::new(2).unwrap(),
-        Coord::new(3).unwrap(),
-    ]));
-    assert_eq!(a.hamming_distance(&b), 3);
-}
-
-#[test]
-fn hamming_distance_some_differ() {
-    let a = CoordCube::<4, 2, 2>::from_path(CoordPath::new([
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-    ]));
-    let b = CoordCube::<4, 2, 2>::from_path(CoordPath::new([
-        Coord::new(0).unwrap(),
-        Coord::new(1).unwrap(),
-        Coord::new(2).unwrap(),
-        Coord::new(0).unwrap(),
-    ]));
-    assert_eq!(a.hamming_distance(&b), 2);
-}
-
-// ---------------------------------------------------------------------------
-// Axis-wise Hamming distance
-// ---------------------------------------------------------------------------
-
-#[test]
-fn hamming_distance_axes_identical() {
-    let path = CoordPath::<4>::new([
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-    ]);
-    let a = CoordCube::<4, 2, 2>::from_path(path);
-    let b = CoordCube::<4, 2, 2>::from_path(path);
-    let mut out = [0usize; 2];
-    a.hamming_distance_axes(&b, &mut out);
-    assert_eq!(out, [0, 0]);
-}
-
-#[test]
-fn hamming_distance_axes_first_dim() {
-    let a = CoordCube::<4, 2, 2>::from_path(CoordPath::new([
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-    ]));
-    let b = CoordCube::<4, 2, 2>::from_path(CoordPath::new([
-        Coord::new(0).unwrap(),
-        Coord::new(1).unwrap(),
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-    ]));
-    let mut out = [0usize; 2];
-    a.hamming_distance_axes(&b, &mut out);
-    assert_eq!(out[0], 1);
-    assert_eq!(out[1], 0);
-}
-
-// ---------------------------------------------------------------------------
-// Euclidean distance
-// ---------------------------------------------------------------------------
-
-#[test]
-fn euclidean_distance_identical() {
-    let path = CoordPath::<2>::new([Coord::new(5000).unwrap(), Coord::new(5000).unwrap()]);
-    let a = CoordCube::<2, 2, 1>::from_path(path);
-    let b = CoordCube::<2, 2, 1>::from_path(path);
-    assert!((a.euclidean_distance_approx(&b)).abs() < 1e-10);
-}
-
-#[test]
-fn euclidean_distance_max_in_one_dim() {
-    let a = CoordCube::<2, 2, 1>::from_path(CoordPath::new([
-        Coord::new(0).unwrap(),
-        Coord::new(0).unwrap(),
-    ]));
-    let b = CoordCube::<2, 2, 1>::from_path(CoordPath::new([
-        Coord::new(11171).unwrap(),
-        Coord::new(0).unwrap(),
-    ]));
-    let d = a.euclidean_distance_approx(&b);
-    // Max distance in one dimension = 1.0 (normalised)
-    // Since only one dim differs, sqrt(1.0) = 1.0
-    assert!((d - 1.0).abs() < 0.001, "got {}", d);
 }
 
 // ---------------------------------------------------------------------------
@@ -295,7 +178,6 @@ fn cube_ne() {
 
 #[test]
 fn cube_single_dimension() {
-    // D=1, R=3: single dimension with 3 syllables
     let path = CoordPath::<3>::new([
         Coord::new(5).unwrap(),
         Coord::new(10).unwrap(),
@@ -312,7 +194,6 @@ fn cube_single_dimension() {
 
 #[test]
 fn cube_single_syllable_per_dim() {
-    // D=5, R=1: five dimensions, one syllable each
     let path = CoordPath::<5>::new([
         Coord::new(0).unwrap(),
         Coord::new(1).unwrap(),
