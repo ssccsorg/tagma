@@ -58,12 +58,12 @@ Test coverage: 170 unit/integration tests + 15 doc-tests, all passing. Zero clip
 
 | Type | Description | File |
 |------|-------------|------|
-| CoordKey\<N\> | Fixed N-byte key, type-level length enforcement. Injective to CoordPath | `tagma-kv/src/coord_gen.rs` |
-| DynCoordKV | Dynamic KV, ByteWise strategy, all-length strings | `tagma-kv/src/dyn_coord_kv.rs` |
-| CoordKV2 | Fixed 2-byte dense KV, CoordSpace2 (119 MB), O(1) lookup | `tagma-kv/src/coord_kv2.rs` |
-| CoordKVN\<N\> | Fixed N-byte tree KV, CoordSpaceN, sparse | `tagma-kv/src/coord_kv_n.rs` |
-| CoordKV trait | HashMap-compatible: `insert`, `get`, `remove`, `contains_key` via `&str` | `tagma-kv/src/coord_kv.rs` |
-| CoordKVKey\<N\> trait | `_by_coordkey` methods for CoordKey-based access | `tagma-kv/src/coord_kv.rs` |
+| CoordKey\<N\> | Fixed N-byte key, type-level length enforcement. Injective to CoordPath | `kvsrc/coord_gen.rs` |
+| DynCoordKV | Dynamic KV, ByteWise strategy, all-length strings | `kvsrc/dyn_coord_kv.rs` |
+| CoordKV2 | Fixed 2-byte dense KV, CoordSpace2 (119 MB), O(1) lookup | `kvsrc/coord_kv2.rs` |
+| CoordKVN\<N\> | Fixed N-byte tree KV, CoordSpaceN, sparse | `kvsrc/coord_kv_n.rs` |
+| CoordKV trait | HashMap-compatible: `insert`, `get`, `remove`, `contains_key` via `&str` | `kvsrc/coord_kv.rs` |
+| CoordKVKey\<N\> trait | `_by_coordkey` methods for CoordKey-based access | `kvsrc/coord_kv.rs` |
 
 ## Quick start
 

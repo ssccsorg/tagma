@@ -4,9 +4,9 @@ members = [
     "core",
     "base11172",
     "benches",
-    "tagma-kv",
+    "kv",
 ]
 
 [workspace.dependencies]
 tagma-core = { path = "core" }
-tagma-kv = { path = "tagma-kv" }
+tagma-kv = { path = "kv" }

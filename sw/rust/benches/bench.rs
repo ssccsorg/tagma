@@ -1265,25 +1265,25 @@ criterion_group!(
 // ===========================================================================
 //
 // Single-op results (ns):
-//   tagma-kv/static/insert/single        16.9  ns
-//   tagma-kv/dynamic/insert/single       29.0  ns
-//   tagma-kv/hashmap/insert/single       47.6  ns
-//   tagma-kv/static/get/single            1.07 ns
-//   tagma-kv/dynamic/get/single           4.19 ns
-//   tagma-kv/hashmap/get/single          13.4  ns
+//   kv/static/insert/single        16.9  ns
+//   kv/dynamic/insert/single       29.0  ns
+//   kv/hashmap/insert/single       47.6  ns
+//   kv/static/get/single            1.07 ns
+//   kv/dynamic/get/single           4.19 ns
+//   kv/hashmap/get/single          13.4  ns
 //
 // Batch results:
-//   tagma-kv/static/insert/short_1k      21.4 µs
-//   tagma-kv/dynamic/insert/short_1k     42.6 µs
-//   tagma-kv/hashmap/insert/short_1k     57.1 µs
-//   tagma-kv/static/insert/medium_1k     21.4 µs
-//   tagma-kv/dynamic/insert/medium_1k    73.6 µs
-//   tagma-kv/hashmap/insert/medium_1k    57.6 µs
+//   kv/static/insert/short_1k      21.4 µs
+//   kv/dynamic/insert/short_1k     42.6 µs
+//   kv/hashmap/insert/short_1k     57.1 µs
+//   kv/static/insert/medium_1k     21.4 µs
+//   kv/dynamic/insert/medium_1k    73.6 µs
+//   kv/hashmap/insert/medium_1k    57.6 µs
 //
 // Batch get (10k keys, per-key ns):
-//   tagma-kv/batch-get/static             0.84 ns
-//   tagma-kv/batch-get/dynamic           12.0  ns
-//   tagma-kv/batch-get/hashmap           19.1  ns
+//   kv/batch-get/static             0.84 ns
+//   kv/batch-get/dynamic           12.0  ns
+//   kv/batch-get/hashmap           19.1  ns
 //
 // Wrapper single-op (ns):
 //   DynCoordKV/insert/single             49.4 ns
@@ -1352,7 +1352,7 @@ fn bench_kv_single_insert_static(c: &mut Criterion) {
     let path = Prefix::<2>.generate(key).unwrap();
     let cp = CoordPath::new([path[0], path[1]]);
 
-    c.bench_function("tagma-kv/static/insert/single", |b| {
+    c.bench_function("kv/static/insert/single", |b| {
         let mut space: tagma_core::CoordSpace2<Box<[u8]>> = tagma_core::CoordSpace2::new();
         b.iter(|| {
             black_box(space.place_path(black_box(&cp), kv_boxed(&kv_value())));
@@ -1364,7 +1364,7 @@ fn bench_kv_single_insert_dyn(c: &mut Criterion) {
     let key = "k000";
     let path = ByteWise.generate(key).unwrap();
 
-    c.bench_function("tagma-kv/dynamic/insert/single", |b| {
+    c.bench_function("kv/dynamic/insert/single", |b| {
         let mut space: tagma_core::DynCoordSpace<Box<[u8]>> = tagma_core::DynCoordSpace::new();
         b.iter(|| {
             black_box(space.place(black_box(&path), kv_boxed(&kv_value())));
@@ -1375,7 +1375,7 @@ fn bench_kv_single_insert_dyn(c: &mut Criterion) {
 fn bench_kv_single_insert_hashmap(c: &mut Criterion) {
     let key = "k000";
 
-    c.bench_function("tagma-kv/hashmap/insert/single", |b| {
+    c.bench_function("kv/hashmap/insert/single", |b| {
         let mut map: std::collections::HashMap<String, Box<[u8]>> =
             std::collections::HashMap::new();
         b.iter(|| {
@@ -1391,7 +1391,7 @@ fn bench_kv_single_get_static(c: &mut Criterion) {
     let mut space: tagma_core::CoordSpace2<Box<[u8]>> = tagma_core::CoordSpace2::new();
     space.place_path(&cp, kv_boxed(&kv_value()));
 
-    c.bench_function("tagma-kv/static/get/single", |b| {
+    c.bench_function("kv/static/get/single", |b| {
         b.iter(|| {
             black_box(black_box(&space).at_path(black_box(&cp)));
         })
@@ -1404,7 +1404,7 @@ fn bench_kv_single_get_dyn(c: &mut Criterion) {
     let mut space: tagma_core::DynCoordSpace<Box<[u8]>> = tagma_core::DynCoordSpace::new();
     space.place(&path, kv_boxed(&kv_value()));
 
-    c.bench_function("tagma-kv/dynamic/get/single", |b| {
+    c.bench_function("kv/dynamic/get/single", |b| {
         b.iter(|| {
             black_box(black_box(&space).at(black_box(&path)));
         })
@@ -1416,7 +1416,7 @@ fn bench_kv_single_get_hashmap(c: &mut Criterion) {
     let mut map: std::collections::HashMap<String, Box<[u8]>> = std::collections::HashMap::new();
     map.insert(key.to_string(), kv_boxed(&kv_value()));
 
-    c.bench_function("tagma-kv/hashmap/get/single", |b| {
+    c.bench_function("kv/hashmap/get/single", |b| {
         b.iter(|| {
             black_box(black_box(&map).get(key));
         })
@@ -1435,7 +1435,7 @@ fn bench_kv_batch_insert_static_short(c: &mut Criterion) {
         })
         .collect();
 
-    c.bench_function("tagma-kv/static/insert/short_1k", |b| {
+    c.bench_function("kv/static/insert/short_1k", |b| {
         let mut space: tagma_core::CoordSpace2<Box<[u8]>> = tagma_core::CoordSpace2::new();
         b.iter(|| {
             for (cp, val) in &keys {
@@ -1455,7 +1455,7 @@ fn bench_kv_batch_insert_dyn_short(c: &mut Criterion) {
         })
         .collect();
 
-    c.bench_function("tagma-kv/dynamic/insert/short_1k", |b| {
+    c.bench_function("kv/dynamic/insert/short_1k", |b| {
         let mut space: tagma_core::DynCoordSpace<Box<[u8]>> = tagma_core::DynCoordSpace::new();
         b.iter(|| {
             for (path, val) in &keys {
@@ -1472,7 +1472,7 @@ fn bench_kv_batch_insert_hashmap_short(c: &mut Criterion) {
         .map(|k| (k.clone(), kv_boxed(&kv_value())))
         .collect();
 
-    c.bench_function("tagma-kv/hashmap/insert/short_1k", |b| {
+    c.bench_function("kv/hashmap/insert/short_1k", |b| {
         let mut map: std::collections::HashMap<String, Box<[u8]>> =
             std::collections::HashMap::new();
         b.iter(|| {
@@ -1496,7 +1496,7 @@ fn bench_kv_batch_insert_static_medium(c: &mut Criterion) {
         })
         .collect();
 
-    c.bench_function("tagma-kv/static/insert/medium_1k", |b| {
+    c.bench_function("kv/static/insert/medium_1k", |b| {
         let mut space: tagma_core::CoordSpace2<Box<[u8]>> = tagma_core::CoordSpace2::new();
         b.iter(|| {
             for (cp, val) in &keys {
@@ -1516,7 +1516,7 @@ fn bench_kv_batch_insert_dyn_medium(c: &mut Criterion) {
         })
         .collect();
 
-    c.bench_function("tagma-kv/dynamic/insert/medium_1k", |b| {
+    c.bench_function("kv/dynamic/insert/medium_1k", |b| {
         let mut space: tagma_core::DynCoordSpace<Box<[u8]>> = tagma_core::DynCoordSpace::new();
         b.iter(|| {
             for (path, val) in &keys {
@@ -1533,7 +1533,7 @@ fn bench_kv_batch_insert_hashmap_medium(c: &mut Criterion) {
         .map(|k| (k.clone(), kv_boxed(&kv_value())))
         .collect();
 
-    c.bench_function("tagma-kv/hashmap/insert/medium_1k", |b| {
+    c.bench_function("kv/hashmap/insert/medium_1k", |b| {
         let mut map: std::collections::HashMap<String, Box<[u8]>> =
             std::collections::HashMap::new();
         b.iter(|| {
@@ -1549,7 +1549,7 @@ fn bench_kv_batch_insert_hashmap_medium(c: &mut Criterion) {
 
 fn bench_kv_batch_get_all(c: &mut Criterion) {
     let short_keys = kv_short_keys(10_000);
-    let mut group = c.benchmark_group("tagma-kv/batch-get/short_10k");
+    let mut group = c.benchmark_group("kv/batch-get/short_10k");
 
     // Static: pre-populate CoordSpace2
     {
@@ -1796,7 +1796,7 @@ fn kv_workload(c: &mut Criterion, scale: &str, n: usize, cycles: usize) {
     let k2_str = kv_2byte_keys(STR_2BYTE_UNIQUE); // 1296 unique 2-char str keys
     let all_k2 = kv_2byte_all(); // 65536 raw CoordKey<2>
     let val = kv_value();
-    let group_name = format!("tagma-kv/workload/{}", scale);
+    let group_name = format!("kv/workload/{}", scale);
     let mut group = c.benchmark_group(&group_name);
 
     // Use by_coordkey API when n exceeds the str-usable key limit
