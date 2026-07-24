@@ -3,6 +3,7 @@ use tagma_geo::spatial::SpatialOps;
 use tagma_geo::BoundingBoxIter;
 
 use crate::coord_kv_n::CoordKVN;
+use crate::dyn_coord_kv::DynCoordKV;
 use crate::CoordKV2;
 
 // ---------------------------------------------------------------------------
@@ -94,6 +95,33 @@ impl<const N: usize> CoordCubeKV<N> for CoordKVN<N> {
     }
 }
 
+impl<const N: usize> CoordCubeKV<N> for DynCoordKV {
+    fn proximity<const D: usize, const R: usize>(
+        &self,
+        center: &CoordPath<N>,
+        radius: usize,
+    ) -> Vec<(CoordPath<N>, Vec<u8>)> {
+        let cube = CoordCube::<N, D, R>::from_path(*center);
+        let mut results = Vec::new();
+        for path in cube.proximity(radius) {
+            if let Some(val) = self.get_by_coord_path(&path) {
+                results.push((path, val));
+            }
+        }
+        results
+    }
+
+    fn bounding_box_range(&self, ranges: &[(u16, u16); N]) -> Vec<(CoordPath<N>, Vec<u8>)> {
+        let mut results = Vec::new();
+        for path in BoundingBoxIter::<N>::new(*ranges) {
+            if let Some(val) = self.get_by_coord_path(&path) {
+                results.push((path, val));
+            }
+        }
+        results
+    }
+}
+
 // ── Helpers: get_by_coordpath for KV types ────────────────────────────────
 
 /// Internal helper: look up a `CoordPath<2>` in `CoordKV2`.
@@ -143,6 +171,7 @@ mod tests {
     use super::*;
     use crate::coord_gen::CoordKey;
     use crate::CoordKVKey;
+    use crate::CoordKV;
     use tagma_core::{Coord, CoordPath};
 
     // ── CoordKV2 spatial tests ─────────────────────────────────────
@@ -252,6 +281,42 @@ mod tests {
 
         let center_path = CoordPath::<2>::new([Coord::new(50).unwrap(), Coord::new(50).unwrap()]);
         let results = kv.proximity::<2, 1>(&center_path, 1);
+        assert!(results.is_empty());
+    }
+
+    // ── DynCoordKV spatial tests ──────────────────────────────────
+
+    #[test]
+    fn dynkv_proximity_finds_nearby() {
+        let mut kv = DynCoordKV::new();
+        kv.insert("ab", b"center".to_vec());
+        kv.insert("ac", b"nearby".to_vec());
+        kv.insert("az", b"far".to_vec());
+
+        let center_path = CoordPath::<2>::new([
+            Coord::new(97).unwrap(),
+            Coord::new(98).unwrap(),
+        ]);
+        let results = kv.proximity::<2, 1>(&center_path, 1);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn dynkv_bounding_box_range() {
+        let mut kv = DynCoordKV::new();
+        kv.insert("ab", b"v1".to_vec());
+        kv.insert("ac", b"v2".to_vec());
+        kv.insert("xy", b"v3".to_vec());
+        let ranges = [(97u16, 99u16), (98u16, 100u16)];
+        let results = kv.bounding_box_range(&ranges);
+        assert_eq!(results.len(), 2);
+    }
+
+    #[test]
+    fn dynkv_empty_store_returns_empty() {
+        let kv = DynCoordKV::new();
+        let ranges = [(0u16, 100u16), (0u16, 100u16)];
+        let results = kv.bounding_box_range(&ranges);
         assert!(results.is_empty());
     }
 }

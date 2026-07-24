@@ -1337,7 +1337,7 @@ fn bench_coordcube_path_vs_cube(c: &mut Criterion) {
     // Pre-compute the 9 neighbor keys for sequential lookup
     let neighbor_paths: Vec<_> = fill_box.proximity(1).collect();
     let neighbor_keys: Vec<_> = neighbor_paths.iter()
-        .map(|p| CoordKey::from_coord_path(p))
+        .map(CoordKey::from_coord_path)
         .collect();
 
     let query_center = CoordPath::<2>::new([Coord::new(5000).unwrap(), Coord::new(5000).unwrap()]);
@@ -1369,6 +1369,171 @@ fn bench_coordcube_path_vs_cube(c: &mut Criterion) {
             let r = kv.proximity::<2, 1>(&query_center, 2);
             black_box(r.len());
         })
+    });
+
+    group.finish();
+}
+
+// ===========================================================================
+// CoordCube: large-N tree, hierarchical query, proximity_hamming
+// ===========================================================================
+
+// Spatial/cubelargen
+//   CoordCube on large-N trees (N=12, N=19). Tests that spatial queries
+//   work on deep trees with small radii to keep output bounded.
+//   D=12,R=1 (N=12): 12 dimensions, r=0 → 1 path, r=1 → 3^12 paths
+//   D=19,R=1 (N=19): 19 dimensions, r=0 → 1 path only (r=1 would be 3^19)
+fn bench_coordcube_large_n(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordPath, CoordCube};
+    use tagma_geo::spatial::SpatialOps;
+    use tagma_kv::CoordKVKey;
+    use tagma_kv::coord_gen::CoordKey;
+    use tagma_kv::spatial::CoordCubeKV;
+    use tagma_kv::coord_kv_n::CoordKVN;
+
+    let mut group = c.benchmark_group("Spatial/cubelargen");
+
+    // N=12, D=12, R=1: path gen r=0 on tree
+    {
+        let path = CoordPath::<12>::new(core::array::from_fn(|i| Coord::new((i as u16) % 11172).unwrap()));
+        let cube = CoordCube::<12, 12, 1>::from_path(path);
+        group.bench_function("n12_path_gen_r0", |b| {
+            b.iter(|| black_box(cube.proximity(0).count()));
+        });
+    }
+
+    // N=12, D=12, R=1: KV proximity r=0 on tree
+    {
+        let mut kv = CoordKVN::<12>::new();
+        let path = CoordPath::<12>::new(core::array::from_fn(|i| Coord::new((i as u16) % 11172).unwrap()));
+        let key = CoordKey::from_coord_path(&path);
+        kv.insert_by_coordkey(&key, b"v".to_vec());
+        let center = CoordPath::<12>::new(core::array::from_fn(|i| Coord::new((i as u16) % 11172).unwrap()));
+        group.bench_function("n12_kv_proximity_r0", |b| {
+            b.iter(|| {
+                let r = kv.proximity::<12, 1>(&center, 0);
+                black_box(r.len());
+            })
+        });
+    }
+
+    // N=19, D=19, R=1: path gen r=0 (single path, 19-D coord)
+    {
+        let path = CoordPath::<19>::new(core::array::from_fn(|i| Coord::new(Coord::N_VALID as u16 - 1 - (i as u16 % 11172)).unwrap()));
+        let cube = CoordCube::<19, 19, 1>::from_path(path);
+        group.bench_function("n19_path_gen_r0", |b| {
+            b.iter(|| black_box(cube.proximity(0).count()));
+        });
+    }
+
+    // N=19, D=19, R=1: KV proximity r=0 on tree
+    {
+        let mut kv = CoordKVN::<19>::new();
+        let path = CoordPath::<19>::new(core::array::from_fn(|i| Coord::new((i as u16) % 11172).unwrap()));
+        let key = CoordKey::from_coord_path(&path);
+        kv.insert_by_coordkey(&key, b"v".to_vec());
+        let center = CoordPath::<19>::new(core::array::from_fn(|i| Coord::new((i as u16) % 11172).unwrap()));
+        group.bench_function("n19_kv_proximity_r0", |b| {
+            b.iter(|| {
+                let r = kv.proximity::<19, 1>(&center, 0);
+                black_box(r.len());
+            })
+        });
+    }
+
+    group.finish();
+}
+
+// Spatial/hierarchical
+//   Two-phase query: coarse CoordCube filter → fine CoordPath match.
+//   Phase 1: CoordCube<2,2> (D=2,R=2, N=4) generates candidates at low res.
+//   Phase 2: CoordPath filters generated paths against stored keys.
+fn bench_coordcube_hierarchical(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordPath, CoordCube};
+    use tagma_geo::spatial::SpatialOps;
+    use tagma_kv::CoordKVKey;
+    use tagma_kv::coord_gen::CoordKey;
+    use tagma_kv::spatial::CoordCubeKV;
+    use tagma_kv::coord_kv_n::CoordKVN;
+
+    let mut group = c.benchmark_group("Spatial/hierarchical");
+
+    // Fill a 4-syllable store (D=2, R=2 → N=4)
+    let mut kv = CoordKVN::<4>::new();
+    let center = CoordPath::<4>::new([
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+    ]);
+    for d0 in [4995u16, 5000u16, 5005u16] {
+        for d1 in [4995u16, 5000u16, 5005u16] {
+            let p = CoordPath::<4>::new([
+                Coord::new(d0).unwrap(), Coord::new(d0+1).unwrap(),
+                Coord::new(d1).unwrap(), Coord::new(d1+1).unwrap(),
+            ]);
+            kv.insert_by_coordkey(&CoordKey::from_coord_path(&p), b"v".to_vec());
+        }
+    }
+
+    // Coarse phase: CoordCube<2,2> (but proximity is per-syllable, so use D=4,R=1 instead)
+    // Actually D=2,R=2 means 2 dimensions with 2 syllables each.
+    // proximity treats each syllable independently (L∞ on the flat array).
+    let cube = CoordCube::<4, 2, 2>::from_path(center);
+
+    group.bench_function("proximity_r1_2phase", |b| {
+        b.iter(|| {
+            // Phase 1: generate candidates via CoordCube proximity
+            let candidates: Vec<_> = cube.proximity(1).collect();
+            // Phase 2: filter by exact store lookup
+            let mut count = 0usize;
+            for path in &candidates {
+                let key = CoordKey::from_coord_path(path);
+                if kv.get_by_coordkey(&key).is_some() {
+                    count += 1;
+                }
+            }
+            black_box(count);
+        })
+    });
+
+    // Compare with direct KV proximity
+    group.bench_function("kv_proximity_r1_direct", |b| {
+        b.iter(|| {
+            let r = kv.proximity::<4, 1>(&center, 1);
+            black_box(r.len());
+        })
+    });
+
+    group.finish();
+}
+
+// Spatial/cubehamming
+//   Compare proximity() vs proximity_hamming() at same radius.
+//   proximity_hamming filters L∞ neighbors by Hamming distance.
+fn bench_coordcube_proximity_hamming(c: &mut Criterion) {
+    use tagma_core::{Coord, CoordPath, CoordCube};
+    use tagma_geo::spatial::SpatialOps;
+
+    let path = CoordPath::<3>::new([
+        Coord::new(5000).unwrap(), Coord::new(5000).unwrap(), Coord::new(5000).unwrap(),
+    ]);
+    let cube = CoordCube::<3, 3, 1>::from_path(path);
+
+    let mut group = c.benchmark_group("Spatial/cubehamming");
+
+    group.bench_function("proximity_r1", |b| {
+        b.iter(|| { let p: Vec<_> = cube.proximity(1).collect(); black_box(p.len()); })
+    });
+
+    group.bench_function("proximity_hamming_r1", |b| {
+        b.iter(|| { let p: Vec<_> = cube.proximity_hamming(1).collect(); black_box(p.len()); })
+    });
+
+    group.bench_function("proximity_r3", |b| {
+        b.iter(|| { let p: Vec<_> = cube.proximity(3).collect(); black_box(p.len()); })
+    });
+
+    group.bench_function("proximity_hamming_r3", |b| {
+        b.iter(|| { let p: Vec<_> = cube.proximity_hamming(3).collect(); black_box(p.len()); })
     });
 
     group.finish();
@@ -1655,7 +1820,10 @@ criterion_group!(
               bench_kv_spatial_proximity,
               bench_coordcube_box_n_scaling,
               bench_coordcube_overhead,
-              bench_coordcube_path_vs_cube
+              bench_coordcube_path_vs_cube,
+              bench_coordcube_large_n,
+              bench_coordcube_hierarchical,
+              bench_coordcube_proximity_hamming
 );
 
 // ===========================================================================
