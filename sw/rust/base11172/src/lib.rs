@@ -16,7 +16,7 @@ use alloc::vec::Vec;
 use tagma_core::Coord;
 
 /// The number of distinct characters used by this encoding (11172).
-pub const N_SYLLABLES: u32 = Coord::N_VALID as u32;
+pub const N_CHARS: u32 = Coord::N_VALID as u32;
 
 // ---------------------------------------------------------------------------
 // Encoding
@@ -27,8 +27,8 @@ pub const N_SYLLABLES: u32 = Coord::N_VALID as u32;
 /// Each character carries log₂(11172) ≈ 13.45 bits of information,
 /// so a pair covers 26.9 bits — sufficient for a full `u16`.
 pub fn encode_u16(v: u16) -> [char; 2] {
-    let hi = (v as u32) / N_SYLLABLES;
-    let lo = (v as u32) % N_SYLLABLES;
+    let hi = (v as u32) / N_CHARS;
+    let lo = (v as u32) % N_CHARS;
     let c0 = Coord::new(hi as u16).unwrap_or_else(|| Coord::new(0).unwrap());
     let c1 = Coord::new(lo as u16).unwrap_or_else(|| Coord::new(0).unwrap());
     [c0.to_char(), c1.to_char()]
@@ -62,7 +62,7 @@ pub fn encode_bytes(bytes: &[u8]) -> String {
 pub fn decode_pair(c0: char, c1: char) -> Option<u16> {
     let coord0 = Coord::from_char(c0)?;
     let coord1 = Coord::from_char(c1)?;
-    Some((coord0.index() as u32 * N_SYLLABLES + coord1.index() as u32) as u16)
+    Some((coord0.index() as u32 * N_CHARS + coord1.index() as u32) as u16)
 }
 
 /// Decodes a Hangul string back to bytes, 2 characters per `u16` pair.
