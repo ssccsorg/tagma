@@ -1,8 +1,8 @@
 use crate::coord::Coord;
 use crate::coord_path::CoordPath;
 
-/// An interpretation layer over [`CoordPath`] that views `N` syllables
-/// as a D-dimensional grid where each dimension has `R` syllables of
+/// An interpretation layer over [`CoordPath`] that views `N` characters
+/// as a D-dimensional grid where each dimension has `R` characters of
 /// resolution (i.e., 11,172^R addressable values per dimension).
 ///
 /// # Const generic constraint
@@ -14,7 +14,7 @@ use crate::coord_path::CoordPath;
 ///
 /// | Approach | Precision | Spatial ability |
 /// |----------|-----------|-----------------|
-/// | `CoordPath` (1D) | Highest (per-syllable axes) | None |
+/// | `CoordPath` (1D) | Highest (per-character axes) | None |
 /// | `CoordCube` (D-dim) | Lower (grouped axes) | Rich (distance, region, proximity) |
 ///
 /// The total addressable space is exactly `11,172^N` in both views.
@@ -29,23 +29,23 @@ use crate::coord_path::CoordPath;
 ///
 /// # Type Parameters
 ///
-/// * `N` — Total number of syllables.
+/// * `N` — Total number of characters.
 /// * `D` — Number of spatial dimensions.
-/// * `R` — Number of syllables per dimension (resolution exponent).
+/// * `R` — Number of characters per dimension (resolution exponent).
 ///
 /// # Example
 ///
 /// ```
 /// use tagma_core::{Coord, CoordPath, CoordCube};
 ///
-/// // N = 6, D = 3, R = 2: 3 dimensions, 2 syllables each
+/// // N = 6, D = 3, R = 2: 3 dimensions, 2 characters each
 /// let path = CoordPath::<6>::new([
-///     Coord::new(0).unwrap(),   // dim 0, syllable 0
-///     Coord::new(1).unwrap(),   // dim 0, syllable 1
-///     Coord::new(2).unwrap(),   // dim 1, syllable 0
-///     Coord::new(3).unwrap(),   // dim 1, syllable 1
-///     Coord::new(4).unwrap(),   // dim 2, syllable 0
-///     Coord::new(5).unwrap(),   // dim 2, syllable 1
+///     Coord::new(0).unwrap(),   // dim 0, character 0
+///     Coord::new(1).unwrap(),   // dim 0, character 1
+///     Coord::new(2).unwrap(),   // dim 1, character 0
+///     Coord::new(3).unwrap(),   // dim 1, character 1
+///     Coord::new(4).unwrap(),   // dim 2, character 0
+///     Coord::new(5).unwrap(),   // dim 2, character 1
 /// ]);
 ///
 /// let cube = CoordCube::<6, 3, 2>::from_path(path);
@@ -116,19 +116,19 @@ impl<const N: usize, const D: usize, const R: usize> CoordCube<N, D, R> {
         D
     }
 
-    /// Returns the number of syllables per dimension.
+    /// Returns the number of characters per dimension.
     #[inline]
     pub const fn resolution(&self) -> usize {
         R
     }
 
-    /// Returns the total number of syllables.
+    /// Returns the total number of characters.
     #[inline]
-    pub const fn total_syllables(&self) -> usize {
+    pub const fn total_characters(&self) -> usize {
         N
     }
 
-    /// Returns the `R`-syllable path for dimension `dim`.
+    /// Returns the `R`-character path for dimension `dim`.
     ///
     /// # Panics
     ///
@@ -153,12 +153,12 @@ impl<const N: usize, const D: usize, const R: usize> CoordCube<N, D, R> {
         CoordPath::new(coords)
     }
 
-    /// Returns the `Coord` at a specific syllable within a dimension.
+    /// Returns the `Coord` at a specific character within a dimension.
     ///
     /// # Panics
     ///
-    /// Panics if `dim >= D` or `syllable >= R`.
-    pub fn coord_at(&self, dim: usize, syllable: usize) -> Coord {
+    /// Panics if `dim >= D` or `character >= R`.
+    pub fn coord_at(&self, dim: usize, character: usize) -> Coord {
         assert!(
             dim < D,
             "CoordCube::coord_at: dim {} out of range [0, {})",
@@ -166,12 +166,12 @@ impl<const N: usize, const D: usize, const R: usize> CoordCube<N, D, R> {
             D
         );
         assert!(
-            syllable < R,
-            "CoordCube::coord_at: syllable {} out of range [0, {})",
-            syllable,
+            character < R,
+            "CoordCube::coord_at: character {} out of range [0, {})",
+            character,
             R
         );
-        self.path.coords()[dim * R + syllable]
+        self.path.coords()[dim * R + character]
     }
 
     /// Returns a reference to the full coordinate array.

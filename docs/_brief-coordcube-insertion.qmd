@@ -11,9 +11,9 @@ title: "CoordCube insertions for brief.qmd"
 ```markdown
 ### The second channel: CoordCube spatial queries
 
-CoordPath treats N syllables as a linear key. The same bytes can be
+CoordPath treats N characters as a linear key. The same bytes can be
 reinterpreted as a D-dimensional grid (CoordCube) where each dimension
-has R syllables of resolution (N = D × R). Conversion between the two
+has R characters of resolution (N = D × R). Conversion between the two
 views costs 960 ps — a single assertion check — and changes no state.
 
 This dual view enables two complementary access channels:

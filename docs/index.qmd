@@ -15,7 +15,7 @@ metadata-files:
     - ./_include/format.html.yml
 colorlinks: true
 abstract: |
-  Tagma is the realization that the Unicode Hangul syllable block encodes a 16-bit structural coordinate space with a closed-form composition formula, three independent axes, and a built-in invalidity margin of 54,364 of 65,536 states. This space enables hash-less, collision-free content addressing with a combinational decoder of approximately 300 gates and one cycle. We define the coordinate space, the decoder specification, a RISC-V XIF coprocessor reference implementation, and core data structures (Coord, CoordSpace, CoordSet, CoordSpace multi-syllable maps). Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection.
+  Tagma is the realization that the contiguous range of Unicode closed-form composition block encodes a 16-bit structural coordinate space with a arithmetic address formula, three independent axes, and a built-in invalidity margin of 54,364 of 65,536 states. This space enables hash-less, collision-free content addressing with a combinational decoder of approximately 300 gates and one cycle. We define the coordinate space, the decoder specification, a RISC-V XIF coprocessor reference implementation, and core data structures (Coord, CoordSpace, CoordSet, CoordSpace multi-character maps). Tagma replaces hash-based identity generation where cryptographic integrity is not required; SHA-256 and other cryptographic primitives remain for signatures and tamper detection.
 format:
   html:
     number-sections: true
@@ -70,11 +70,11 @@ format:
 %run ./_include/_graphviz.py
 ```
 
-Tagma is a structural identity primitive: a 16-bit coordinate space embedded in the Unicode Hangul syllable block that replaces hash-based addressing with a combinational decoder. The space is an open international standard (Unicode) and a public good. Tagma was not invented; it was discovered --- an emergent structure at the intersection of a featural writing system (Hangul, 1443), a universal encoding standard (Unicode, 1991), and the needs of content-addressable computing.
+Tagma is a structural identity primitive: a 16-bit coordinate space embedded in the Unicode composition block that replaces hash-based addressing with a combinational decoder. As the space is an open international standard (Unicode) and a public good, Tagma was discovered as an emergent structure at the intersection of a featural writing system (Hangul, 1443), a universal encoding standard (Unicode, 1991), and the needs of content-addressable computing. This structural primitive becomes a template: any future international standard block satisfying the same mathematical conditions — closed-form composition, three independent axes, and contiguous 16-bit addressability — is natively absorbed into the same computational framework.
 
 ## Coordinate Space {#sec-coordinate-space}
 
-The Unicode Hangul syllable block is the only script whose encoding follows a closed-form composition formula:
+The Unicode precomposed block is the only script whose encoding follows a closed-form composition formula:
 
 $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 21,\; 0 \leq f < 28$$
 
@@ -87,7 +87,7 @@ Every valid 16-bit value carries three interpretations:
 |---------------|--------|-----|
 | 1-D address | Unicode code point U+AC00--U+D7AF | Character encoding |
 | 3-D coordinate | (initial, medial, final) | Structural positioning |
-| Semantic symbol | Hangul syllable | Debugging aid |
+| Semantic symbol | compositional character | Debugging aid |
 
 ## Decoder Specification
 
@@ -139,7 +139,7 @@ C(i,m,f) = 0xAC00 + 588i + 28m + f  →  access    (Tagma, 1 cycle)
 
 The coordinate space is implemented as a library providing four fundamental types:
 
-- **Coord** -- A 16-bit value guaranteed to be structurally valid. Constructable from raw index, Unicode code point, character, or the three axes (initial, medial, final). Decomposable back to axes. Hamming distance computation. Display as Hangul syllable.
+- **Coord** -- A 16-bit value guaranteed to be structurally valid. Constructable from raw index, Unicode code point, character, or the three axes (initial, medial, final). Decomposable back to axes. Hamming distance computation. Display as compositional character.
 - **CoordSpace** -- A direct-address table indexed by coordinate. Fixed capacity of 11,172 entries. O(1) insert, lookup, and delete with no collisions, no resizing, and no hashing overhead.
 - **CoordSet** -- A bit array over the coordinate space. Insert, remove, and membership test are single-bit operations. Union, intersection, and difference are bitwise operations over 175 machine words.
 - **TagmaTimeIndex** -- Temporal indexing via linearized coordinate: `time × 11172 + coord`. A single multiply-add replaces a full hash computation.
@@ -164,6 +164,6 @@ For the full technical analysis including decoder specification, XIF coprocessor
 
 1. Tagma White Paper (forthcoming) -- Zenodo DOI (TBD)
 2. ISO/IEC 10646:2020 -- Universal Coded Character Set (UCS)
-3. Unicode Standard -- Hangul Syllables (U+AC00--U+D7AF)
+3. Unicode Standard -- compositional characters (U+AC00--U+D7AF)
 4. OpenHW CV-X-IF Specification
 5. SSCCS Whitepaper -- Schema--Segment Composition Computing System (2026)

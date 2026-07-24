@@ -34,7 +34,7 @@ pub trait CoordCubeKV<const N: usize> {
         radius: usize,
     ) -> Vec<(CoordPath<N>, Vec<u8>)>;
 
-    /// Returns all entries within a bounding box defined by per-syllable
+    /// Returns all entries within a bounding box defined by per-character
     /// `(min, max)` ranges.
     fn bounding_box_range(&self, ranges: &[(u16, u16); N]) -> Vec<(CoordPath<N>, Vec<u8>)>;
 }
@@ -152,7 +152,7 @@ impl<const N: usize> CoordPathLookup<N> for CoordKVN<N> {
 impl<const N: usize> crate::coord_gen::CoordKey<N> {
     /// Creates a `CoordKey<N>` from a `CoordPath<N>`.
     ///
-    /// Each syllable's index byte is used as the key byte.
+    /// Each character's index byte is used as the key byte.
     pub fn from_coord_path(path: &CoordPath<N>) -> Self {
         let mut bytes = [0u8; N];
         for (i, coord) in path.coords().iter().enumerate() {
@@ -208,7 +208,7 @@ mod tests {
         kv.insert_by_coordkey(&CoordKey::new([5, 6]), b"v2".to_vec());
         kv.insert_by_coordkey(&CoordKey::new([10, 10]), b"v3".to_vec());
 
-        // Box: syllable 0 in [4,6], syllable 1 in [5,7]
+        // Box: character 0 in [4,6], character 1 in [5,7]
         let ranges = [(4, 6), (5, 7)];
         let results = kv.bounding_box_range(&ranges);
 

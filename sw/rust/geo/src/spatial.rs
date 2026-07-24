@@ -5,7 +5,7 @@ use tagma_core::{Coord, CoordCube, CoordPath};
 // ---------------------------------------------------------------------------
 
 /// An iterator that yields all `CoordPath<N>` within a multi-dimensional
-/// bounding box, where each syllable position has a `(min, max)` range.
+/// bounding box, where each character position has a `(min, max)` range.
 ///
 /// Uses a mixed-radix counter: O(N) per yield.
 pub struct BoundingBoxIter<const N: usize> {
@@ -15,7 +15,7 @@ pub struct BoundingBoxIter<const N: usize> {
 }
 
 impl<const N: usize> BoundingBoxIter<N> {
-    /// Creates a new bounding box iterator over the given per-syllable
+    /// Creates a new bounding box iterator over the given per-character
     /// `(min, max)` ranges.
     ///
     /// # Panics
@@ -163,7 +163,7 @@ impl<const N: usize> Iterator for HammingFilter<N> {
 /// they do **not** perform storage lookups.
 pub trait SpatialOps<const N: usize> {
     /// Generates all `CoordPath<N>` within a bounding box defined by
-    /// per-syllable `(min, max)` ranges.
+    /// per-character `(min, max)` ranges.
     fn bounding_box(&self, ranges: &[(u16, u16); N]) -> BoundingBoxIter<N>;
 
     /// Generates all `CoordPath<N>` within an L∞ (Chebyshev) proximity
@@ -226,7 +226,7 @@ impl<const N: usize, const D: usize, const R: usize> SpatialOps<N> for CoordCube
 /// assert_eq!(a.hamming_distance(&b), 1);
 /// ```
 pub trait DistanceMetrics<const N: usize, const D: usize, const R: usize> {
-    /// Hamming distance: count of syllable positions that differ.
+    /// Hamming distance: count of character positions that differ.
     fn hamming_distance(&self, other: &CoordCube<N, D, R>) -> usize;
 
     /// Axis-wise Hamming distance: writes per-dimension differences into `out`.
@@ -235,7 +235,7 @@ pub trait DistanceMetrics<const N: usize, const D: usize, const R: usize> {
 
     /// Normalised Euclidean distance approximation.
     ///
-    /// Each dimension's R-syllable value is normalised to `[0, 1]`, then
+    /// Each dimension's R-character value is normalised to `[0, 1]`, then
     /// Euclidean distance is computed in D-dimensional normalised space.
     /// Result is in `[0, sqrt(D)]`.
     ///
@@ -246,7 +246,7 @@ pub trait DistanceMetrics<const N: usize, const D: usize, const R: usize> {
     fn euclidean_distance_approx(&self, other: &CoordCube<N, D, R>) -> f64;
 
     /// Manhattan (L1) distance: sum of absolute differences across all
-    /// syllable positions.
+    /// character positions.
     fn manhattan_distance(&self, other: &CoordCube<N, D, R>) -> u64;
 }
 
@@ -264,13 +264,13 @@ impl<const N: usize, const D: usize, const R: usize> DistanceMetrics<N, D, R>
     fn hamming_distance_axes(&self, other: &CoordCube<N, D, R>, out: &mut [usize]) {
         for (dim, slot) in out.iter_mut().enumerate().take(D) {
             let start = dim * R;
-            let mut syllable_diff = 0;
+            let mut character_diff = 0;
             for i in 0..R {
                 if self.coords()[start + i] != other.coords()[start + i] {
-                    syllable_diff += 1;
+                    character_diff += 1;
                 }
             }
-            *slot = syllable_diff;
+            *slot = character_diff;
         }
     }
 
@@ -301,7 +301,7 @@ impl<const N: usize, const D: usize, const R: usize> DistanceMetrics<N, D, R>
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-/// Interprets the R syllables of dimension `dim` of `cube` as a little-endian
+/// Interprets the R characters of dimension `dim` of `cube` as a little-endian
 /// base-11172 integer in `[0, 11172^R)`.
 ///
 /// # Panics
@@ -360,7 +360,7 @@ mod tests {
     // ── BoundingBoxIter ────────────────────────────────────────────
 
     #[test]
-    fn bb_iter_single_syllable() {
+    fn bb_iter_single_character() {
         let iter = BoundingBoxIter::<1>::new([(5, 7)]);
         assert!(!iter.is_empty());
         let paths: Vec<_> = iter.collect();
@@ -370,7 +370,7 @@ mod tests {
     }
 
     #[test]
-    fn bb_iter_two_syllables() {
+    fn bb_iter_two_characters() {
         let iter = BoundingBoxIter::<2>::new([(1, 2), (3, 4)]);
         let paths: Vec<_> = iter.collect();
         assert_eq!(paths.len(), 4);
@@ -436,8 +436,8 @@ mod tests {
     }
 
     #[test]
-    fn cube_bounding_box_multi_syllable() {
-        // D=2, R=2: 2-syllable-per-dim cube
+    fn cube_bounding_box_multi_character() {
+        // D=2, R=2: 2-character-per-dim cube
         let path = CoordPath::<4>::new([
             Coord::new(0).unwrap(),
             Coord::new(0).unwrap(),
@@ -479,7 +479,7 @@ mod tests {
     }
 
     #[test]
-    fn cube_proximity_multi_syllable() {
+    fn cube_proximity_multi_character() {
         // D=2, R=2
         let path = CoordPath::<4>::new([
             Coord::new(5).unwrap(),
@@ -489,7 +489,7 @@ mod tests {
         ]);
         let cube = CoordCube::<4, 2, 2>::from_path(path);
         let paths: Vec<_> = cube.proximity(1).collect();
-        // 4 syllables, each range width 3 → 3^4 = 81
+        // 4 characters, each range width 3 → 3^4 = 81
         assert_eq!(paths.len(), 81);
     }
 
@@ -564,8 +564,8 @@ mod tests {
     }
 
     #[test]
-    fn euclidean_multi_syllable() {
-        // D=1, R=2: single dimension with 2 syllables
+    fn euclidean_multi_character() {
+        // D=1, R=2: single dimension with 2 characters
         // (0, 5586) in little-endian base-11172 = 0 + 5586 * 11172 ≈ half of max
         let a = CoordCube::<2, 1, 2>::from_path(CoordPath::new([
             Coord::new(0).unwrap(),
@@ -602,7 +602,7 @@ mod tests {
     }
 
     #[test]
-    fn manhattan_multi_syllable() {
+    fn manhattan_multi_character() {
         // D=1, R=2
         let a = CoordCube::<2, 1, 2>::from_path(CoordPath::new([
             Coord::new(0).unwrap(),

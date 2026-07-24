@@ -17,7 +17,7 @@ fn cube_from_path() {
     let cube = CoordCube::<6, 3, 2>::from_path(path);
     assert_eq!(cube.ndim(), 3);
     assert_eq!(cube.resolution(), 2);
-    assert_eq!(cube.total_syllables(), 6);
+    assert_eq!(cube.total_characters(), 6);
 }
 
 #[test]
@@ -95,7 +95,7 @@ fn cube_invalid_dimensions_panics() {
 // ---------------------------------------------------------------------------
 
 #[test]
-fn cube_axis_single_syllable() {
+fn cube_axis_single_character() {
     let path = CoordPath::<3>::new([
         Coord::new(111).unwrap(),
         Coord::new(222).unwrap(),
@@ -108,7 +108,7 @@ fn cube_axis_single_syllable() {
 }
 
 #[test]
-fn cube_axis_multi_syllable() {
+fn cube_axis_multi_character() {
     let path = CoordPath::<6>::new([
         Coord::new(0).unwrap(),
         Coord::new(1).unwrap(),
@@ -220,7 +220,7 @@ fn cube_single_dimension() {
 }
 
 #[test]
-fn cube_single_syllable_per_dim() {
+fn cube_single_character_per_dim() {
     let path = CoordPath::<5>::new([
         Coord::new(0).unwrap(),
         Coord::new(1).unwrap(),

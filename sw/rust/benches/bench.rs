@@ -18,7 +18,7 @@
 //  │       true Tagma (dense)    │        software fallback (sparse)      │
 //  └─────────────────────────────────────────────────────────────────────┘
 //
-// Single-syllable get latency (ARMv8.4-A Firestorm, measured):
+// Single-character get latency (ARMv8.4-A Firestorm, measured):
 //   CoordSpace   N=1  inline  0.38 ns   22 KB  (array, no alloc)
 //   CoordSpace2  N=2  heap    0.39 ns  119 MB  (single alloc_zeroed)
 //   CoordSpaceM3 N=3  mmap    0.40 ns  1.27 TB (MAP_NORESERVE, lazy page)
@@ -902,7 +902,7 @@ fn bench_baseline_iterate(c: &mut Criterion) {
 }
 
 // ===========================================================================
-// N-scaling: CoordSpaceN lookup latency at various syllable depths.
+// N-scaling: CoordSpaceN lookup latency at various character depths.
 // Demonstrates O(N) linear cost despite exponentially growing address space.
 // ===========================================================================
 
@@ -994,7 +994,7 @@ fn bench_coordcube_proximity_radius(c: &mut Criterion) {
     use tagma_core::{Coord, CoordCube, CoordPath};
     use tagma_geo::spatial::SpatialOps;
 
-    // D=2, R=1: 2-syllable path interpreted as 2D cube
+    // D=2, R=1: 2-character path interpreted as 2D cube
     let path = CoordPath::<2>::new([Coord::new(5586).unwrap(), Coord::new(5586).unwrap()]);
     let cube = CoordCube::<2, 2, 1>::from_path(path);
 
@@ -1170,7 +1170,7 @@ fn bench_coordcube_distance_metrics(c: &mut Criterion) {
         })
     });
 
-    // Multi-syllable (R=2) variants
+    // Multi-character (R=2) variants
     let a_r2 = CoordCube::<4, 2, 2>::from_path(CoordPath::new([
         Coord::new(1000).unwrap(),
         Coord::new(2000).unwrap(),
@@ -1273,7 +1273,7 @@ fn bench_kv_spatial_proximity(c: &mut Criterion) {
 }
 
 // Spatial/cubebox/n_scaling
-//   Bounding box enumeration throughput vs N (number of syllables)
+//   Bounding box enumeration throughput vs N (number of characters)
 fn bench_coordcube_box_n_scaling(c: &mut Criterion) {
     use tagma_core::{Coord, CoordCube, CoordPath};
     use tagma_geo::spatial::SpatialOps;
@@ -1546,7 +1546,7 @@ fn bench_coordcube_hierarchical(c: &mut Criterion) {
 
     let mut group = c.benchmark_group("Spatial/hierarchical");
 
-    // Fill a 4-syllable store (D=2, R=2 → N=4)
+    // Fill a 4-character store (D=2, R=2 → N=4)
     let mut kv = CoordKVN::<4>::new();
     let center = CoordPath::<4>::new([
         Coord::new(5000).unwrap(),
@@ -1566,10 +1566,10 @@ fn bench_coordcube_hierarchical(c: &mut Criterion) {
         }
     }
 
-    // CoordCube<4, 2, 2>: N=4, D=2 dimensions with R=2 syllables each.
-    // proximity() creates ranges per-syllable (4 ranges for 4 syllables),
+    // CoordCube<4, 2, 2>: N=4, D=2 dimensions with R=2 characters each.
+    // proximity() creates ranges per-character (4 ranges for 4 characters),
     // then BoundingBoxIter enumerates all combinations — this correctly
-    // models a 2D L∞ neighborhood where each dimension has 2 syllables.
+    // models a 2D L∞ neighborhood where each dimension has 2 characters.
     let cube = CoordCube::<4, 2, 2>::from_path(center);
 
     group.bench_function("proximity_r1_2phase", |b| {

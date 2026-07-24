@@ -30,7 +30,7 @@ Add a paragraph connecting the 3-axis Coord decomposition to the D×R CoordCube 
 
 ```markdown
 The same structural decoding that extracts three axes from a single Coord
-extends naturally to N-Coord paths. Grouping R syllables per dimension
+extends naturally to N-Coord paths. Grouping R characters per dimension
 yields a D-dimensional coordinate space where D × R = N. This CoordCube
 view requires no additional decoding — the byte array is unchanged,
 only its interpretation shifts from linear path to spatial coordinate.

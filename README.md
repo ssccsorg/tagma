@@ -1,6 +1,6 @@
 # synTagma
 
-synTagma is a spatial coordinate space computing system built on Tagma, a 16-bit coordinate primitive embedded in the Unicode Hangul syllable block (U+AC00--U+D7AF). Every valid 16-bit value decomposes into three independent axes (initial, medial, final), serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
+synTagma is a spatial coordinate space computing system built on Tagma, a 16-bit coordinate primitive embedded in the Unicode closed-form composition block (U+AC00--U+D7AF). Every valid 16-bit value decomposes into three independent axes, serving simultaneously as a 1-D address and a 3-D coordinate. The reference implementation is a `#![no_std]` Rust library.
 
 Tagma is a primitive where the address is the coordinate — not a flat pointer, but a point in an N-dimensional geometric space. This is made possible by a 16-bit Unicode block allocated to a 3-axis writing system, which provides a collision-free, hash-less, structurally addressable coordinate space.
 
@@ -35,8 +35,8 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 | Coord | 16-bit atomic coordinate (0..11172), 3-axis composition/decomposition, Hamming distance, Hangul display | `core/src/coord.rs` |
 | CoordPath\<N\> | Index path (not a hash key), compile-time N-element Coord array | `core/src/coord_path.rs` |
 | CoordSet | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/coord_set.rs` |
-| CoordSpace\<V\> | Single-syllable direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
-| base11172 | Self-validating serialization: arbitrary bytes to Hangul syllable strings | `base11172/src/lib.rs` |
+| CoordSpace\<V\> | Single-character direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
+| base11172 | Self-validating serialization: arbitrary bytes to composition-block strings | `base11172/src/lib.rs` |
 
 Test coverage: 170 unit/integration tests + 15 doc-tests, all passing. Zero clippy warnings. CI runs `cargo fmt --check`, `cargo clippy`, `cargo build --release`, `cargo test --release`, `cargo build --no-default-features` (no_alloc verification).
 
@@ -45,10 +45,10 @@ Test coverage: 170 unit/integration tests + 15 doc-tests, all passing. Zero clip
 | Type | Description | File |
 |------|-------------|------|
 | CoordSpaceN\<N, V\> | N-level direct-address tree. Lazy heap allocation per node. `N` dereferences per lookup | `core/src/coord_space_n.rs` |
-| CoordSpaceN2\<V\> | 2-syllable ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/coord_space_n.rs` |
-| CoordSpaceN6\<V\> | 6-syllable UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/coord_space_n.rs` |
-| CoordSpaceN12\<V\> | 12-syllable ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/coord_space_n.rs` |
-| CoordSpaceN19\<V\> | 19-syllable ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN2\<V\> | 2-character ($1.25 \times 10^8$ space). Type alias for `CoordSpaceN<2, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN6\<V\> | 6-character UUID-scale ($1.94 \times 10^{24}$). Type alias for `CoordSpaceN<6, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN12\<V\> | 12-character ($2.41 \times 10^{67}$). Type alias for `CoordSpaceN<12, V>` | `core/src/coord_space_n.rs` |
+| CoordSpaceN19\<V\> | 19-character ($\approx 2^{256}$, SHA-256-scale). Type alias for `CoordSpaceN<19, V>` | `core/src/coord_space_n.rs` |
 | CoordSpace2\<V\> | N=2 dense heap, 124M slots, single `alloc_zeroed`, true Tagma identity | `core/src/coord_space_dense.rs` |
 | CoordSpaceM\<N, V\> | N≥3 mmap-backed dense (feature: `mmap`). Virtual address reservation with `MAP_NORESERVE` | `core/src/coord_space_m.rs` |
 | CoordSpaceM3\<V\> | N=3 mmap dense. Type alias for `CoordSpaceM<3, V>` | `core/src/coord_space_m.rs` |
@@ -90,9 +90,9 @@ use tagma_core::{Coord, CoordSpace, CoordSet};
 // Compose a coordinate from three axes
 let c = Coord::from_axes(5, 10, 15).unwrap();
 assert_eq!(c.to_axes(), (5, 10, 15));
-assert_eq!(c.to_char(), '걐');  // Hangul syllable display
+assert_eq!(c.to_char(), '걐');  // compositional character display
 
-// Single-syllable direct-address space (no allocator)
+// Single-character direct-address space (no allocator)
 let mut space = CoordSpace::new();
 space.place(c, "tagma");
 assert_eq!(space.at(&c), Some(&"tagma"));
@@ -156,9 +156,9 @@ Of 65,536 representable 16-bit states, only 11,172 satisfy this formula. The rem
 
 - A 1-D address (Unicode code point) for flat array indexing.
 - A 3-D coordinate (initial, medial, final) for structural queries.
-- A Hangul syllable for human-readable display.
+- A compositional character for human-readable display.
 
-N-syllable sequences (CoordPath) extend the address space to $11172^N$ identifiers via direct-index tree traversal. A 6-syllable identifier covers UUID-scale space; 19 syllables match SHA-256's $2^{256}$ identifier space.
+N-character sequences (CoordPath) extend the address space to $11172^N$ identifiers via direct-index tree traversal. A 6-character identifier covers UUID-scale space; 19 characters match SHA-256's $2^{256}$ identifier space.
 
 The three-axis composition formula admits unbounded recursive embedding: each axis of a synTagma coordinate can itself be a full CoordPath, enabling physical topology mapping across distributed nodes without modifying the core arithmetic.
 
@@ -170,7 +170,7 @@ The three-axis composition formula admits unbounded recursive embedding: each ax
 | Speedup | baseline | 597x | 41x | 4.1x |
 | Address space | 2^256 | 1.1e4 | 1.9e24 | 2^256 |
 
-CoordSpace2 (N=2 dense heap, 119 MB, `alloc_zeroed`) covers the full 124M 2-syllable space in a single pre-zeroed allocation — single load at 0.39 ns, no lazy branching.
+CoordSpace2 (N=2 dense heap, 119 MB, `alloc_zeroed`) covers the full 124M 2-character space in a single pre-zeroed allocation — single load at 0.39 ns, no lazy branching.
 
 ## Benchmark: Spatial query vs HashMap (ARMv8.4-A Firestorm)
 
