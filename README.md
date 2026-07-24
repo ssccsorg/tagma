@@ -32,7 +32,7 @@ Tagma provides a single feature gate: `alloc` (default: on). Without it (`--no-d
 
 | Type | Description | File |
 |------|-------------|------|
-| Coord | 16-bit atomic coordinate (0..11172), 3-axis composition/decomposition, Hamming distance, Hangul display | `core/src/coord.rs` |
+| Coord | 16-bit atomic coordinate (0..11172), 3-axis composition/decomposition, Hamming distance, U+AC00–U+D7AF block display | `core/src/coord.rs` |
 | CoordPath\<N\> | Index path (not a hash key), compile-time N-element Coord array | `core/src/coord_path.rs` |
 | CoordSet | Bit array over 11,172 slots (1.4 KB). Union, intersection, difference, subset tests, `Copy` | `core/src/coord_set.rs` |
 | CoordSpace\<V\> | Single-character direct-address table. Inline `[Option<V>; 11172]` — zero heap. O(1), no hashing, no collisions | `core/src/coord_space.rs` |
@@ -148,7 +148,7 @@ kv.remove("hi");
 
 ## How Tagma works
 
-A Tagma coordinate is computed from three structural axes via the Hangul composition formula defined in ISO/IEC 10646:
+A Tagma coordinate is computed from three structural axes via the Unicode U+AC00–U+D7AF composition formula defined in ISO/IEC 10646:
 
 $$C(i,m,f) = \text{U+AC00} + 588i + 28m + f, \quad 0 \leq i < 19,\; 0 \leq m < 21,\; 0 \leq f < 28$$
 

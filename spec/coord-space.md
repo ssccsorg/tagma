@@ -78,8 +78,7 @@ Bit:  15  14  13  12  11  10   9   8   7   6   5   4   3   2   1   0
 ### 2.2 The Coord Type
 
 `Coord` is the atomic coordinate value: a 16-bit unsigned integer in the range
-0..11172, guaranteed to be structurally valid. It represents exactly one Hangul
-character (one triplet of initial, medial, final axes).
+0..11172, guaranteed to be structurally valid. It represents exactly one compositional unicode character (one triplet of initial, medial, final axes).
 
 ## 3. N-Character Composition
 
@@ -186,8 +185,7 @@ value is a consumer policy, not a Coord concern:
 A Tagma coordinate may be serialized to a printable, self-validating string
 using the Base11172 encoding:
 
-- Each coordinate index $0 \leq \text{idx} < 11,172$ maps to exactly one Hangul
-  character: $\text{char} = \text{U+AC00} + \text{idx}$.
+- Each coordinate index $0 \leq \text{idx} < 11,172$ maps to exactly one compositional unicode character: $\text{char} = \text{U+AC00} + \text{idx}$.
 - A pair of characters encodes a 16-bit value (2 bytes):
   $\text{value} = \text{hi} \times 11172 + \text{lo}$.
 - A CoordPath of N Coords serializes to N consecutive compositional characters.

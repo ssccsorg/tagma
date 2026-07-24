@@ -34,7 +34,7 @@ pub fn encode_u16(v: u16) -> [char; 2] {
     [c0.to_char(), c1.to_char()]
 }
 
-/// Encodes a byte slice into a Hangul string, 2 bytes per character pair.
+/// Encodes a byte slice into a compositional unicode string, 2 bytes per character pair.
 pub fn encode_bytes(bytes: &[u8]) -> String {
     let n_pairs = bytes.len().div_ceil(2);
     let mut out = String::with_capacity(n_pairs * 2 * 3); // UTF-8: ≤3 bytes/char
@@ -65,7 +65,7 @@ pub fn decode_pair(c0: char, c1: char) -> Option<u16> {
     Some((coord0.index() as u32 * N_CHARS + coord1.index() as u32) as u16)
 }
 
-/// Decodes a Hangul string back to bytes, 2 characters per `u16` pair.
+/// Decodes a string back to bytes, 2 characters per `u16` pair.
 ///
 /// Returns `None` if the string contains an odd number of characters or any
 /// invalid character.
@@ -99,7 +99,7 @@ mod tests {
 
     #[test]
     fn roundtrip_bytes() {
-        let data = b"Hello, Hangul Base11172!";
+        let data = b"Hello, Base11172!";
         let encoded = encode_bytes(data);
         let decoded = decode_bytes(&encoded).unwrap();
         assert_eq!(&decoded[..data.len()], data);

@@ -111,7 +111,7 @@ Three custom instructions are defined for the RISC-V XIF coprocessor interface: 
 | **Field** | Hardware comparators defining admissible states |
 | **Observation** | Decoder evaluation: validity flag + three axis fields |
 
-## Why Hangul Is Irreplaceable
+## Why the Unicode blocks are irreplaceable
 
 No other Unicode script provides the conjunction of properties that Tagma requires:
 
@@ -156,7 +156,7 @@ Beyond these paths, the coordinate space opens directions including:
 
 - **Tagma as SSCCS foundation:** Segment → Coord, Scheme → 19×21×28 lattice, Field → axis comparators, Observation → decoder evaluation. The coordinate space provides a hardware substrate for SSCCS primitives.
 - **Tagma as neXus FIH accelerator:** Fact indexing via coordinate, Intent as movement vector, Hint as adjacency weight. The coordinate space replaces hash-based state indexing in the FIH model.
-- **Tagma as universal serializer:** Base11172 encoding maps arbitrary bytes to self-validating Hangul strings, serving as Tagma's native serialization format for storage and communication.
+- **Tagma as universal serializer:** Base11172 encoding maps arbitrary bytes to self-validating compositional character strings, serving as Tagma's native serialization format for storage and communication.
 
 ## References
 
